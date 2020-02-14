@@ -1,0 +1,18 @@
+<script src="https://cdn.jsdelivr.net/npm/exif-js"></script>
+
+<script>
+window.onload = getExif;
+
+function getExif() {
+    var img2 = document.getElementById("img1");
+    //EXIF.enableXmp();
+    EXIF.getData(img2, function() {
+        var allMetaData = EXIF.getAllTags(this);
+        var allMetaDataSpan = document.getElementById("allMetaDataSpan");
+        allMetaDataSpan.innerHTML = JSON.stringify(allMetaData, null, "\t");
+    });
+}
+</script>
+
+<pre id="allMetaDataSpan"></pre>
+<img src="20190707-131116785.vr.jpg" id="img1" />
