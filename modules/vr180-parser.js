@@ -9,27 +9,22 @@ function extractTag(tag, imgStr) {
 async function parse(url) {
     // https://developers.google.com/vr/reference/cardboard-camera-vr-photo-format
 
-    let blob = await fetch(url).then(r => r.blob());
-
-    // fetch(url).then(res => {
-    //     return res.arrayBuffer();
-    // }).then(buf => {
-    //     return new DataView(buf);
-    // }).then(data => {
-
-
-    // https://developer.mozilla.org/en-US/docs/Web/API/Blob/text
-    let fileAsText = await blob.text(); 
+    const fileData = new DataView( await fetch(url).then(r => r.arrayBuffer()) );
+    for(let offset = 0; offset < fileData.byteLength - 1; offset++) {
+        if(fileData.getUint8(offset) === 0xff && fileData.getUint8(offset + 1) === 0xe1) {
+            console.log(`Marker detected at offset ${offset}`);
+        }
+    }
 
     // finds it
     //let imgEye2 = extractTag('xmlns:GImage', fileAsText)
     
     // does not find it, likely because text is truncated
-    let imgEye2 = extractTag('GImage:Data', fileAsText)
+    //let imgEye2 = extractTag('GImage:Data', fileAsText)
 
-    // use instead https://developer.mozilla.org/en-US/docs/Web/API/Blob/stream ? 
-
-    console.log(imgEye2)
+    //console.log(imgEye2)
+    
+    // const objectURL = URL.createObjectURL(blob);
     let leftEye = '';
     let rightEye = '';
     return {leftEye, rightEye};
