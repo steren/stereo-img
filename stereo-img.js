@@ -1,4 +1,4 @@
-import { parse } from './modules/vr180-parser.js';
+import { parse } from './modules/vr180-parser/vr180-parser.js';
 
 window.onload = init;
 
