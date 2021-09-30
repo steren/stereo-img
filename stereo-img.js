@@ -2,20 +2,23 @@ import { parse } from './modules/vr180-parser/vr180-parser.js';
 
 let tmpl = document.createElement('template');
 tmpl.innerHTML = `
-  <img src="demo.vr.jpg"></img>
+  <button>VR</button>
 `;
 
-class StereoImg extends HTMLElement {
+class StereoImg extends HTMLImageElement {
 
-    get src() {
-      return this.getAttribute('src');
+    /**
+     * type attribute: "left-right" (default), "top-bottom", "vr180"
+     */
+    get type() {
+      return this.getAttribute('type');
     }
-    set src(val) {
+    set type(val) {
       // Reflect the value of the open property as an HTML attribute.
       if (val) {
-        this.setAttribute('src', val);
+        this.setAttribute('type', val);
       } else {
-        this.removeAttribute('open');
+        this.removeAttribute('type');
       }
     }
   
@@ -26,12 +29,13 @@ class StereoImg extends HTMLElement {
         console.log('I was clicked')
       });
 
-      let shadowRoot = this.attachShadow({mode: 'open'});
-      shadowRoot.appendChild(tmpl.content.cloneNode(true));
+      //// <img> doesn't allow for attaching shadowDOM, so it's unclear how we will add a VR button
+      // let shadowRoot = this.attachShadow({mode: 'open'});
+      // shadowRoot.appendChild(tmpl.content.cloneNode(true));
     }
   }
 
-window.customElements.define('stereo-img', StereoImg);
+window.customElements.define('stereo-img', StereoImg, {extends: 'img'});
 
 // window.onload = init;
 
