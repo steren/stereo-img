@@ -42,12 +42,14 @@ class StereoImg extends HTMLElement {
       const leftEye = this.stereoData.leftEye;
       const rightEye = this.stereoData.rightEye;
       setInterval(() => {
-        if(currentEye === 0) {
-          ctx.putImageData(leftEye, 0, 0);
-        } else {
-          ctx.putImageData(rightEye, 0, 0);
+        if(!this.pause) {
+          if(currentEye === 0) {
+            ctx.putImageData(leftEye, 0, 0);
+          } else {
+            ctx.putImageData(rightEye, 0, 0);
+          }
+          currentEye = (currentEye + 1) % 2;
         }
-        currentEye = (currentEye + 1) % 2;
       }, 100);
 
     }
@@ -65,8 +67,8 @@ class StereoImg extends HTMLElement {
     constructor() {
       super();
 
-      this.addEventListener('click', e => {
-        console.log('I was clicked')
+      this.addEventListener('click', () => {
+        this.pause = !this.pause;
       });
 
       let vrButton = document.createElement('button');
