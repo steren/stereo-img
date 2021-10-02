@@ -2,7 +2,7 @@
 import { parseVR180 } from './modules/vr180-parser/vr180-parser.js';
 import { parseStereo } from './modules/stereo-parser/stereo-parser.js';
 
-class StereoImg extends HTMLImageElement {
+class StereoImg extends HTMLElement {
 
     /**
      * type attribute: "left-right" (default), "top-bottom", "vr180"
@@ -19,12 +19,24 @@ class StereoImg extends HTMLImageElement {
       }
     }
 
+    get src() {
+      return this.getAttribute('src');
+    }
+    set src(val) {
+      // Reflect the value of the open property as an HTML attribute.
+      if (val) {
+        this.setAttribute('src', val);
+      } else {
+        this.removeAttribute('src');
+      }
+    }
+
     renderOnCanvas() {
       this.canvas = document.createElement('canvas');
       this.canvas.height = this.stereoData.leftEye.height;
       this.canvas.width = this.stereoData.leftEye.width;
-      const ctx = this.canvas.getContext('2d');
-      this.parentNode.insertBefore(this.canvas, this.nextSibling);
+      const ctx = this.canvas.getContext('2d');      
+      this.shadowRoot.appendChild(this.canvas);
       
       let currentEye = 0;
       const leftEye = this.stereoData.leftEye;
@@ -59,12 +71,24 @@ class StereoImg extends HTMLImageElement {
 
       let vrButton = document.createElement('button');
       vrButton.innerText = 'VR';
-      this.parentNode.insertBefore(vrButton, this.nextSibling);
+      this.attachShadow({mode: 'open'});
+      this.shadowRoot.innerHTML = `
+        <style>
+          :host {
+            display: block;
+            contain: content;
+          }
+          canvas {
+            width: 100%;
+          }
+        </style>
+      `;
+      this.shadowRoot.appendChild(vrButton);
 
       this.parse();
     }
 
   }
 
-window.customElements.define('stereo-img', StereoImg, {extends: 'img'});
+window.customElements.define('stereo-img', StereoImg);
 
