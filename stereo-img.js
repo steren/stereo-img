@@ -1,10 +1,5 @@
 import { parse } from './modules/vr180-parser/vr180-parser.js';
 
-let tmpl = document.createElement('template');
-tmpl.innerHTML = `
-  <button>VR</button>
-`;
-
 class StereoImg extends HTMLImageElement {
 
     /**
@@ -29,9 +24,10 @@ class StereoImg extends HTMLImageElement {
         console.log('I was clicked')
       });
 
-      //// <img> doesn't allow for attaching shadowDOM, so it's unclear how we will add a VR button
-      // let shadowRoot = this.attachShadow({mode: 'open'});
-      // shadowRoot.appendChild(tmpl.content.cloneNode(true));
+      let vrButton = document.createElement('button');
+      vrButton.innerText = 'VR';
+      this.parentNode.insertBefore(vrButton, this.nextSibling);
+
     }
   }
 
