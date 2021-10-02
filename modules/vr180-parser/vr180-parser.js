@@ -10,7 +10,7 @@ function extractTag(tag, imgStr) {
     }
 }
 
-async function parse(url) {
+async function parseVR180(url) {
     // Read more about JPEG structure at https://en.wikipedia.org/wiki/JPEG#Syntax_and_structure
 
     const fileBuffer = await fetch(url).then(r => r.arrayBuffer());
@@ -56,4 +56,4 @@ async function parse(url) {
     return {leftEye, rightEye};
 }
 
-export {parse}
+export {parseVR180}
