@@ -19,13 +19,25 @@ class StereoImg extends HTMLImageElement {
       }
     }
 
-    renderOnPage() {
-      const canvas = document.createElement('canvas');
-      canvas.height = this.stereoData.leftEye.height;
-      canvas.width = this.stereoData.leftEye.width;
-      const ctx = canvas.getContext('2d');
-      ctx.putImageData(this.stereoData.leftEye, 0, 0);
-      this.parentNode.insertBefore(canvas, this.nextSibling);
+    renderOnCanvas() {
+      this.canvas = document.createElement('canvas');
+      this.canvas.height = this.stereoData.leftEye.height;
+      this.canvas.width = this.stereoData.leftEye.width;
+      const ctx = this.canvas.getContext('2d');
+      this.parentNode.insertBefore(this.canvas, this.nextSibling);
+      
+      let currentEye = 0;
+      const leftEye = this.stereoData.leftEye;
+      const rightEye = this.stereoData.rightEye;
+      setInterval(() => {
+        if(currentEye === 0) {
+          ctx.putImageData(leftEye, 0, 0);
+        } else {
+          ctx.putImageData(rightEye, 0, 0);
+        }
+        currentEye = (currentEye + 1) % 2;
+      }, 100);
+
     }
   
     async parse() {
@@ -35,7 +47,7 @@ class StereoImg extends HTMLImageElement {
         this.stereoData = await parseStereo(this.src);
       }
       console.log(this.stereoData);
-      this.renderOnPage();
+      this.renderOnCanvas();
     }
 
     constructor() {
