@@ -60,7 +60,7 @@ class StereoImg extends HTMLElement {
 
       const loader = new THREE.TextureLoader();
 
-      const texture = loader.load('demo.left-right.jpg');
+      const texture = loader.load('demo2.left-right.jpg');
 
 			// left eye
 
