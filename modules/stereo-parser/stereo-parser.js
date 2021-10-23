@@ -14,12 +14,11 @@ async function parseStereo(url) {
   canvas.width = width;
   canvas.height = height;
   ctx.drawImage(image, 0, 0);
+  
   const leftEye = ctx.getImageData(0, 0, width / 2, height);
   const rightEye = ctx.getImageData(width / 2, 0, width / 2, height);
-  return {
-    leftEye: leftEye,
-    rightEye: rightEye
-  };
+  
+  return {leftEye, rightEye};
 }
 
 async function createImageBitmap(blob) {
