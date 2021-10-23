@@ -23,7 +23,7 @@ async function parseStereo(url) {
 }
 
 async function createImageBitmap(blob) {
-    const url = URL.createObjectURL(blob);
+  const url = URL.createObjectURL(blob);
   const image = new Image();
   image.src = url;
   return new Promise((resolve, reject) => {
