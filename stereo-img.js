@@ -60,7 +60,8 @@ class StereoImg extends HTMLElement {
       const texture1 = new THREE.Texture(this.stereoData.leftEye);
       texture1.needsUpdate = true;
 
-      const geometry1 = new THREE.SphereGeometry( 500, 60, 40 );
+      // TODO: Screen size should depend on image aspect ratio, camera fov...
+      const geometry1 = new THREE.SphereGeometry( 500, 60, 40, Math.PI / 2 , Math.PI, Math.PI / 4, Math.PI / 2);
       // invert the geometry on the x-axis so that all of the faces point inward
       geometry1.scale( - 1, 1, 1 );
 
@@ -77,7 +78,7 @@ class StereoImg extends HTMLElement {
       const texture2 = new THREE.Texture(this.stereoData.rightEye);
       texture2.needsUpdate = true;
 
-      const geometry2 = new THREE.SphereGeometry( 500, 60, 40 );
+      const geometry2 = new THREE.SphereGeometry( 500, 60, 40, Math.PI / 2 , Math.PI, Math.PI / 4, Math.PI / 2);
       geometry2.scale( - 1, 1, 1 );
 
       const material2 = new THREE.MeshBasicMaterial( { map: texture2 } );
