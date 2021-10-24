@@ -3,9 +3,7 @@
 import exifr from 'https://cdn.skypack.dev/pin/exifr@v7.1.3-Bxn3dmuljZ8rRmNteMgs/mode=imports,min/optimized/exifr.js'
 
 async function parseVR180(url) {
-  const response = await fetch(url);
-  const blob = await response.blob();
-  const image = await createImageBitmap(blob);
+  const image = await createImageFromURL(url);
 
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
@@ -22,7 +20,7 @@ async function parseVR180(url) {
     multiSegment: true
   })
 
-  var image2 = await createImageBitmapfromBase64(exif.Data);
+  var image2 = await createImageFromURL("data:image/jpg;base64," + exif.Data);
 
   const canvas2 = document.createElement('canvas');
   const ctx2 = canvas2.getContext('2d');
@@ -35,24 +33,12 @@ async function parseVR180(url) {
   return {leftEye, rightEye};
 }
 
-async function createImageBitmap(blob) {
-  const url = URL.createObjectURL(blob);
+async function createImageFromURL(url) {
   const image = new Image();
   image.src = url;
   return new Promise((resolve, reject) => {
     image.onload = () => {
       URL.revokeObjectURL(url);
-      resolve(image);
-    };
-    image.onerror = reject;
-  });
-}
-
-async function createImageBitmapfromBase64(base64) {
-  const image = new Image();
-  image.src = "data:image/jpg;base64," + base64;
-  return new Promise((resolve, reject) => {
-    image.onload = () => {
       resolve(image);
     };
     image.onerror = reject;
