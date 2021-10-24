@@ -1,6 +1,6 @@
 // see official spec at https://developers.google.com/vr/reference/cardboard-camera-vr-photo-format
 
-import exifr from 'https://cdn.skypack.dev/pin/exifr@v7.1.3-Bxn3dmuljZ8rRmNteMgs/mode=imports,min/optimized/exifr.js'
+import exifr from 'exifr'
 
 async function parseVR180(url) {
   const image = await createImageFromURL(url);

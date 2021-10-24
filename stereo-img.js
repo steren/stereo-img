@@ -4,8 +4,8 @@ import { parseStereo } from './modules/stereo-parser/stereo-parser.js';
 import { parseAnaglyph } from './modules/anaglyph-parser/anaglyph-parser.js';
 
 // TODO: Decide how to load three.js.
-import * as THREE from 'https://cdn.skypack.dev/three@0.133.1';
-import { VRButton } from 'https://cdn.skypack.dev/three@0.133.1/examples/jsm/webxr/VRButton.js';
+import * as THREE from 'three';
+import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
 
 
 class StereoImg extends HTMLElement {
