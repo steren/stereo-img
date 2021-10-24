@@ -101,10 +101,6 @@ class StereoImg extends HTMLElement {
       </style>
     `;
 
-      this.addEventListener('click', () => {
-        this.pause = !this.pause;
-      });
-
       await this.parse();
       this.initialize3DScene();
 
