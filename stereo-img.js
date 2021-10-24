@@ -61,14 +61,13 @@ class StereoImg extends HTMLElement {
       texture1.needsUpdate = true;
 
       // TODO: Screen size should depend on image aspect ratio, camera fov...
-      const geometry1 = new THREE.SphereGeometry( 500, 60, 40, Math.PI / 2 , Math.PI, Math.PI / 4, Math.PI / 2);
+      const geometry1 = new THREE.SphereGeometry( 500, 60, 40, Math.PI, this.stereoData.phiLength, this.stereoData.thetaStart, this.stereoData.thetaLength);
       // invert the geometry on the x-axis so that all of the faces point inward
       geometry1.scale( - 1, 1, 1 );
 
       const material1 = new THREE.MeshBasicMaterial( { map: texture1 } );
 
       const mesh1 = new THREE.Mesh( geometry1, material1 );
-      mesh1.rotation.y = - Math.PI / 2;
       mesh1.layers.set( 1 ); // display in left eye only
       this.scene.add( mesh1 );
 
@@ -78,13 +77,12 @@ class StereoImg extends HTMLElement {
       const texture2 = new THREE.Texture(this.stereoData.rightEye);
       texture2.needsUpdate = true;
 
-      const geometry2 = new THREE.SphereGeometry( 500, 60, 40, Math.PI / 2 , Math.PI, Math.PI / 4, Math.PI / 2);
+      const geometry2 = new THREE.SphereGeometry( 500, 60, 40, Math.PI, this.stereoData.phiLength, this.stereoData.thetaStart, this.stereoData.thetaLength);
       geometry2.scale( - 1, 1, 1 );
 
       const material2 = new THREE.MeshBasicMaterial( { map: texture2 } );
 
       const mesh2 = new THREE.Mesh( geometry2, material2 );
-      mesh2.rotation.y = - Math.PI / 2;
       mesh2.layers.set( 2 ); // display in right eye only
       this.scene.add( mesh2 );
     }

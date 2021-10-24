@@ -30,7 +30,13 @@ async function parseVR180(url) {
 
   const rightEye = ctx2.getImageData(0, 0, width, height);
 
-  return {leftEye, rightEye};
+
+  // VR180 are a half sphere
+  const phiLength = Math.PI;
+  const thetaStart = 0;
+  const thetaLength = Math.PI;
+
+  return {leftEye, rightEye, phiLength, thetaStart, thetaLength};
 }
 
 async function createImageFromURL(url) {

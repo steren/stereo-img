@@ -18,7 +18,12 @@ async function parseStereo(url) {
   const leftEye = ctx.getImageData(0, 0, width / 2, height);
   const rightEye = ctx.getImageData(width / 2, 0, width / 2, height);
   
-  return {leftEye, rightEye};
+  // Assume a 180deg horizontal and 90 deg vertical field of view, 
+  const phiLength = Math.PI;
+  const thetaStart = Math.PI / 4;
+  const thetaLength =  Math.PI / 2;
+
+  return {leftEye, rightEye, phiLength, thetaStart, thetaLength};
 }
 
 async function createImageBitmap(blob) {
