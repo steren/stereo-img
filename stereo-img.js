@@ -1,6 +1,7 @@
 // TODO: only load the module that corresponds to "type"
 import { parseVR180 } from './modules/vr180-parser/vr180-parser.js';
 import { parseStereo } from './modules/stereo-parser/stereo-parser.js';
+import { parseAnaglyph } from './modules/anaglyph-parser/anaglyph-parser.js';
 
 // TODO: Decide how to load three.js.
 import * as THREE from 'https://cdn.skypack.dev/three@0.133.1';
@@ -47,8 +48,13 @@ class StereoImg extends HTMLElement {
         this.stereoData = await parseVR180(this.src);
       } else if(this.type === 'left-right') {
         this.stereoData = await parseStereo(this.src);
+      } else if(this.type === 'anaglyph') {
+        this.stereoData = await parseAnaglyph(this.src);
+      } else {
+        // TODO: try to detect?
+        this.stereoData = await parseVR180(this.src);
+        console.warning('<stereo-img> does not have a "type" attriute, assuming "type"="vr180"');
       }
-      console.log(this.stereoData);
     }
 
     initialize3DScene() {
