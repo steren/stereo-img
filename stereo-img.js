@@ -96,15 +96,14 @@ class StereoImg extends HTMLElement {
     }
 
     async init() {
+      // TODO: should we read width and height attributes and resize element accordingly?
+
       this.attachShadow({mode: 'open'});
       this.shadowRoot.innerHTML = `
       <style>
         :host {
           display: block;
           contain: content;
-        }
-        canvas {
-          width: 100%;
         }
       </style>
     `;
@@ -115,10 +114,11 @@ class StereoImg extends HTMLElement {
       this.renderer = new THREE.WebGLRenderer();
       this.renderer.setPixelRatio(window.devicePixelRatio);
       this.renderer.xr.enabled = true;
+      this.renderer.setSize(this.offsetWidth, this.offsetHeight);
       this.shadowRoot.appendChild(this.renderer.domElement);
 
       // TODO: Should we use component size instead?
-      this.camera = new THREE.PerspectiveCamera( 70, window.innerWidth / window.innerHeight, 1, 2000 );
+      this.camera = new THREE.PerspectiveCamera( 70, this.offsetWidth / this.offsetHeight, 1, 2000 );
       this.camera.layers.enable( 1 );
 
       this.shadowRoot.appendChild(VRButton.createButton(this.renderer));
