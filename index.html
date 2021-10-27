@@ -34,4 +34,20 @@
     stereoImg.src = src;
     stereoImg.type = type;
   });
+
+  // listen for arrow keypress and go to previous / next option in examples
+  document.addEventListener('keydown', (e) => {
+    const index = examples.selectedIndex;
+    if (e.keyCode == 37 || e.keyCode === 38) {
+      if (index > 0) {
+        examples.selectedIndex = index - 1;
+        examples.dispatchEvent(new Event('change'));
+      }
+    } else if (e.keyCode == 39 || e.keyCode === 40) {
+      if (index < examples.options.length - 1) {
+        examples.selectedIndex = index + 1;
+        examples.dispatchEvent(new Event('change'));
+      }
+    }
+  });
 </script>
