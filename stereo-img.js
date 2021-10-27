@@ -35,6 +35,13 @@ class StereoImg extends HTMLElement {
       } else {
         this.removeAttribute('src');
       }
+
+      // use setTimeout to ensure all DOM updates have finished, it's indeed common to update both src= and type= at the same time.
+      // There is probably a cleaner way to do this.
+      let that = this;
+      window.setTimeout(() => {
+        that.parseImageAndInitialize3DScene();
+      }, 0);
     }
 
     animate() {
@@ -95,6 +102,11 @@ class StereoImg extends HTMLElement {
       this.scene.add( mesh2 );
     }
 
+    async parseImageAndInitialize3DScene() {
+      await this.parse();
+      this.initialize3DScene();
+    }
+
     async init() {
       // TODO: should we read width and height attributes and resize element accordingly?
 
@@ -108,8 +120,7 @@ class StereoImg extends HTMLElement {
       </style>
     `;
 
-      await this.parse();
-      this.initialize3DScene();
+      await this.parseImageAndInitialize3DScene();
 
       this.renderer = new THREE.WebGLRenderer();
       this.renderer.setPixelRatio(window.devicePixelRatio);
