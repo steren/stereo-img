@@ -17,13 +17,19 @@
 
 <script type="module" src="stereo-img.js"></script>
 
-<h2>VR180</h2>
+<select id="examples">
+  <option value='{"src": "examples/vr180-lenovo-mirage.vr.jpg", "type": "vr180"}'> VR180</option>
+  <option value='{"src": "examples/GOPR0.left-right.jpg", "type": "left-right"}'>           Left-right stereo Go Pro</option>
+  <option value='{"src": "examples/stereograph.left-right.jpg", "type": "left-right"}'>     Left-right stereograph 1901</option>
+  <option value='{"src": "examples/wikipedia.anaglyph.jpg", "type": "anaglyph"}'>           Anaglyph</option>
+</select>
+
 <stereo-img src="examples/vr180-lenovo-mirage.vr.jpg" type="vr180"></stereo-img>
 
-<h2>Left-right stereo</h2>
-<stereo-img src="examples/GOPR0.left-right.jpg" type="left-right"></stereo-img>
-
-<stereo-img src="examples/stereograph.left-right.jpg" type="left-right"></stereo-img>
-
-<h2>Anaglyph</h2>
-<stereo-img src="examples/wikipedia.anaglyph.jpg" type="anaglyph"></stereo-img>
+<script>
+  document.getElementById('examples').addEventListener('change', () => {
+    const example = JSON.parse(document.getElementById('examples').value);
+    document.querySelector('stereo-img').src = example.src;
+    document.querySelector('stereo-img').type = example.type;
+  });
+</script>
