@@ -33,10 +33,11 @@ async function parseAnaglyph(url) {
   const leftEye = new ImageData(new Uint8ClampedArray(leftEyePixels), width, height);
   const rightEye = new ImageData(new Uint8ClampedArray(rightEyePixels), width, height);
 
-  // Assume a 120deg horizontal and 90 deg vertical field of view, 
-  const phiLength = 2 * Math.PI / 3;
-  const thetaStart = Math.PI / 4;
-  const thetaLength =  Math.PI / 2;
+  // TODO: use same method as for left-right stereo (share helper function)
+  const phiLength = 1.02278;
+  const thetaLength =  0.8838;
+
+  const thetaStart = Math.PI / 2 - thetaLength / 2;
 
   return {leftEye, rightEye, phiLength, thetaStart, thetaLength};
 }
