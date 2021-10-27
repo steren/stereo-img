@@ -27,9 +27,11 @@
 <stereo-img src="examples/vr180-lenovo-mirage.vr.jpg" type="vr180"></stereo-img>
 
 <script>
-  document.getElementById('examples').addEventListener('change', () => {
-    const example = JSON.parse(document.getElementById('examples').value);
-    document.querySelector('stereo-img').src = example.src;
-    document.querySelector('stereo-img').type = example.type;
+  const examples = document.getElementById('examples');
+  examples.addEventListener('change', (e) => {
+    const { src, type } = JSON.parse(e.target.value);
+    const stereoImg = document.querySelector('stereo-img');
+    stereoImg.src = src;
+    stereoImg.type = type;
   });
 </script>
