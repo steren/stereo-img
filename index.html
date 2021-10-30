@@ -1,53 +1,107 @@
-<script type="importmap">
-  {
-    "imports": {
-      "exifr": "https://cdn.skypack.dev/pin/exifr@v7.1.3-Bxn3dmuljZ8rRmNteMgs/mode=imports,min/optimized/exifr.js",
-      "three": "https://cdn.skypack.dev/three@0.133.1",
-      "three/": "https://cdn.skypack.dev/three@0.133.1/"
-    }
-  }
-</script>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>stereo-img demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<style>
-  img, stereo-img {
-    width: 600px;
-    height: 400px;
-  }
-</style>
-
-<script type="module" src="stereo-img.js"></script>
-
-<select id="examples">
-  <option value='{"src": "examples/vr180-lenovo-mirage.vr.jpg", "type": "vr180"}'> VR180</option>
-  <option value='{"src": "examples/GOPR0.left-right.jpg", "type": "left-right"}'>           Left-right stereo Go Pro</option>
-  <option value='{"src": "examples/stereograph.left-right.jpg", "type": "left-right"}'>     Left-right stereograph 1901</option>
-  <option value='{"src": "examples/wikipedia.anaglyph.jpg", "type": "anaglyph"}'>           Anaglyph</option>
-</select>
-
-<stereo-img src="examples/vr180-lenovo-mirage.vr.jpg" type="vr180"></stereo-img>
-
-<script>
-  const examples = document.getElementById('examples');
-  examples.addEventListener('change', (e) => {
-    const { src, type } = JSON.parse(e.target.value);
-    const stereoImg = document.querySelector('stereo-img');
-    stereoImg.src = src;
-    stereoImg.type = type;
-  });
-
-  // listen for arrow keypress and go to previous / next option in examples
-  document.addEventListener('keydown', (e) => {
-    const index = examples.selectedIndex;
-    if (e.keyCode == 37 || e.keyCode === 38) {
-      if (index > 0) {
-        examples.selectedIndex = index - 1;
-        examples.dispatchEvent(new Event('change'));
-      }
-    } else if (e.keyCode == 39 || e.keyCode === 40) {
-      if (index < examples.options.length - 1) {
-        examples.selectedIndex = index + 1;
-        examples.dispatchEvent(new Event('change'));
+  <script type="importmap">
+    {
+      "imports": {
+        "exifr": "https://cdn.skypack.dev/pin/exifr@v7.1.3-Bxn3dmuljZ8rRmNteMgs/mode=imports,min/optimized/exifr.js",
+        "three": "https://cdn.skypack.dev/three@0.133.1",
+        "three/": "https://cdn.skypack.dev/three@0.133.1/"
       }
     }
-  });
-</script>
+  </script>
+
+  <style>
+    img, stereo-img {
+      width: 600px;
+      height: 400px;
+    }
+  </style>
+
+  <script type="module" src="stereo-img.js"></script>
+
+</head>
+
+<body id='dropbox'>
+
+  <label for="input">Drag and drop or select your VR180 pictures:</label>
+  <input type="file" id="input" multiple accept="image/*">
+
+  <label for="examples">Or try these demos:</label>
+  <select id="examples">
+    <option value='{"src": "examples/vr180-lenovo-mirage.vr.jpg", "type": "vr180"}'> VR180</option>
+    <option value='{"src": "examples/GOPR0.left-right.jpg", "type": "left-right"}'>           Left-right stereo Go Pro</option>
+    <option value='{"src": "examples/stereograph.left-right.jpg", "type": "left-right"}'>     Left-right stereograph 1901</option>
+    <option value='{"src": "examples/wikipedia.anaglyph.jpg", "type": "anaglyph"}'>           Anaglyph</option>
+  </select>
+
+  <stereo-img src="examples/vr180-lenovo-mirage.vr.jpg" type="vr180"></stereo-img>
+
+  <script>
+    const examples = document.getElementById('examples');
+    examples.addEventListener('change', (e) => {
+      const { src, type } = JSON.parse(e.target.value);
+      const stereoImg = document.querySelector('stereo-img');
+      stereoImg.src = src;
+      stereoImg.type = type;
+    });
+
+    // listen for arrow keypress and go to previous / next option in examples
+    document.addEventListener('keydown', (e) => {
+      const index = examples.selectedIndex;
+      if (e.keyCode == 37 || e.keyCode === 38) {
+        if (index > 0) {
+          examples.selectedIndex = index - 1;
+          examples.dispatchEvent(new Event('change'));
+        }
+      } else if (e.keyCode == 39 || e.keyCode === 40) {
+        if (index < examples.options.length - 1) {
+          examples.selectedIndex = index + 1;
+          examples.dispatchEvent(new Event('change'));
+        }
+      }
+    });
+
+
+    function handleFiles(files) {
+      for (let i = 0; i < files.length; i++) {
+        let file = files[i];
+        
+        if (!file.type.startsWith('image/')){ continue }
+        
+        let reader = new FileReader();
+        reader.onload =  e => { processFile(e.target.result); };
+        reader.readAsDataURL(file);
+      }
+
+      // TODO: Load the last option in the select dropdown
+    }
+
+    function processFile(url) {
+      const newOption = document.createElement("option");
+      newOption.value = JSON.stringify({ src: url, type: 'vr180' });
+      examples.appendChild(newOption);
+    }
+
+    document.getElementById("input").addEventListener("change", (e) => {
+      handleFiles(e.target.files);
+    }, false);
+
+    const dropzone = document.getElementById("dropbox");
+    dropzone.ondragover = dropzone.ondragenter = (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    dropzone.ondrop = (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      handleFiles(e.dataTransfer.files);
+    }
+  </script>
+
+</body>
+
+</html>

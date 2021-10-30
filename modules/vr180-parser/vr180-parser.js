@@ -3,6 +3,11 @@
 import exifr from 'exifr'
 
 async function parseVR180(url) {
+  // VR180 are a half sphere
+  const phiLength = Math.PI;
+  const thetaStart = 0;
+  const thetaLength = Math.PI;
+
   const image = await createImageFromURL(url);
 
   const canvas = document.createElement('canvas');
@@ -17,10 +22,18 @@ async function parseVR180(url) {
 
   const exif = await exifr.parse(url, {
     xmp: true,
-    multiSegment: true
+    multiSegment: true,
+    mergeOutput: false,
+    ihdr: true, //unclear why we need this, but if not enabled, some VR180 XMP Data are not parsed
   })
 
-  var image2 = await createImageFromURL("data:image/jpg;base64," + exif.Data);
+  if (!exif.GImage?.Data) {
+    const err = "No right eye data found in XMP of image";
+    console.error(err);
+    return {leftEye, phiLength, thetaStart, thetaLength, error: err};
+  }
+
+  var image2 = await createImageFromURL("data:image/jpg;base64," + exif.GImage.Data);
 
   const canvas2 = document.createElement('canvas');
   const ctx2 = canvas2.getContext('2d');
@@ -29,12 +42,6 @@ async function parseVR180(url) {
   ctx2.drawImage(image2, 0, 0);
 
   const rightEye = ctx2.getImageData(0, 0, width, height);
-
-
-  // VR180 are a half sphere
-  const phiLength = Math.PI;
-  const thetaStart = 0;
-  const thetaLength = Math.PI;
 
   return {leftEye, rightEye, phiLength, thetaStart, thetaLength};
 }
