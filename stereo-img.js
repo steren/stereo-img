@@ -60,7 +60,7 @@ class StereoImg extends HTMLElement {
       } else {
         // TODO: try to detect?
         this.stereoData = await parseVR180(this.src);
-        console.warning('<stereo-img> does not have a "type" attribute, assuming "type"="vr180"');
+        console.warn('<stereo-img> does not have a "type" attribute, assuming "type"="vr180"');
       }
     }
 
