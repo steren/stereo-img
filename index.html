@@ -38,8 +38,11 @@
     <option value='{"src": "examples/wikipedia.anaglyph.jpg", "type": "anaglyph"}'>           Anaglyph</option>
   </select>
 
+  
+  
   <stereo-img src="examples/vr180-lenovo-mirage.vr.jpg" type="vr180"></stereo-img>
-
+  <button id="prevous" >Previous</button> <button id="next">Next</button>
+  
   <script>
     // On dropdown item selection, update <stereo-img>
     const examples = document.getElementById('examples');
@@ -50,19 +53,31 @@
       stereoImg.type = type;
     });
 
+    function previous() {
+      const index = examples.selectedIndex;
+      if (index > 0) {
+        examples.selectedIndex = index - 1;
+        examples.dispatchEvent(new Event('change'));
+      }
+    }
+
+    function next() {
+      const index = examples.selectedIndex;
+      if (index < examples.options.length - 1) {
+        examples.selectedIndex = index + 1;
+        examples.dispatchEvent(new Event('change'));
+      }
+    }
+
+    document.getElementById('prevous').addEventListener('click', previous);
+    document.getElementById('next').addEventListener('click', next);
+
     // listen for arrow keypress and go to previous / next option in dropdown examples
     document.addEventListener('keydown', (e) => {
-      const index = examples.selectedIndex;
       if (e.keyCode == 37 || e.keyCode === 38) {
-        if (index > 0) {
-          examples.selectedIndex = index - 1;
-          examples.dispatchEvent(new Event('change'));
-        }
+        previous();
       } else if (e.keyCode == 39 || e.keyCode === 40) {
-        if (index < examples.options.length - 1) {
-          examples.selectedIndex = index + 1;
-          examples.dispatchEvent(new Event('change'));
-        }
+        next();
       }
     });
 
