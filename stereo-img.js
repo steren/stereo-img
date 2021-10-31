@@ -68,12 +68,14 @@ class StereoImg extends HTMLElement {
       this.scene = new THREE.Scene();
       this.scene.background = new THREE.Color( 0x101010 );
 
+      const radius = 10; // 500
+
 			// left eye
       const texture1 = new THREE.Texture(this.stereoData.leftEye);
       texture1.needsUpdate = true;
 
       // TODO: Screen size should depend on image aspect ratio, camera fov...
-      const geometry1 = new THREE.SphereGeometry( 500, 60, 40, -1 * this.stereoData.phiLength / 2, this.stereoData.phiLength, this.stereoData.thetaStart, this.stereoData.thetaLength);
+      const geometry1 = new THREE.SphereGeometry( radius, 60, 40, -1 * this.stereoData.phiLength / 2, this.stereoData.phiLength, this.stereoData.thetaStart, this.stereoData.thetaLength);
       // invert the geometry on the x-axis so that all of the faces point inward
       geometry1.scale( - 1, 1, 1 );
 
@@ -93,7 +95,7 @@ class StereoImg extends HTMLElement {
       const texture2 = new THREE.Texture(this.stereoData.rightEye);
       texture2.needsUpdate = true;
 
-      const geometry2 = new THREE.SphereGeometry( 500, 60, 40, -1 * this.stereoData.phiLength / 2, this.stereoData.phiLength, this.stereoData.thetaStart, this.stereoData.thetaLength);
+      const geometry2 = new THREE.SphereGeometry( radius, 60, 40, -1 * this.stereoData.phiLength / 2, this.stereoData.phiLength, this.stereoData.thetaStart, this.stereoData.thetaLength);
       geometry2.scale( - 1, 1, 1 );
 
       const material2 = new THREE.MeshBasicMaterial( { map: texture2 } );
