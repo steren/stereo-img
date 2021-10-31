@@ -74,15 +74,16 @@
         if (!file.type.startsWith('image/')){ continue }
         
         let reader = new FileReader();
-        reader.onload = e => { processFile(e.target.result); };
+        reader.onload = e => { processFile(e.target.result, file.name); };
         reader.readAsDataURL(file);
       }
     }
 
     // Add a URL to the dropdown
-    function processFile(url) {
+    function processFile(url, name) {
       const newOption = document.createElement("option");
       newOption.value = JSON.stringify({ src: url, type: 'vr180' });
+      newOption.text = name;
       examples.appendChild(newOption);
       examples.selectedIndex = examples.options.length - 1;
       examples.dispatchEvent(new Event('change'));
