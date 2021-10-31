@@ -47,7 +47,7 @@
   <main>
     <p>&lt;stereo-img&gt; element:</p>
     <stereo-img src="examples/vr180-lenovo-mirage.vr.jpg" type="vr180"></stereo-img>
-    <button id="prevous" >Previous</button> <button id="next">Next</button>
+    <button id="previous" >Previous</button> <button id="next">Next</button>
     
     <p>Just for comparison, here is the same in a regular &lt;img&gt; element:</p>
     <img src="examples/vr180-lenovo-mirage.vr.jpg">
@@ -82,7 +82,7 @@
       }
     }
 
-    document.getElementById('prevous').addEventListener('click', previous);
+    document.getElementById('previous').addEventListener('click', previous);
     document.getElementById('next').addEventListener('click', next);
 
     // listen for arrow keypress and go to previous / next option in dropdown examples
