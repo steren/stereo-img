@@ -3,7 +3,8 @@ import { parseVR180 } from './modules/vr180-parser/vr180-parser.js';
 import { parseStereo } from './modules/stereo-parser/stereo-parser.js';
 import { parseAnaglyph } from './modules/anaglyph-parser/anaglyph-parser.js';
 
-// TODO: Decide how to load three.js.
+import exifr from 'exifr';
+
 import * as THREE from 'three';
 import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
 
@@ -58,9 +59,23 @@ class StereoImg extends HTMLElement {
       } else if(this.type === 'anaglyph') {
         this.stereoData = await parseAnaglyph(this.src);
       } else {
-        // TODO: try to detect?
-        this.stereoData = await parseVR180(this.src);
-        console.warn('<stereo-img> does not have a "type" attribute, assuming "type"="vr180"');
+        // Read XMP metadata
+        const exif = await exifr.parse(this.src, {
+          xmp: true,
+          multiSegment: true,
+          mergeOutput: false,
+          ihdr: true, //unclear why we need this, but if not enabled, some VR180 XMP Data are not parsed
+        });
+
+        if (exif?.GImage?.Data) {
+          // XMP for left eye found, assume VR180
+          this.stereoData = await parseVR180(this.src);
+        } else {
+          // no left eye found, assume left-right
+          console.warn('<stereo-img> does not have a "type" attribute and image does not have XMP metadata of a VR180 picture.  Use "type" attribute to specify the type of stereoscopic image. Assuming left-right stereo image.');
+          this.stereoData = await parseStereo(this.src);
+        }
+        
       }
     }
 

@@ -1,6 +1,6 @@
 // see official spec at https://developers.google.com/vr/reference/cardboard-camera-vr-photo-format
 
-import exifr from 'exifr'
+import exifr from 'exifr';
 
 async function parseVR180(url) {
   // VR180 are a half sphere
@@ -25,7 +25,7 @@ async function parseVR180(url) {
     multiSegment: true,
     mergeOutput: false,
     ihdr: true, //unclear why we need this, but if not enabled, some VR180 XMP Data are not parsed
-  })
+  });
 
   const result = {leftEye, phiLength, thetaStart, thetaLength};
 

@@ -9,4 +9,3 @@
 - Add a simple type that takes 2 images as input: `type="single" src="" src-right=""`
 - index.html: arrow to switch to previous/next one
 - add loading when parsing image
-- better automatic detection: look at XMP data to determine if VR180.
