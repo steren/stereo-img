@@ -69,7 +69,6 @@ class StereoImg extends HTMLElement {
       this.scene.background = new THREE.Color( 0x101010 );
 
 			// left eye
-
       const texture1 = new THREE.Texture(this.stereoData.leftEye);
       texture1.needsUpdate = true;
 
@@ -81,7 +80,10 @@ class StereoImg extends HTMLElement {
       const material1 = new THREE.MeshBasicMaterial( { map: texture1 } );
 
       const mesh1 = new THREE.Mesh( geometry1, material1 );
+      mesh1.rotation.reorder( 'YXZ' );
       mesh1.rotation.y = Math.PI / 2;
+      mesh1.rotation.x = this.stereoData.roll || 0;
+      mesh1.rotation.z = this.stereoData.pitch || 0;
       mesh1.layers.set( 1 ); // display in left eye only
       this.scene.add( mesh1 );
 
@@ -97,7 +99,10 @@ class StereoImg extends HTMLElement {
       const material2 = new THREE.MeshBasicMaterial( { map: texture2 } );
 
       const mesh2 = new THREE.Mesh( geometry2, material2 );
+      mesh2.rotation.reorder( 'YXZ' );
       mesh2.rotation.y = Math.PI / 2;
+      mesh2.rotation.x = this.stereoData.roll || 0;
+      mesh2.rotation.z = this.stereoData.pitch || 0;
       mesh2.layers.set( 2 ); // display in right eye only
       this.scene.add( mesh2 );
     }

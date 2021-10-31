@@ -27,10 +27,20 @@ async function parseVR180(url) {
     ihdr: true, //unclear why we need this, but if not enabled, some VR180 XMP Data are not parsed
   })
 
+  const result = {leftEye, phiLength, thetaStart, thetaLength};
+
   if (!exif.GImage?.Data) {
     const err = "No right eye data found in XMP of image";
     console.error(err);
-    return {leftEye, phiLength, thetaStart, thetaLength, error: err};
+    result.error = err;
+    return result;
+  }
+
+  if(exif.GPano?.PoseRollDegrees) {
+    result.roll = exif.GPano.PoseRollDegrees / 180 * Math.PI;
+  }
+  if(exif.GPano?.PosePitchDegrees) {
+    result.pitch = exif.GPano.PosePitchDegrees / 180 * Math.PI;
   }
 
   var image2 = await createImageFromURL("data:image/jpg;base64," + exif.GImage.Data);
@@ -41,9 +51,9 @@ async function parseVR180(url) {
   canvas2.height = height;
   ctx2.drawImage(image2, 0, 0);
 
-  const rightEye = ctx2.getImageData(0, 0, width, height);
+  result.rightEye = ctx2.getImageData(0, 0, width, height);
 
-  return {leftEye, rightEye, phiLength, thetaStart, thetaLength};
+  return result;
 }
 
 async function createImageFromURL(url) {
