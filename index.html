@@ -41,6 +41,7 @@
   <stereo-img src="examples/vr180-lenovo-mirage.vr.jpg" type="vr180"></stereo-img>
 
   <script>
+    // On dropdown item selection, update <stereo-img>
     const examples = document.getElementById('examples');
     examples.addEventListener('change', (e) => {
       const { src, type } = JSON.parse(e.target.value);
@@ -49,7 +50,7 @@
       stereoImg.type = type;
     });
 
-    // listen for arrow keypress and go to previous / next option in examples
+    // listen for arrow keypress and go to previous / next option in dropdown examples
     document.addEventListener('keydown', (e) => {
       const index = examples.selectedIndex;
       if (e.keyCode == 37 || e.keyCode === 38) {
@@ -65,7 +66,7 @@
       }
     });
 
-
+    // Add selected files to dropdown
     function handleFiles(files) {
       for (let i = 0; i < files.length; i++) {
         let file = files[i];
@@ -73,23 +74,25 @@
         if (!file.type.startsWith('image/')){ continue }
         
         let reader = new FileReader();
-        reader.onload =  e => { processFile(e.target.result); };
+        reader.onload = e => { processFile(e.target.result); };
         reader.readAsDataURL(file);
       }
-
-      // TODO: Load the last option in the select dropdown
     }
 
+    // Add a URL to the dropdown
     function processFile(url) {
       const newOption = document.createElement("option");
       newOption.value = JSON.stringify({ src: url, type: 'vr180' });
       examples.appendChild(newOption);
+      examples.selectedIndex = examples.options.length - 1;
+      examples.dispatchEvent(new Event('change'));
     }
 
     document.getElementById("input").addEventListener("change", (e) => {
       handleFiles(e.target.files);
     }, false);
 
+    // Drag and drop
     const dropzone = document.getElementById("dropbox");
     dropzone.ondragover = dropzone.ondragenter = (e) => {
       e.stopPropagation();
