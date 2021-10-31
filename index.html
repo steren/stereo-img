@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>stereo-img demo</title>
+  <title>&lt;stereo-img&gt; demo</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <script type="importmap">
@@ -27,22 +27,32 @@
 
 <body id='dropbox'>
 
-  <label for="input">Drag and drop or select your stereo pictures:</label>
-  <input type="file" id="input" multiple accept="image/*">
+  <header>
+    <h1>&lt;stereo-img&gt; demo</h1>
+    <p>
+      <label for="input">Drag and drop or select your stereo pictures:</label>
+      <input type="file" id="input" multiple accept="image/*">
+    </p>
+    <p>
+      <label for="examples">Or try these demos:</label>
+      <select id="examples">
+        <option value='{"src": "examples/vr180-lenovo-mirage.vr.jpg", "type": "vr180"}'>          VR180</option>
+        <option value='{"src": "examples/GOPR0.left-right.jpg", "type": "left-right"}'>           Left-right stereo Go Pro</option>
+        <option value='{"src": "examples/stereograph.left-right.jpg", "type": "left-right"}'>     Left-right stereograph 1901</option>
+        <option value='{"src": "examples/wikipedia.anaglyph.jpg", "type": "anaglyph"}'>           Anaglyph</option>
+      </select>
+    </p>
+  </header>
 
-  <label for="examples">Or try these demos:</label>
-  <select id="examples">
-    <option value='{"src": "examples/vr180-lenovo-mirage.vr.jpg", "type": "vr180"}'>          VR180</option>
-    <option value='{"src": "examples/GOPR0.left-right.jpg", "type": "left-right"}'>           Left-right stereo Go Pro</option>
-    <option value='{"src": "examples/stereograph.left-right.jpg", "type": "left-right"}'>     Left-right stereograph 1901</option>
-    <option value='{"src": "examples/wikipedia.anaglyph.jpg", "type": "anaglyph"}'>           Anaglyph</option>
-  </select>
+  <main>
+    <p>&lt;stereo-img&gt; element:</p>
+    <stereo-img src="examples/vr180-lenovo-mirage.vr.jpg" type="vr180"></stereo-img>
+    <button id="prevous" >Previous</button> <button id="next">Next</button>
+    
+    <p>Just for comparison, here is the same in a regular &lt;img&gt; element:</p>
+    <img src="examples/vr180-lenovo-mirage.vr.jpg">
+  </main>
 
-  
-  
-  <stereo-img src="examples/vr180-lenovo-mirage.vr.jpg" type="vr180"></stereo-img>
-  <button id="prevous" >Previous</button> <button id="next">Next</button>
-  
   <script>
     // On dropdown item selection, update <stereo-img>
     const examples = document.getElementById('examples');
@@ -51,6 +61,9 @@
       const stereoImg = document.querySelector('stereo-img');
       stereoImg.src = src;
       stereoImg.type = type;
+
+      const img = document.querySelector('img');
+      img.src = src;
     });
 
     function previous() {
