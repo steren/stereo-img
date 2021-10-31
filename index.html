@@ -82,7 +82,12 @@
     // Add a URL to the dropdown
     function processFile(url, name) {
       const newOption = document.createElement("option");
-      newOption.value = JSON.stringify({ src: url, type: 'vr180' });
+      // if file name includes .vr.jpg, assume it's a VR180, otherwise, do not specify type (rely on component's default)
+      if (name.includes('.vr.jpg')) {
+        newOption.value = JSON.stringify({ src: url, type: 'vr180' });
+      } else {
+        newOption.value = JSON.stringify({ src: url });
+      }
       newOption.text = name;
       examples.appendChild(newOption);
       examples.selectedIndex = examples.options.length - 1;
