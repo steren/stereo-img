@@ -157,6 +157,15 @@ class StereoImg extends HTMLElement {
       this.shadowRoot.appendChild(VRButton.createButton(this.renderer));
 
       this.animate();
+
+      // Listen for component resize
+      const resizeObserver = new ResizeObserver(() => {
+        this.renderer.setSize(this.offsetWidth, this.offsetHeight);
+        this.camera.aspect = this.offsetWidth / this.offsetHeight;
+        this.camera.updateProjectionMatrix();
+      });
+
+      resizeObserver.observe(this);
     }
 
 
