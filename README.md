@@ -1,9 +1,31 @@
-# stereo-img
+# `<stereo-img>`
 
+`<stereo-img>`is a web component to display stereographic pictures on web pages, with VR support.
+It supports various stereo picture formats: VR180, left-right, and anaglyph.
+
+## How to use
+
+Load the `stereo-img.js` JavaScript module. For example using a `<script>` tag in your your HTML file:
+
+```html
+<script type="module" src="stereo-img.js"></script>
+```
+
+Then use the `<stereo-img>` custom element anywhere:
+
+```html
+<stereo-img src="picture.vr.jpg" type="vr180"></stereo-img>
+```
+
+
+### Options
+
+* `src`: (Required) source of the stereo picture (absolute or relative)
+* `type`: (Optional) type of stereo picture: `vr180`, `left-right`, or `anaglyph`
 
 ## TODO
 
-- Add top/bottom stereo
+- Add support for top/bottom stereo
 - Add support for 360 panorama (with stereo and sound)
 - clicking Enter VR on a second image returns `DOMException: Failed to execute 'requestSession' on 'XRSystem': There is already an active, immersive XRSession.`  
 - improve non-VR experience (e.g. panning? allow switching between left / right eye?)
