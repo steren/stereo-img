@@ -33,3 +33,4 @@ Then use the `<stereo-img>` custom element anywhere:
 - Add a simple type that takes 2 images as input: `type="single" src="" src-right=""`
 - add loading when parsing image
 - make sure the component renders when size is updated
+- Do not start a Three.js scene before the user interacts with the component (to avoid potentially creating too many WebGL contexts), use a canvas2d fallback in the meanwhile.
