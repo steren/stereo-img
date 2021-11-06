@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { parseVR180 } from './modules/vr180-parser/vr180-parser.js';
+import { parseVR } from './modules/vr-parser/vr-parser.js';
 import { parseStereo } from './modules/stereo-parser/stereo-parser.js';
 import { parseAnaglyph } from './modules/anaglyph-parser/anaglyph-parser.js';
 
@@ -66,7 +66,7 @@ class StereoImg extends HTMLElement {
   
     async parse() {
       if(this.type === 'vr180') {
-        this.stereoData = await parseVR180(this.src);
+        this.stereoData = await parseVR(this.src);
       } else if(this.type === 'left-right') {
         this.stereoData = await parseStereo(this.src);
       } else if(this.type === 'anaglyph') {
@@ -82,7 +82,7 @@ class StereoImg extends HTMLElement {
 
         if (exif?.GImage?.Data) {
           // XMP for left eye found, assume VR180
-          this.stereoData = await parseVR180(this.src);
+          this.stereoData = await parseVR(this.src);
         } else {
           // no left eye found, assume left-right
           console.warn('<stereo-img> does not have a "type" attribute and image does not have XMP metadata of a VR180 picture.  Use "type" attribute to specify the type of stereoscopic image. Assuming left-right stereo image.');

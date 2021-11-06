@@ -16,7 +16,7 @@
 
 import exifr from 'exifr';
 
-async function parseVR180(url) {
+async function parseVR(url) {
   // VR180 are a half sphere
   const phiLength = Math.PI;
   const thetaStart = 0;
@@ -82,4 +82,4 @@ async function createImageFromURL(url) {
   });
 }
 
-export {parseVR180}
+export {parseVR}
