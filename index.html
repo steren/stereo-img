@@ -19,15 +19,27 @@ limitations under the License.
   <title>&lt;stereo-img&gt; demo</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
+  <!-- Use the following if you want to load dependencies from the skypack.dev CDN -->
   <script type="importmap">
     {
       "imports": {
         "exifr": "https://cdn.skypack.dev/pin/exifr@v7.1.3-Bxn3dmuljZ8rRmNteMgs/mode=imports,min/optimized/exifr.js",
-        "three": "https://cdn.skypack.dev/three@0.133.1",
-        "three/": "https://cdn.skypack.dev/three@0.133.1/"
+        "three": "https://cdn.skypack.dev/pin/three@v0.134.0-dfARp6tVCbGvQehLfkdx/mode=imports,min/optimized/three.js",
+        "three/": "https://cdn.skypack.dev/pin/three@v0.134.0-dfARp6tVCbGvQehLfkdx/mode=imports,min/unoptimized/"
       }
     }
   </script>
+
+  <!-- Use the following if you want to load dependencies from a public node_modules folder -->
+  <!-- <script type="importmap">
+    {
+      "imports": {
+        "exifr": "/node_modules/exifr/dist/full.esm.js",
+        "three": "/node_modules/three/build/three.module.js",
+        "three/": "/node_modules/three/"
+      }
+    }
+  </script> -->
 
   <style>
     html {
