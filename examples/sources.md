@@ -1,3 +1,8 @@
+Panorama: 
+
+* `pixel3xl.PANO.jpg`: personal picture taken with Google Camera on Pixel 3 XL 
+* `pixel5.PANO.jpg`: personal picture taken with Google Camera on Pixel 5
+
 VR180: 
 
 * `vr180-lenovo-mirage.vr.jpg`: personal picture taken with Lenovo Mirage camera
