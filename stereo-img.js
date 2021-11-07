@@ -24,9 +24,6 @@ import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
 
 class StereoImg extends HTMLElement {
 
-    /**
-     * type attribute: "left-right" (default), "top-bottom", "vr180"
-     */
     get type() {
       return this.getAttribute('type');
     }
@@ -65,7 +62,7 @@ class StereoImg extends HTMLElement {
     }
   
     async parse() {
-      if(this.type === 'vr180') {
+      if(this.type === 'vr') {
         this.stereoData = await parseVR(this.src);
       } else if(this.type === 'left-right') {
         this.stereoData = await parseStereo(this.src);
@@ -81,11 +78,11 @@ class StereoImg extends HTMLElement {
         });
 
         if (exif?.GImage?.Data) {
-          // XMP for left eye found, assume VR180
+          // XMP for left eye found, assume VR Photo
           this.stereoData = await parseVR(this.src);
         } else {
           // no left eye found, assume left-right
-          console.warn('<stereo-img> does not have a "type" attribute and image does not have XMP metadata of a VR180 picture.  Use "type" attribute to specify the type of stereoscopic image. Assuming left-right stereo image.');
+          console.warn('<stereo-img> does not have a "type" attribute and image does not have XMP metadata of a VR picture.  Use "type" attribute to specify the type of stereoscopic image. Assuming left-right stereo image.');
           this.stereoData = await parseStereo(this.src);
         }
         

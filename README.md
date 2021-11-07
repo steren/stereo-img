@@ -1,7 +1,7 @@
 # `<stereo-img>`
 
 `<stereo-img>`is a web component to display stereographic pictures on web pages, with VR support.
-It supports various stereo picture formats: VR180, left-right, and anaglyph.
+It supports various stereo picture formats: VR Photos (VR180, Google Camera panorama, Photosphere), left-right, and anaglyph.
 
 ## How to use
 
@@ -21,12 +21,12 @@ Then use the `<stereo-img>` custom element anywhere:
 ### Options
 
 * `src`: (Required) source of the stereo picture (absolute or relative)
-* `type`: (Optional) type of stereo picture: `vr180`, `left-right`, or `anaglyph`
+* `type`: (Optional) type of stereo picture: `vr`, `left-right`, or `anaglyph`
 
 ## TODO
 
 - Add support for top/bottom stereo
-- Add support for 360 panorama (with stereo and sound)
+- Add support for sound (GAudio)
 - clicking Enter VR on a second image returns `DOMException: Failed to execute 'requestSession' on 'XRSystem': There is already an active, immersive XRSession.`  
 - improve non-VR experience (e.g. panning? allow switching between left / right eye?)
 - fix anaglyph parser to handle the [many types of color schemes](https://en.wikipedia.org/wiki/Anaglyph_3D#Stereo_conversion_(single_2D_image_to_3D)) (red-blue, red-green, red-cyan...)

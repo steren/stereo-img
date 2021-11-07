@@ -12,16 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/**
+ * Parser for VR pictures: Cardboard camera, Pixel Camera panorama, VR180 pictures...
+ */
+
 // see official spec at https://developers.google.com/vr/reference/cardboard-camera-vr-photo-format
 
 import exifr from 'exifr';
 
 async function parseVR(url) {
-  // VR180 are a half sphere
-  const phiLength = Math.PI;
-  const thetaStart = 0;
-  const thetaLength = Math.PI;
-
   const image = await createImageFromURL(url);
 
   const canvas = document.createElement('canvas');
@@ -34,6 +33,8 @@ async function parseVR(url) {
 
   const leftEye = ctx.getImageData(0, 0, width, height);
 
+  const result = {leftEye};
+
   const exif = await exifr.parse(url, {
     xmp: true,
     multiSegment: true,
@@ -41,13 +42,26 @@ async function parseVR(url) {
     ihdr: true, //unclear why we need this, but if not enabled, some VR180 XMP Data are not parsed
   });
 
-  const result = {leftEye, phiLength, thetaStart, thetaLength};
+  // VR180 are a half sphere, but are just a special case.
+  if(exif.GPano?.CroppedAreaImageWidthPixels && exif.GPano?.FullPanoWidthPixels) {
+    result.phiLength = exif.GPano.CroppedAreaImageWidthPixels / exif.GPano.FullPanoWidthPixels * 2 * Math.PI;
+  } else {
+    // assume VR180 (should we assume full sphere instead?)
+    console.warn('No GPano CroppedAreaImageWidthPixels and FullPanoWidthPixels data found, assuming VR180');
+    result.phiLength = Math.PI;
+  }
 
-  if (!exif.GImage?.Data) {
-    const err = "No right eye data found in XMP of image";
-    console.error(err);
-    result.error = err;
-    return result;
+  if(exif.GPano?.CroppedAreaImageHeightPixels && exif.GPano?.FullPanoHeightPixels) {
+    result.thetaLength = exif.GPano.CroppedAreaImageHeightPixels / exif.GPano.FullPanoHeightPixels * Math.PI;
+    
+  } else {
+    result.thetaLength = Math.PI;
+  }
+
+  if(exif.GPano?.CroppedAreaTopPixels) {
+    result.thetaStart = exif.GPano.CroppedAreaTopPixels / exif.GPano.FullPanoHeightPixels * Math.PI;
+  } else {
+    result.thetaStart = 0;
   }
 
   if(exif.GPano?.PoseRollDegrees) {
@@ -55,6 +69,13 @@ async function parseVR(url) {
   }
   if(exif.GPano?.PosePitchDegrees) {
     result.pitch = exif.GPano.PosePitchDegrees / 180 * Math.PI;
+  }
+
+  if (!exif.GImage?.Data) {
+    const err = "No right eye data found in XMP of image";
+    console.error(err);
+    result.error = err;
+    return result;
   }
 
   var image2 = await createImageFromURL("data:image/jpg;base64," + exif.GImage.Data);
