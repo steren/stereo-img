@@ -27,3 +27,9 @@ information on using pull requests.
 
 This project follows
 [Google's Open Source Community Guidelines](https://opensource.google/conduct/).
+
+## Starting a local development server
+
+Install dependencies with `npm install`	
+
+Run the local web server with `npm start`

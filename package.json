@@ -1,0 +1,35 @@
+{
+  "name": "stereo-img",
+  "version": "0.1.0",
+  "description": "a web component to display stereographic pictures on web pages, with VR support",
+  "main": "stereo-img.js",
+  "directories": {
+    "example": "examples"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "serve"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/steren/stereo-img.git"
+  },
+  "keywords": [
+    "vr",
+    "vr180",
+    "stereo",
+    "custom",
+    "element",
+    "web",
+    "component"
+  ],
+  "author": "Steren Giannini <steren.giannini@gmail.com>",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/steren/stereo-img/issues"
+  },
+  "homepage": "https://github.com/steren/stereo-img#readme",
+  "devDependencies": {
+    "serve": "^13.0.2"
+  }
+}
