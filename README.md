@@ -23,6 +23,16 @@ Then use the `<stereo-img>` custom element anywhere:
 * `src`: (Required) source of the stereo picture (absolute or relative)
 * `type`: (Optional) type of stereo picture: `vr`, `left-right`, or `anaglyph`
 
+## Compatibility
+
+This component has been manually tested on the following hardware, OS and browsers:
+
+
+| Hardware    | OS          | Browser | Status |
+| ----------- | -------     | ------- | ------ |
+| HTC Vive    | Windows     | Chrome  | ✔️
+| Cardboard   | Android     | Chrome  | ❌ (Chrome [bug](https://bugs.chromium.org/p/chromium/issues/detail?id=1267732))
+
 ## TODO
 
 - Panoramas don't load on mobile, likely due to max WebGL texture size of 4096, see https://webglreport.com 
