@@ -20,6 +20,7 @@ import exifr from 'exifr';
 
 import * as THREE from 'three';
 import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
+import { OrbitControls  } from 'three/examples/jsm/controls/OrbitControls.js';
 
 
 class StereoImg extends HTMLElement {
@@ -179,6 +180,10 @@ class StereoImg extends HTMLElement {
       // TODO: Should we use component size instead?
       this.camera = new THREE.PerspectiveCamera( 70, this.offsetWidth / this.offsetHeight, 1, 2000 );
       this.camera.layers.enable( 1 );
+
+      const controls = new OrbitControls( this.camera, this.renderer.domElement );
+      this.camera.position.set(0, 0, 0.1);
+      controls.update();
 
       this.shadowRoot.appendChild(VRButton.createButton(this.renderer));
 
