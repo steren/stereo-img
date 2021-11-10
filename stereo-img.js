@@ -61,7 +61,7 @@ class StereoImg extends HTMLElement {
       // There is probably a cleaner way to do this.
       let that = this;
       window.setTimeout(() => {
-        that.parseImageAndInitialize3DScene();
+        that.parseImageAndCreateNew3DScene();
       }, 0);
     }
 
@@ -106,7 +106,7 @@ class StereoImg extends HTMLElement {
       }
     }
 
-    initialize3DScene() {
+    createNew3DScene() {
       this.scene = new THREE.Scene();
       this.scene.background = new THREE.Color( 0x101010 );
 
@@ -151,26 +151,7 @@ class StereoImg extends HTMLElement {
       this.scene.add( mesh2 );
     }
 
-    async parseImageAndInitialize3DScene() {
-      await this.parse();
-      this.initialize3DScene();
-    }
-
-    async init() {
-      // TODO: should we read width and height attributes and resize element accordingly?
-
-      this.attachShadow({mode: 'open'});
-      this.shadowRoot.innerHTML = `
-      <style>
-        :host {
-          display: block;
-          contain: content;
-        }
-      </style>
-    `;
-
-      await this.parseImageAndInitialize3DScene();
-
+    initializeRendererAndCamera() {
       this.renderer = new THREE.WebGLRenderer();
       this.renderer.setPixelRatio(window.devicePixelRatio);
       this.renderer.xr.enabled = true;
@@ -187,8 +168,6 @@ class StereoImg extends HTMLElement {
 
       this.shadowRoot.appendChild(VRButton.createButton(this.renderer));
 
-      this.animate();
-
       // Listen for component resize
       const resizeObserver = new ResizeObserver(() => {
         this.renderer.setSize(this.offsetWidth, this.offsetHeight);
@@ -197,11 +176,44 @@ class StereoImg extends HTMLElement {
       });
 
       resizeObserver.observe(this);
+
+      this.animate();
+    }
+
+    async parseImageAndCreateNew3DScene() {
+      await this.parse();
+      this.createNew3DScene();
+    }
+
+    async init() {
+      // TODO: should we read width and height attributes and resize element accordingly?
+
+      this.attachShadow({mode: 'open'});
+      this.shadowRoot.innerHTML = `
+        <style>
+          :host {
+            display: block;
+            contain: content;
+          }
+        </style>
+      `;
+
+      await this.parse();
+
+      // Only initialize 3D on click
+      this.addEventListener("click", function (e) {
+        if(!this.initializedRenderer) {
+          this.initializedRenderer = true;
+          this.createNew3DScene();
+          this.initializeRendererAndCamera();
+        }
+      });
     }
 
 
     constructor() {
       super();
+      this.initializedRenderer = false;
       this.init();
     }
 
