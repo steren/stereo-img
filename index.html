@@ -89,6 +89,7 @@ limitations under the License.
         <option value='{"src": "examples/pixel3xl.PANO.jpg", "type": "vr"}'>                      Panorama</option>
         <option value='{"src": "examples/GOPR0.left-right.jpg", "type": "left-right"}'>           Left-right stereo Go Pro</option>
         <option value='{"src": "examples/stereograph.left-right.jpg", "type": "left-right"}'>     Left-right stereograph 1901</option>
+        <option value='{"src": "examples/walrus-360.top-bottom.jpg", "type": "top-bottom", "angle": 360}'>Top-Bottom Photosphere</option>
         <option value='{"src": "examples/wikipedia.anaglyph.jpg", "type": "anaglyph"}'>           Anaglyph</option>
       </select>
     </p>
@@ -107,10 +108,11 @@ limitations under the License.
     // On dropdown item selection, update <stereo-img>
     const examples = document.getElementById('examples');
     examples.addEventListener('change', (e) => {
-      const { src, type } = JSON.parse(e.target.value);
+      const { src, type, angle } = JSON.parse(e.target.value);
       const stereoImg = document.querySelector('stereo-img');
       stereoImg.src = src;
       stereoImg.type = type;
+      stereoImg.angle = angle;
 
       const img = document.querySelector('img');
       img.src = src;

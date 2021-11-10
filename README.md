@@ -38,7 +38,6 @@ This component has been manually tested on the following hardware, OS and browse
 ## TODO
 
 - Panoramas don't load on mobile, likely due to max WebGL texture size of 4096, see https://webglreport.com 
-- Add support for top/bottom stereo
 - Add support for sound (GAudio)
 - clicking Enter VR on a second image returns `DOMException: Failed to execute 'requestSession' on 'XRSystem': There is already an active, immersive XRSession.`  
 - improve non-VR experience (e.g. panning? allow switching between left / right eye?)

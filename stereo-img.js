@@ -28,7 +28,6 @@ class StereoImg extends HTMLElement {
       return this.getAttribute('type');
     }
     set type(val) {
-      // Reflect the value of the open property as an HTML attribute.
       if (val) {
         this.setAttribute('type', val);
       } else {
@@ -36,11 +35,21 @@ class StereoImg extends HTMLElement {
       }
     }
 
+    get angle() {
+      return this.getAttribute('angle');
+    }
+    set angle(val) {
+      if (val) {
+        this.setAttribute('angle', val);
+      } else {
+        this.removeAttribute('angle');
+      }
+    }
+
     get src() {
       return this.getAttribute('src');
     }
     set src(val) {
-      // Reflect the value of the open property as an HTML attribute.
       if (val) {
         this.setAttribute('src', val);
       } else {
@@ -64,10 +73,15 @@ class StereoImg extends HTMLElement {
     async parse() {
       if(this.type === 'vr') {
         this.stereoData = await parseVR(this.src);
-      } else if(this.type === 'left-right') {
-        this.stereoData = await parseStereo(this.src);
+      } else if(this.type === 'left-right' || this.type === 'top-bottom') {
+        this.stereoData = await parseStereo(this.src, {
+          type: this.type,
+          angle: this.angle,
+        });
       } else if(this.type === 'anaglyph') {
-        this.stereoData = await parseAnaglyph(this.src);
+        this.stereoData = await parseAnaglyph(this.src, {
+          angle: this.angle,
+        });
       } else {
         // Read XMP metadata
         const exif = await exifr.parse(this.src, {
@@ -83,7 +97,9 @@ class StereoImg extends HTMLElement {
         } else {
           // no left eye found, assume left-right
           console.warn('<stereo-img> does not have a "type" attribute and image does not have XMP metadata of a VR picture.  Use "type" attribute to specify the type of stereoscopic image. Assuming left-right stereo image.');
-          this.stereoData = await parseStereo(this.src);
+          this.stereoData = await parseStereo(this.src, {
+            angle: this.angle,
+          });
         }
         
       }

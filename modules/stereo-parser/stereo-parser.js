@@ -18,8 +18,10 @@ import exifr from 'exifr'
  * fetch the image from URL
  * read its left half, return in left eye image
  * read its right half, return in right eye image  
+ * @Param {string} url - image url
+ * @Param {Object} (options) - Parsing options: type: 'left-right' or 'top-bottom', angle: '180' or '360'
  * */
-async function parseStereo(url) {
+async function parseStereo(url, options) {
   const image = await createImageFromURL(url);
   
   const canvas = document.createElement('canvas');
@@ -35,8 +37,8 @@ async function parseStereo(url) {
     multiSegment: true
   })
   
-  const leftEye = ctx.getImageData(0, 0, width / 2, height);
-  const rightEye = ctx.getImageData(width / 2, 0, width / 2, height);
+  const leftEye = options?.type === 'top-bottom' ? ctx.getImageData(0, 0, width, height / 2) : ctx.getImageData(0, 0, width / 2, height);
+  const rightEye = options?.type === 'top-bottom' ? ctx.getImageData(0, height / 2, width, height / 2) : ctx.getImageData(width / 2, 0, width / 2, height);
   
   let angleOfViewFocalLengthIn35mmFormat = function(focalLengthIn35mmFormat) {
     // https://en.wikipedia.org/wiki/Angle_of_view#Common_lens_angles_of_view
@@ -54,8 +56,13 @@ async function parseStereo(url) {
   let phiLength;
   let thetaLength;
 
-
-  if(exif?.FocalLengthIn35mmFormat) {
+  if(options?.angle === "180" || options?.angle === 180) {
+    phiLength = Math.PI;
+    thetaLength = Math.PI;
+  } else if(options?.angle === "360" || options?.angle === 360) {
+    phiLength = Math.PI * 2;
+    thetaLength = Math.PI;
+  } else if(exif?.FocalLengthIn35mmFormat) {
     const angle = angleOfViewFocalLengthIn35mmFormat(exif.FocalLengthIn35mmFormat);
     phiLength = angle.horizontalAngle;
     thetaLength = angle.verticalAngle;
