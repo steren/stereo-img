@@ -47,3 +47,4 @@ This component has been manually tested on the following hardware, OS and browse
 - add loading when parsing image
 - make sure the component renders when size is updated
 - Do not start a Three.js scene before the user interacts with the component (to avoid potentially creating too many WebGL contexts), use a canvas2d fallback in the meanwhile.
+- In index.html, go to previous / next using VR controllers
