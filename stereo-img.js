@@ -61,7 +61,11 @@ class StereoImg extends HTMLElement {
       // There is probably a cleaner way to do this.
       let that = this;
       window.setTimeout(() => {
-        that.parseImageAndCreateNew3DScene();
+        if(that.initializedRenderer) {
+          that.parseImageAndCreateNew3DScene();
+        } else {
+          that.parseAndDisplayPlaceholder();
+        }
       }, 0);
     }
 
@@ -104,6 +108,12 @@ class StereoImg extends HTMLElement {
         }
         
       }
+    }
+
+    async parseAndDisplayPlaceholder() {
+      await this.parse();
+
+      // TODO ue canvas 2d to render a placeholder
     }
 
     createNew3DScene() {
@@ -198,7 +208,7 @@ class StereoImg extends HTMLElement {
         </style>
       `;
 
-      await this.parse();
+      await this.parseAndDisplayPlaceholder();
 
       // Only initialize 3D on click
       this.addEventListener("click", function (e) {
