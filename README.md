@@ -14,14 +14,23 @@ Load the `stereo-img.js` JavaScript module. For example using a `<script>` tag i
 Then use the `<stereo-img>` custom element anywhere:
 
 ```html
-<stereo-img src="picture.vr.jpg" type="vr180"></stereo-img>
+<stereo-img src="picture.vr.jpg" type="vr"></stereo-img>
 ```
 
 
 ### Options
 
 * `src`: (Required) source of the stereo picture (absolute or relative)
-* `type`: (Optional) type of stereo picture: `vr`, `left-right`, or `anaglyph`
+* `type`: (Optional) type of stereo picture:
+  - `vr`: [VR Photo](https://developers.google.com/vr/reference/cardboard-camera-vr-photo-format) - VR180, Google Camera panorama, Carboard Camera, Photosphere images (Where right eye image and angle of view info are embedded in the image metadata) 
+  - `left-right`: left eye on the left, right eye on the right, Exif angle of view is used if present.
+  - `top-bottom`: left eye on the top, right eye on the bottom, Exif angle of view is used if present.
+  - `anaglyph`: [Anaglyph 3D](https://en.wikipedia.org/wiki/Anaglyph_3D) - currently only supporting red / green
+  - If unset, type is inferred from heuristics.
+* `angle`: (Optional) hint at angle of view for `left-right` or `top-bottom` types
+  - `180`: Half sphere (VR180)
+  - `360`: Full sphere
+  - If unset, Exif angle of view is used if present.
 
 ## Compatibility
 
