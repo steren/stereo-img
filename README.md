@@ -27,11 +27,13 @@ Then use the `<stereo-img>` custom element anywhere:
 
 This component has been manually tested on the following hardware, OS and browsers:
 
-
-| Hardware    | OS          | Browser | Status |
-| ----------- | -------     | ------- | ------ |
-| HTC Vive    | Windows     | Chrome  | ✔️
-| Cardboard   | Android     | Chrome  | ❌ (Chrome [bug](https://bugs.chromium.org/p/chromium/issues/detail?id=1267732))
+| Hardware    | OS          | Browser         | Status |
+| ----------- | -------     | --------------- | ------ |
+| HTC Vive    | Windows     | Chrome          | ✔️
+| HTC Vive    | Windows     | Firefox         | ❌ ([Three.js issue](https://github.com/mrdoob/three.js/issues/18431))
+| HTC Vive    | Windows     | Firefox Reality | ✔️
+| Cardboard   | Android     | Chrome          | ❌ ([Chrome bug](https://bugs.chromium.org/p/chromium/issues/detail?id=1267732))
+| Cardboard   | Android     | Firefox         | ❌
 
 ## TODO
 
