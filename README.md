@@ -57,3 +57,4 @@ This component has been manually tested on the following hardware, OS and browse
 - In index.html, go to previous / next using VR controllers
 - OrbitControls is probably not the best choice for panning in non-VR mode
 - better adjust field of view in non-VR mode so that no black margins appear
+- strip `examples/` and other hidden folders before publishing to npm
