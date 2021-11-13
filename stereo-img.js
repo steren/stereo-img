@@ -157,8 +157,6 @@ class StereoImg extends HTMLElement {
     }
 
     async init() {
-      // TODO: should we read width and height attributes and resize element accordingly?
-
       this.attachShadow({mode: 'open'});
       this.shadowRoot.innerHTML = `
       <style>
@@ -167,18 +165,24 @@ class StereoImg extends HTMLElement {
           contain: content;
         }
       </style>
-    `;
+      `;
+
+      // TODO: should we also read width and height attributes and resize element accordingly?
+      if(this.clientHeight === 0) {
+        const aspectRatio = 4 / 3;
+        this.style.height = this.clientWidth / aspectRatio + "px";
+      }
 
       await this.parseImageAndInitialize3DScene();
 
       this.renderer = new THREE.WebGLRenderer();
       this.renderer.setPixelRatio(window.devicePixelRatio);
       this.renderer.xr.enabled = true;
-      this.renderer.setSize(this.offsetWidth, this.offsetHeight);
+      this.renderer.setSize(this.clientWidth, this.clientHeight);
       this.shadowRoot.appendChild(this.renderer.domElement);
 
       // TODO: Should we use component size instead?
-      this.camera = new THREE.PerspectiveCamera( 70, this.offsetWidth / this.offsetHeight, 1, 2000 );
+      this.camera = new THREE.PerspectiveCamera( 70, this.clientWidth / this.clientHeight, 1, 2000 );
       this.camera.layers.enable( 1 );
 
       const controls = new OrbitControls( this.camera, this.renderer.domElement );
@@ -191,8 +195,8 @@ class StereoImg extends HTMLElement {
 
       // Listen for component resize
       const resizeObserver = new ResizeObserver(() => {
-        this.renderer.setSize(this.offsetWidth, this.offsetHeight);
-        this.camera.aspect = this.offsetWidth / this.offsetHeight;
+        this.renderer.setSize(this.clientWidth, this.clientHeight);
+        this.camera.aspect = this.clientWidth / this.clientHeight;
         this.camera.updateProjectionMatrix();
       });
 
