@@ -43,17 +43,3 @@ This component has been manually tested on the following hardware, OS and browse
 | HTC Vive    | Windows     | Firefox Reality | ✔️
 | Cardboard   | Android     | Chrome          | ❌ ([Chrome bug](https://bugs.chromium.org/p/chromium/issues/detail?id=1267732))
 | Cardboard   | Android     | Firefox         | ❌
-
-## TODO
-
-- Panoramas don't load on mobile, likely due to max WebGL texture size of 4096, see https://webglreport.com 
-- Add support for sound (GAudio)
-- clicking Enter VR on a second image returns `DOMException: Failed to execute 'requestSession' on 'XRSystem': There is already an active, immersive XRSession.`  
-- fix anaglyph parser to handle the [many types of color schemes](https://en.wikipedia.org/wiki/Anaglyph_3D#Stereo_conversion_(single_2D_image_to_3D)) (red-blue, red-green, red-cyan...)
-- Add a simple type that takes 2 images as input: `type="single" src="" src-right=""`
-- add loading when parsing image
-- make sure the component renders when size is updated
-- Do not start a Three.js scene before the user interacts with the component (to avoid potentially creating too many WebGL contexts), use a canvas2d fallback in the meanwhile.
-- In index.html, go to previous / next using VR controllers
-- OrbitControls is probably not the best choice for panning in non-VR mode
-- better adjust field of view in non-VR mode so that no black margins appear
