@@ -16,7 +16,7 @@ limitations under the License.
 <!DOCTYPE html>
 <html>
 <head>
-  <title>&lt;stereo-img&gt; demo</title>
+  <title>Stereo image viewer</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <!-- Polyfill for WebXR -->
@@ -74,16 +74,18 @@ limitations under the License.
     <h1>Stereo image viewer</h1>
     <p>
       A web viewer for stereographic pictures with VR support (<a href="https://github.com/steren/stereo-img">GitHub</a>).<br>
-      It supports: VR Photos (VR180, Google Camera panorama), left-right, and anaglyph.<br>
-      
+      It supports: VR Photos (VR180, Google Camera panorama), left-right, and anaglyph.<br>     
     </p>
+  </header>
 
+  <main>
+    <h2>Demo</h2>
     <p>
       <label for="input">Drag and drop or select your stereo pictures:</label>
       <input type="file" id="input" multiple accept="image/*">
     </p>
     <p>
-      <label for="examples">Or try these demos:</label>
+      <label for="examples">Or try these:</label>
       <select id="examples">
         <option value='{"src": "examples/vr180-lenovo-mirage.vr.jpg", "type": "vr"}'>             VR180</option>
         <option value='{"src": "examples/pixel3xl.PANO.jpg", "type": "vr"}'>                      Panorama</option>
@@ -93,15 +95,13 @@ limitations under the License.
         <option value='{"src": "examples/wikipedia.anaglyph.jpg", "type": "anaglyph"}'>           Anaglyph</option>
       </select>
     </p>
-  </header>
 
-  <main>
-    <p><code>&lt;stereo-img&gt;</code> element:</p>
     <stereo-img src="examples/vr180-lenovo-mirage.vr.jpg" type="vr"></stereo-img>
-    <button id="previous" >Previous</button> <button id="next">Next</button>
-    
-    <p>Just for comparison, here is the same picture in a regular <code>&lt;img&gt;</code> element:</p>
-    <img src="examples/vr180-lenovo-mirage.vr.jpg">
+    <button id="previous">Previous</button> <button id="next">Next</button> (or use left/right keyboard keys)
+
+    <p>These are best viewed in VR, click "Enter VR" if your device supports VR.</p>
+
+    <h2>Use it</h2>
 
     <p>To add this viewer to your page or app:
       <code><pre>
@@ -109,6 +109,12 @@ limitations under the License.
 &lt;stereo-img src="picture.vr.jpg">&lt;/stereo-img>
       </pre></code>
     </p>
+
+    <h2>For info</h2>
+
+    <p>Just for comparison, here is the same picture in a regular <code>&lt;img&gt;</code> element:</p>
+    <img src="examples/vr180-lenovo-mirage.vr.jpg">
+
   </main>
 
   <script>
