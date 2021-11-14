@@ -19,22 +19,18 @@ limitations under the License.
   <title>&lt;stereo-img&gt; demo</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- Shim for importmap -->
-  <script async src="https://unpkg.com/es-module-shims@1.3.0/dist/es-module-shims.js"></script>
-
-  <!-- The following loads dependencies from the skypack.dev CDN -->
-  <script type="importmap">
-    {
-      "imports": {
-        "stereo-img": "./stereo-img.js",
-        "exifr": "https://cdn.skypack.dev/pin/exifr@v7.1.3-Bxn3dmuljZ8rRmNteMgs/mode=imports,min/optimized/exifr.js",
-        "three": "https://cdn.skypack.dev/pin/three@v0.134.0-dfARp6tVCbGvQehLfkdx/mode=imports,min/optimized/three.js",
-        "three/": "https://cdn.skypack.dev/pin/three@v0.134.0-dfARp6tVCbGvQehLfkdx/mode=imports,min/unoptimized/"
-      }
-    }
+  <!-- Polyfill for WebXR -->
+  <script src='https://cdn.jsdelivr.net/npm/webxr-polyfill@latest/build/webxr-polyfill.js'></script>
+  <script>
+    window.polyfill = new WebXRPolyfill();
   </script>
 
-  <!-- The following loads dependencies from the node_modules folder -->
+  <!-- Load from CDN-->
+  <script type="module" src="https://cdn.skypack.dev/stereo-img"></script>
+
+  <!-- In development, use dependencies from local node_modules -->
+  <!-- Shim for importmap -->
+  <!-- <script async src="https://unpkg.com/es-module-shims@1.3.0/dist/es-module-shims.js"></script> -->
   <!-- <script type="importmap">
     {
       "imports": {
@@ -45,6 +41,7 @@ limitations under the License.
       }
     }
   </script> -->
+  <!-- <script type="module">import "stereo-img";</script> -->
 
   <style>
     html {
@@ -53,6 +50,7 @@ limitations under the License.
       margin: auto;
       line-height: 1.75;
       font-size: 1.25em;
+      font-family: sans-serif;
     }
 
     h1,h2,h3,h4,h5,h6 {
@@ -61,8 +59,6 @@ limitations under the License.
 
     p,ul,ol {
       margin-bottom: 2em;
-      color: #1d1d1d;
-      font-family: sans-serif;
     }
 
     img, stereo-img {
@@ -70,23 +66,18 @@ limitations under the License.
       height: 400px;
     }
   </style>
-
-  <!-- Polyfill for WebXR -->
-  <script src='https://cdn.jsdelivr.net/npm/webxr-polyfill@latest/build/webxr-polyfill.js'></script>
-  <script>
-    window.polyfill = new WebXRPolyfill();
-  </script>
-
-  <script type="module">import "stereo-img";</script>
-
 </head>
 
 <body id='dropbox'>
 
   <header>
-    <h1><code>&lt;stereo-img&gt;</code> demo page</h1>
-    <p><code>&lt;stereo-img&gt;</code> is a web component to display stereographic pictures on web pages and in VR. It supports various stereo picture types: VR180, left-right, and anaglyph.</p>
-    <p>See <a href="https://github.com/steren/stereo-img">GitHub repo</a> for how to use instructions</p>
+    <h1>Stereo image viewer</h1>
+    <p>
+      A web viewer for stereographic pictures with VR support (<a href="https://github.com/steren/stereo-img">GitHub</a>).<br>
+      It supports: VR Photos (VR180, Google Camera panorama), left-right, and anaglyph.<br>
+      
+    </p>
+
     <p>
       <label for="input">Drag and drop or select your stereo pictures:</label>
       <input type="file" id="input" multiple accept="image/*">
@@ -111,6 +102,13 @@ limitations under the License.
     
     <p>Just for comparison, here is the same picture in a regular <code>&lt;img&gt;</code> element:</p>
     <img src="examples/vr180-lenovo-mirage.vr.jpg">
+
+    <p>To add this viewer to your page or app:
+      <code><pre>
+&lt;script type="module" src="https://cdn.skypack.dev/stereo-img">&lt;/script>
+&lt;stereo-img src="picture.vr.jpg">&lt;/stereo-img>
+      </pre></code>
+    </p>
   </main>
 
   <script>

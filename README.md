@@ -3,22 +3,23 @@
 `<stereo-img>` is a web component to display stereographic pictures on web pages, with VR support.
 It supports various stereo picture formats: VR Photos (VR180, Google Camera panorama, Photosphere), left-right, and anaglyph.
 
+See the [demo](https://stereo-img.steren.fr/) for an example.
+
 ## How to use
 
-Load the `stereo-img.js` JavaScript module. For example using a `<script>` tag in your your HTML file:
+Load the module and its dependencies from a CDN:
 
 ```html
-<script type="module" src="stereo-img.js"></script>
+<script type="module" src="https://cdn.skypack.dev/stereo-img"></script>
 ```
 
-Then use the `<stereo-img>` custom element anywhere:
+Then use the `<stereo-img>` custom element anywhere in your page or app, reference a stereo picture in the `src` attribute:
 
 ```html
-<stereo-img src="picture.vr.jpg" type="vr"></stereo-img>
+<stereo-img src="picture.vr.jpg"></stereo-img>
 ```
 
-
-### Options
+## Attributes
 
 * `src`: (Required) source of the stereo picture (absolute or relative)
 * `type`: (Optional) type of stereo picture:
@@ -41,5 +42,38 @@ This component has been manually tested on the following hardware, OS and browse
 | HTC Vive    | Windows     | Chrome          | ✔️
 | HTC Vive    | Windows     | Firefox         | ✔️⚠️ With [WebXR polyfill](https://github.com/immersive-web/webxr-polyfill)
 | HTC Vive    | Windows     | Firefox Reality | ✔️
-| Cardboard   | Android     | Chrome          | ❌ ([Chrome bug](https://bugs.chromium.org/p/chromium/issues/detail?id=1267732))
+| Cardboard   | Android     | Chrome          | ❌ (Chrome 95 has a [bug](https://bugs.chromium.org/p/chromium/issues/detail?id=1267732), fixed in 96)
 | Cardboard   | Android     | Firefox         | ❌
+
+## Installing using npm
+
+Instead of a CDN, you can install the module locally using [npm](https://www.npmjs.com/):
+
+```bash
+npm install stereo-img
+```
+
+Then, use a JavaScript builder or [import-maps](https://github.com/WICG/import-maps) to load the module and its dependencies:
+
+If using import-maps:
+
+```html
+<!-- Shim for importmap -->
+<script async src="https://unpkg.com/es-module-shims@1.3.0/dist/es-module-shims.js"></script>
+<script type="importmap">
+  {
+    "imports": {
+      "stereo-img": "./node_modules/stereo-img/stereo-img.js",
+      "exifr": "./node_modules/exifr/dist/full.esm.js",
+      "three": "./node_modules/three/build/three.module.js",
+      "three/": "./node_modules/three/"
+    }
+  }
+</script>
+```
+
+Then load the `stereo-img` module:
+
+```html
+<script type="module">import "stereo-img";</script>
+```
