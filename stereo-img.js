@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { parseVR } from './modules/vr-parser/vr-parser.js';
-import { parseStereo } from './modules/stereo-parser/stereo-parser.js';
-import { parseAnaglyph } from './modules/anaglyph-parser/anaglyph-parser.js';
+import { parseVR } from './parsers/vr-parser/vr-parser.js.js';
+import { parseStereo } from './parsers/stereo-parser/stereo-parser.js';
+import { parseAnaglyph } from './parsers/anaglyph-parser/anaglyph-parser.js.js';
 
 import exifr from 'exifr';
 
