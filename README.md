@@ -44,6 +44,7 @@ This component has been manually tested on the following hardware, OS and browse
 | HTC Vive    | Windows     | Firefox Reality | ✔️
 | Cardboard   | Android     | Chrome          | ✔️
 | Cardboard   | Android     | Firefox         | ❌
+| Quest 1     |             |                 | ✔️
 
 ## Installing using npm
 
