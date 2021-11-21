@@ -42,7 +42,7 @@ This component has been manually tested on the following hardware, OS and browse
 | HTC Vive    | Windows     | Chrome          | ✔️
 | HTC Vive    | Windows     | Firefox         | ✔️⚠️ With [WebXR polyfill](https://github.com/immersive-web/webxr-polyfill)
 | HTC Vive    | Windows     | Firefox Reality | ✔️
-| Cardboard   | Android     | Chrome          | ✔️
+| Cardboard   | Android     | Chrome          | ✔️⚠️ ([very large do not load](https://github.com/steren/stereo-img/issues/1))
 | Cardboard   | Android     | Firefox         | ❌
 | Quest 1     |             |                 | ✔️
 
