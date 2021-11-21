@@ -16,8 +16,29 @@ limitations under the License.
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Stereo image viewer</title>
+  <title>Stereo 3D image viewer</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:creator" content="@steren">
+  <meta name="twitter:title" content="Stereo 3D image viewer">
+  <meta name="twitter:image" content="https://stereo-img.steren.fr/title.png">
+
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Stereo 3D image viewer">
+  <meta property="og:image" content="https://stereo-img.steren.fr/title.png">
+
+  <script type="application/ld+json">
+  {
+    "@context": "http://schema.org",
+    "@type": "Article",
+    "author": "Steren Giannini",
+    "name": "Stereo 3D image viewer",
+    "image": "https://stereo-img.steren.fr/title.png"
+  }
+  </script>
 
   <!-- Polyfill for WebXR -->
   <script src='https://cdn.jsdelivr.net/npm/webxr-polyfill@latest/build/webxr-polyfill.js'></script>
@@ -65,15 +86,23 @@ limitations under the License.
       width: 100%;
       height: 400px;
     }
+
+    .icon {
+      float: left;
+      margin-right: 1em;
+      width: 3em;
+      height: 3em;
+    }
   </style>
 </head>
 
 <body id='dropbox'>
 
   <header>
-    <h1>Stereo image viewer</h1>
+    <img src="icon.svg" alt="icon" class="icon">
+    <h1>Stereo 3D image viewer</h1>
     <p>
-      A web viewer for stereographic pictures with VR support (<a href="https://github.com/steren/stereo-img">GitHub</a>).<br>
+      A web viewer for stereo 3D pictures with VR support (<a href="https://github.com/steren/stereo-img">GitHub</a>).<br>
       It supports VR Photos (VR180, Google Camera panorama, Cardboard camera), left-right, and anaglyph.<br>     
     </p>
   </header>
