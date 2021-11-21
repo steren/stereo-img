@@ -142,7 +142,7 @@ limitations under the License.
     <h2>For info</h2>
 
     <p>Just for comparison, here is the same picture in a regular <code>&lt;img&gt;</code> element:</p>
-    <img src="examples/vr180-lenovo-mirage.vr.jpg">
+    <img src="examples/vr180-lenovo-mirage.vr.jpg" id="img-ref">
 
   </main>
 
@@ -156,7 +156,7 @@ limitations under the License.
       stereoImg.type = type;
       stereoImg.angle = angle;
 
-      const img = document.querySelector('img');
+      const img = document.getElementById('img-ref');
       img.src = src;
     });
 
