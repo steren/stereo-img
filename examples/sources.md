@@ -2,6 +2,7 @@ Panorama:
 
 * `pixel3xl.PANO.jpg`: personal picture taken with Google Camera on Pixel 3 XL 
 * `pixel5.PANO.jpg`: personal picture taken with Google Camera on Pixel 5
+* [`walrus-360.top-bottom.jpg`](https://github.com/googlearchive/vrview/blob/master/examples/hotspots/walrus.jpg): most likely a Cardboard Camera picture transforced to top - bottom image
 
 VR180: 
 
