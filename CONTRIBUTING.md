@@ -3,6 +3,22 @@
 We'd love to accept your patches and contributions to this project. There are
 just a few small guidelines you need to follow.
 
+## Develop locally
+
+Thre is no compilation step.
+
+### Update index.html to load local files
+
+In `index.html`, comment `<script type="module" src="https://cdn.skypack.dev/stereo-img"></script>`
+and uncomment the lines below loading from local files.
+
+### Starting a local development server
+
+Install dependencies with `npm install`	
+
+Run the local web server with `npm start`
+
+
 ## Contributor License Agreement
 
 Contributions to this project must be accompanied by a Contributor License
@@ -27,9 +43,3 @@ information on using pull requests.
 
 This project follows
 [Google's Open Source Community Guidelines](https://opensource.google/conduct/).
-
-## Starting a local development server
-
-Install dependencies with `npm install`	
-
-Run the local web server with `npm start`

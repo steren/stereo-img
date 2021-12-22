@@ -78,3 +78,7 @@ Then load the `stereo-img` module:
 ```html
 <script type="module">import "stereo-img";</script>
 ```
+
+## Contributing
+
+See [development instructions and contribution guidelines](CONTRIBUTING.md)
