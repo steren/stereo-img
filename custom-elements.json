@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "1.0.0",
+  "readme": "README.md",
+  "modules": [
+    {
+      "kind": "javascript-module",
+      "path": "stereo-img/stereo-img.js",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "A web component to display stereographic pictures on web pages, with VR support.",
+          "name": "StereoImg",
+          "members": [
+            {
+              "kind": "field",
+              "name": "type"
+            },
+            {
+              "kind": "field",
+              "name": "angle"
+            },
+            {
+              "kind": "field",
+              "name": "src"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "type"
+            },
+            {
+              "name": "angle"
+            },
+            {
+              "name": "src"
+            }
+          ],
+          "superclass": {
+            "name": "HTMLElement"
+          },
+          "tagName": "stereo-img",
+          "customElement": true
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "StereoImg",
+          "declaration": {
+            "name": "StereoImg",
+            "module": "stereo-img/stereo-img.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "stereo-img",
+          "declaration": {
+            "name": "StereoImg",
+            "module": "stereo-img/stereo-img.js"
+          }
+        }
+      ]
+    }
+  ]
+}

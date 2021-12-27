@@ -1,5 +1,6 @@
 {
   "name": "stereo-img",
+  "customElements": "custom-elements.json",
   "version": "1.2.0",
   "description": "a web component to display stereographic pictures on web pages, with VR support",
   "directories": {
