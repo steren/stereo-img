@@ -23,6 +23,7 @@ import exifr from 'exifr'
  * */
 async function parseStereo(url, options) {
   const image = await createImageFromURL(url);
+  image.crossOrigin = "Anonymous";
   
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');

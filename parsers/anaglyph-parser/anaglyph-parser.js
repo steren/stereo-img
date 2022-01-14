@@ -17,6 +17,7 @@ async function parseAnaglyph(url) {
   const response = await fetch(url);
   const blob = await response.blob();
   const image = await createImageBitmap(blob);
+  image.crossOrigin = "Anonymous";
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   const width = image.width;
