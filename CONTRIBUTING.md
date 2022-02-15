@@ -19,6 +19,17 @@ Install dependencies with `npm install`
 Run the local web server with `npm start`
 
 
+## Publishing to npm
+
+To update the [npm package](https://www.npmjs.com/package/stereo-img)
+
+Run the following:
+
+* `npm version minor`
+* `git push --follow-tags`
+
+Then a [GitHub Action](https://github.com/steren/stereo-img/blob/main/.github/workflows/release.yml) automatically publishes to npm.
+
 ## Contributor License Agreement
 
 Contributions to this project must be accompanied by a Contributor License
