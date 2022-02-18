@@ -71,37 +71,47 @@ class StereoImg extends HTMLElement {
     }
   
     async parse() {
-      if(this.type === 'vr') {
-        this.stereoData = await parseVR(this.src);
-      } else if(this.type === 'left-right' || this.type === 'top-bottom') {
-        this.stereoData = await parseStereo(this.src, {
-          type: this.type,
-          angle: this.angle,
-        });
-      } else if(this.type === 'anaglyph') {
-        this.stereoData = await parseAnaglyph(this.src, {
-          angle: this.angle,
-        });
-      } else {
-        // Read XMP metadata
-        const exif = await exifr.parse(this.src, {
-          xmp: true,
-          multiSegment: true,
-          mergeOutput: false,
-          ihdr: true, //unclear why we need this, but if not enabled, some VR180 XMP Data are not parsed
-        });
-
-        if (exif?.GImage?.Data) {
-          // XMP for left eye found, assume VR Photo
+      if(this.src) {
+        if(this.type === 'vr') {
           this.stereoData = await parseVR(this.src);
-        } else {
-          // no left eye found, assume left-right
-          console.warn('<stereo-img> does not have a "type" attribute and image does not have XMP metadata of a VR picture.  Use "type" attribute to specify the type of stereoscopic image. Assuming left-right stereo image.');
+        } else if(this.type === 'left-right' || this.type === 'top-bottom') {
           this.stereoData = await parseStereo(this.src, {
+            type: this.type,
             angle: this.angle,
           });
+        } else if(this.type === 'anaglyph') {
+          this.stereoData = await parseAnaglyph(this.src, {
+            angle: this.angle,
+          });
+        } else {
+          // Read XMP metadata
+          const exif = await exifr.parse(this.src, {
+            xmp: true,
+            multiSegment: true,
+            mergeOutput: false,
+            ihdr: true, //unclear why we need this, but if not enabled, some VR180 XMP Data are not parsed
+          });
+
+          if (exif?.GImage?.Data) {
+            // XMP for left eye found, assume VR Photo
+            this.stereoData = await parseVR(this.src);
+          } else {
+            // no left eye found, assume left-right
+            console.warn('<stereo-img> does not have a "type" attribute and image does not have XMP metadata of a VR picture.  Use "type" attribute to specify the type of stereoscopic image. Assuming left-right stereo image.');
+            this.stereoData = await parseStereo(this.src, {
+              angle: this.angle,
+            });
+          }
         }
-        
+      } else {
+        // no src attribute. Use fake stereo data.
+        this.stereoData = {
+          leftEye: new ImageData(10, 10),
+          rightEye: new ImageData(10, 10),
+          phiLength: 0,
+          thetaStart: 0,
+          thetaLength: 0
+        };
       }
     }
 
