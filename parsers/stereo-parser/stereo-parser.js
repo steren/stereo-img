@@ -16,10 +16,9 @@ import exifr from 'exifr'
 
 /**
  * fetch the image from URL
- * read its left half, return in left eye image
- * read its right half, return in right eye image  
+ * return left and right eye images from either left / right, right / left, top / bottom, bottom / top. 
  * @Param {string} url - image url
- * @Param {Object} (options) - Parsing options: type: 'left-right' or 'top-bottom', angle: '180' or '360'
+ * @Param {Object} (options) - Parsing options: type: 'left-right' (default), 'right-left' or 'top-bottom', angle: '180' or '360'
  * */
 async function parseStereo(url, options) {
   const image = await createImageFromURL(url);
@@ -37,9 +36,30 @@ async function parseStereo(url, options) {
     xmp: true,
     multiSegment: true
   })
-  
-  const leftEye = options?.type === 'top-bottom' ? ctx.getImageData(0, 0, width, height / 2) : ctx.getImageData(0, 0, width / 2, height);
-  const rightEye = options?.type === 'top-bottom' ? ctx.getImageData(0, height / 2, width, height / 2) : ctx.getImageData(width / 2, 0, width / 2, height);
+
+  const type = options.type || 'left-right';
+
+  let leftEye;
+  let rightEye;
+
+  switch(type) {
+    case 'left-right':
+      leftEye =  ctx.getImageData(0, 0, width / 2, height);
+      rightEye = ctx.getImageData(width / 2, 0, width / 2, height);
+      break;
+    case 'right-left':
+      leftEye =  ctx.getImageData(width / 2, 0, width / 2, height);
+      rightEye = ctx.getImageData(0, 0, width / 2, height);
+      break;
+    case 'top-bottom':
+      leftEye = ctx.getImageData(0, 0, width, height / 2); 
+      rightEye = ctx.getImageData(0, height / 2, width, height / 2);
+      break;
+    case 'bottom-top':
+      leftEye = ctx.getImageData(0, height / 2, width, height / 2);
+      rightEye = ctx.getImageData(0, 0, width, height / 2);
+      break;
+  }
   
   let angleOfViewFocalLengthIn35mmFormat = function(focalLengthIn35mmFormat) {
     // https://en.wikipedia.org/wiki/Angle_of_view#Common_lens_angles_of_view
