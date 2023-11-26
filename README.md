@@ -35,6 +35,16 @@ Then use the `<stereo-img>` custom element anywhere in your page or app, referen
 
 ## Compatibility
 
+### Image types and cameras
+
+This component has been manually tested to load pictures taken with the following cameras:
+
+| Image type             | Camera                 | Status | Field of view | Orientation |
+| ---------------------- | ---------------------- | ------ | ------------- | ----------- |
+| VR180                  | Lenovo Mirage Camera   | ✔️     |  ✓           | ✓ 
+
+### Viewers
+
 This component has been manually tested on the following hardware, OS and browsers:
 
 | Hardware    | OS          | Browser         | Status |
