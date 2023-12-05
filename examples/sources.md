@@ -22,3 +22,8 @@ Canon EOS R5
 
 * `canon-eos-r5-dual-fisheye.jpg`: personal picture taken with Canon EOS R5 and dual fisheye lens, as the file is saved by the camera (fisheye)
 * `canon-eos-r5-dual-fisheye-processed.jpg`: personal picture taken with Canon EOS R5 and dual fisheye lens, processed with Canon EOS VR Utility software to: switch the order of the left and right eye images and use an equirectangular projection
+
+[CALF](https://calfglobal.com/)
+
+* `calf-vr180.jpg`: personal picture taken using the CALF 3D VR180 camera using VR180 option (Donated by [Arian Kulp](https://github.com/atkulp) in [this issue](https://github.com/steren/stereo-img/issues/20).
+* `calf-left-right.jpg`: personal picture taken using the CALF 3D VR180 camera using the flattened option (Donated by [Arian Kulp](https://github.com/atkulp) in [this issue](https://github.com/steren/stereo-img/issues/20).
