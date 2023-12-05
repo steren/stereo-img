@@ -25,7 +25,7 @@ async function parseStereo(url, options) {
   //image.crossOrigin = "Anonymous";
   
   const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', {willReadFrequently: true});
   const width = image.width;
   const height = image.height;
   canvas.width = width;
@@ -89,8 +89,8 @@ async function parseStereo(url, options) {
     thetaLength = angle.verticalAngle;
   } else if(exif?.Make === 'GoPro' || url.includes('gopro') || url.includes('GOPR') ) {
     // GoPro (https://gopro.com/help/articles/question_answer/hero7-field-of-view-fov-information?sf96748270=1)
-    phiLength = 2.1397737;
-    thetaLength = 1.647591;
+    phiLength = 2.1397737; // 122.6º
+    thetaLength = 1.647591;  // 94.4º
   } else {
     const assumeFocalLengthIn35mmFormat = 27;
     const angle = angleOfViewFocalLengthIn35mmFormat(assumeFocalLengthIn35mmFormat);
