@@ -158,10 +158,10 @@ class StereoImg extends HTMLElement {
       this.scene.background = new THREE.Color( 0x101010 );
 
       // left eye
-      createEye(1);
+      this.createEye(1);
 
       // right eye
-      createEye(2);
+      this.createEye(2);
     }
 
     async parseImageAndInitialize3DScene() {
