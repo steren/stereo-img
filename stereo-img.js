@@ -46,6 +46,17 @@ class StereoImg extends HTMLElement {
       }
     }
 
+    get projection() {
+      return this.getAttribute('projection');
+    }
+    set projection(val) {
+      if (val) {
+        this.setAttribute('projection', val);
+      } else {
+        this.removeAttribute('projection');
+      }
+    }
+
     get src() {
       return this.getAttribute('src');
     }
@@ -72,7 +83,7 @@ class StereoImg extends HTMLElement {
   
     async parse() {
       if(this.src) {
-        if(this.type === 'vr') {
+        if(this.type === 'vr180' || this.type === 'vr') {
           this.stereoData = await parseVR(this.src);
         } else if(this.type === 'left-right' || this.type === 'top-bottom') {
           this.stereoData = await parseStereo(this.src, {
@@ -104,7 +115,7 @@ class StereoImg extends HTMLElement {
           }
         }
       } else {
-        // no src attribute. Use fake stereo data.
+        // no src attribute. Use fake stereo data to render a black sphere
         this.stereoData = {
           leftEye: new ImageData(10, 10),
           rightEye: new ImageData(10, 10),
@@ -115,49 +126,42 @@ class StereoImg extends HTMLElement {
       }
     }
 
+    /**
+     * 
+     * @param {number} eye: 1 for left, 2 for right
+     */
+    createEye(eye) {
+      const radius = 10; // 500
+
+      // left eye
+      const texture = new THREE.Texture(this.stereoData.leftEye);
+      texture.needsUpdate = true;
+
+      // TODO: Screen size should depend on image aspect ratio, camera fov...
+      const geometry = new THREE.SphereGeometry(radius, 60, 40, -1 * this.stereoData.phiLength / 2, this.stereoData.phiLength, this.stereoData.thetaStart, this.stereoData.thetaLength);
+      // invert the geometry on the x-axis so that all of the faces point inward
+      geometry.scale(-1, 1, 1);
+
+      const material = new THREE.MeshBasicMaterial({ map: texture });
+
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.rotation.reorder('YXZ');
+      mesh.rotation.y = Math.PI / 2;
+      mesh.rotation.x = this.stereoData.roll || 0;
+      mesh.rotation.z = this.stereoData.pitch || 0;
+      mesh.layers.set(eye); // display in left eye only
+      this.scene.add(mesh);
+    }
+
     initialize3DScene() {
       this.scene = new THREE.Scene();
       this.scene.background = new THREE.Color( 0x101010 );
 
-      const radius = 10; // 500
-
-			// left eye
-      const texture1 = new THREE.Texture(this.stereoData.leftEye);
-      texture1.needsUpdate = true;
-
-      // TODO: Screen size should depend on image aspect ratio, camera fov...
-      const geometry1 = new THREE.SphereGeometry( radius, 60, 40, -1 * this.stereoData.phiLength / 2, this.stereoData.phiLength, this.stereoData.thetaStart, this.stereoData.thetaLength);
-      // invert the geometry on the x-axis so that all of the faces point inward
-      geometry1.scale( - 1, 1, 1 );
-
-      const material1 = new THREE.MeshBasicMaterial( { map: texture1 } );
-
-      const mesh1 = new THREE.Mesh( geometry1, material1 );
-      mesh1.rotation.reorder( 'YXZ' );
-      mesh1.rotation.y = Math.PI / 2;
-      mesh1.rotation.x = this.stereoData.roll || 0;
-      mesh1.rotation.z = this.stereoData.pitch || 0;
-      mesh1.layers.set( 1 ); // display in left eye only
-      this.scene.add( mesh1 );
-
+      // left eye
+      createEye(1);
 
       // right eye
-
-      const texture2 = new THREE.Texture(this.stereoData.rightEye);
-      texture2.needsUpdate = true;
-
-      const geometry2 = new THREE.SphereGeometry( radius, 60, 40, -1 * this.stereoData.phiLength / 2, this.stereoData.phiLength, this.stereoData.thetaStart, this.stereoData.thetaLength);
-      geometry2.scale( - 1, 1, 1 );
-
-      const material2 = new THREE.MeshBasicMaterial( { map: texture2 } );
-
-      const mesh2 = new THREE.Mesh( geometry2, material2 );
-      mesh2.rotation.reorder( 'YXZ' );
-      mesh2.rotation.y = Math.PI / 2;
-      mesh2.rotation.x = this.stereoData.roll || 0;
-      mesh2.rotation.z = this.stereoData.pitch || 0;
-      mesh2.layers.set( 2 ); // display in right eye only
-      this.scene.add( mesh2 );
+      createEye(2);
     }
 
     async parseImageAndInitialize3DScene() {
