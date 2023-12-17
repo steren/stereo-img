@@ -17,6 +17,10 @@
             },
             {
               "kind": "field",
+              "name": "projection"
+            },
+            {
+              "kind": "field",
               "name": "angle"
             },
             {
@@ -27,6 +31,9 @@
           "attributes": [
             {
               "name": "type"
+            },
+            {
+              "name": "projection"
             },
             {
               "name": "angle"

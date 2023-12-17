@@ -46,6 +46,17 @@ class StereoImg extends HTMLElement {
       }
     }
 
+    get debug() {
+      return this.getAttribute('debug');
+    }
+    set debug(val) {
+      if (val) {
+        this.setAttribute('debug', val);
+      } else {
+        this.removeAttribute('debug');
+      }
+    }
+
     get projection() {
       return this.getAttribute('projection');
     }
@@ -130,7 +141,7 @@ class StereoImg extends HTMLElement {
      * 
      * @param {number} eye: 1 for left, 2 for right
      */
-    createEye(eye) {
+    createEye(eye, debug) {
       const radius = 10; // 500
 
       // left eye
@@ -142,6 +153,25 @@ class StereoImg extends HTMLElement {
       // invert the geometry on the x-axis so that all of the faces point inward
       geometry.scale(-1, 1, 1);
 
+      if (this.projection === 'fisheye' || this.stereoData.projection === 'fisheye') {
+        const imageWidth = this.stereoData.leftEye.width;
+        const imageHeight = this.stereoData.leftEye.height;
+  
+        const normals = geometry.attributes.normal.array;
+        const uvs = geometry.attributes.uv.array;
+        for (let i = 0, l = normals.length / 3; i < l; i++) {
+  
+          const x = normals[i * 3 + 0];
+          const y = normals[i * 3 + 1];
+          const z = normals[i * 3 + 2];
+  
+          var correction = (y == 0 && z == 0) ? 1 : (Math.acos(x) / Math.sqrt(y * y + z * z)) * (2 / Math.PI);
+          uvs[ i * 2 + 0 ] = z * 0.5 * correction + 0.5;
+          uvs[ i * 2 + 1 ] = y * 0.5 * correction + 0.5;
+  
+        }
+      }
+
       const material = new THREE.MeshBasicMaterial({ map: texture });
 
       const mesh = new THREE.Mesh(geometry, material);
@@ -151,6 +181,20 @@ class StereoImg extends HTMLElement {
       mesh.rotation.z = this.stereoData.pitch || 0;
       mesh.layers.set(eye); // display in left eye only
       this.scene.add(mesh);
+
+      if(this.debug) {
+        const wireframe = new THREE.WireframeGeometry(geometry);
+        const line = new THREE.LineSegments(wireframe);
+        line.material.depthTest = false;
+        line.material.opacity = 0.25;
+        line.material.transparent = true;
+        line.rotation.reorder('YXZ');
+        line.rotation.y = Math.PI / 2;
+        line.rotation.x = this.stereoData.roll || 0;
+        line.rotation.z = this.stereoData.pitch || 0;
+        line.layers.set(eye);
+        this.scene.add(line);
+      }
     }
 
     initialize3DScene() {
@@ -170,6 +214,12 @@ class StereoImg extends HTMLElement {
     }
 
     async init() {
+      if (this.debug) {
+        console.log('Debug mode enabled');
+        this.debug = true;
+      }
+      
+
       this.attachShadow({mode: 'open'});
       this.shadowRoot.innerHTML = `
       <style>
