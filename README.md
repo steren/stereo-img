@@ -23,7 +23,7 @@ Then use the `<stereo-img>` custom element anywhere in your page or app, referen
 
 * `src`: (Required) source of the stereo picture (absolute or relative)
 * `type`: (Optional) type of stereo picture:
-  - `vr`: [VR Photo](https://developers.google.com/vr/reference/cardboard-camera-vr-photo-format) - VR180, Google Camera panorama, Cardboard Camera, Photosphere images (Where right eye image and angle of view info are embedded in the image metadata) 
+  - `vr180`: [VR Photo](https://developers.google.com/vr/reference/cardboard-camera-vr-photo-format) - VR180, Google Camera panorama, Cardboard Camera, Photosphere images (Where right eye image and angle of view info are embedded in the image metadata) 
   - `left-right`: left eye on the left, right eye on the right, Exif angle of view is used if present.
   - `top-bottom`: left eye on the top, right eye on the bottom, Exif angle of view is used if present.
   - `anaglyph`: [Anaglyph 3D](https://en.wikipedia.org/wiki/Anaglyph_3D) - currently only supporting red / green
