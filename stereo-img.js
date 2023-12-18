@@ -139,13 +139,16 @@ class StereoImg extends HTMLElement {
 
     /**
      * 
-     * @param {number} eye: 1 for left, 2 for right
+     * @param {String} eye: "left" or "right"
      */
     createEye(eye, debug) {
       const radius = 10; // 500
 
+      const eyeNumber = eye === "left" ? 1 : 2;
+      const imageData = eye === "left" ? this.stereoData.leftEye : this.stereoData.rightEye;
+
       // left eye
-      const texture = new THREE.Texture(this.stereoData.leftEye);
+      const texture = new THREE.Texture(imageData);
       texture.needsUpdate = true;
 
       // TODO: Screen size should depend on image aspect ratio, camera fov...
@@ -154,8 +157,8 @@ class StereoImg extends HTMLElement {
       geometry.scale(-1, 1, 1);
 
       if (this.projection === 'fisheye' || this.stereoData.projection === 'fisheye') {
-        const imageWidth = this.stereoData.leftEye.width;
-        const imageHeight = this.stereoData.leftEye.height;
+        const imageWidth = imageData.width;
+        const imageHeight = imageData.height;
   
         const normals = geometry.attributes.normal.array;
         const uvs = geometry.attributes.uv.array;
@@ -179,7 +182,7 @@ class StereoImg extends HTMLElement {
       mesh.rotation.y = Math.PI / 2;
       mesh.rotation.x = this.stereoData.roll || 0;
       mesh.rotation.z = this.stereoData.pitch || 0;
-      mesh.layers.set(eye); // display in left eye only
+      mesh.layers.set(eyeNumber); // display in left/right eye only
       this.scene.add(mesh);
 
       if(this.debug) {
@@ -192,7 +195,7 @@ class StereoImg extends HTMLElement {
         line.rotation.y = Math.PI / 2;
         line.rotation.x = this.stereoData.roll || 0;
         line.rotation.z = this.stereoData.pitch || 0;
-        line.layers.set(eye);
+        line.layers.set(eyeNumber);
         this.scene.add(line);
       }
     }
@@ -201,11 +204,8 @@ class StereoImg extends HTMLElement {
       this.scene = new THREE.Scene();
       this.scene.background = new THREE.Color( 0x101010 );
 
-      // left eye
-      this.createEye(1);
-
-      // right eye
-      this.createEye(2);
+      this.createEye("left");
+      this.createEye("right");
     }
 
     async parseImageAndInitialize3DScene() {
