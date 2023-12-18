@@ -96,7 +96,7 @@ class StereoImg extends HTMLElement {
       if(this.src) {
         if(this.type === 'vr180' || this.type === 'vr') {
           this.stereoData = await parseVR(this.src);
-        } else if(this.type === 'left-right' || this.type === 'top-bottom') {
+        } else if(this.type === 'left-right' || this.type === 'right-left' || this.type === 'bottom-top' || this.type === 'top-bottom') {
           this.stereoData = await parseStereo(this.src, {
             type: this.type,
             angle: this.angle,
@@ -168,6 +168,7 @@ class StereoImg extends HTMLElement {
           const y = normals[i * 3 + 1];
           const z = normals[i * 3 + 2];
   
+          // TODO: understand and check this line of math. It is taken from https://github.com/mrdoob/three.js/blob/f32e6f14046b5affabe35a0f42f0cad7b5f2470e/examples/webgl_panorama_dualfisheye.html
           var correction = (y == 0 && z == 0) ? 1 : (Math.acos(x) / Math.sqrt(y * y + z * z)) * (2 / Math.PI);
           uvs[ i * 2 + 0 ] = z * 0.5 * correction + 0.5;
           uvs[ i * 2 + 1 ] = y * 0.5 * correction + 0.5;
