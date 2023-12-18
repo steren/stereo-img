@@ -23,7 +23,7 @@ Then use the `<stereo-img>` custom element anywhere in your page or app, referen
 
 * `src`: (Required) source of the stereo picture (absolute or relative)
 * `type`: (Optional) type of stereo picture:
-  - `vr180` or `vr`: [VR Photo](https://developers.google.com/vr/reference/cardboard-camera-vr-photo-format) - VR180, Google Camera panorama, Cardboard Camera, Photosphere images (Where right eye image and angle of view info are embedded in the image metadata) 
+  - `vr`: [VR Photo](https://developers.google.com/vr/reference/cardboard-camera-vr-photo-format) - VR180, Google Camera panorama, Cardboard Camera, Photosphere images (Where right eye image and angle of view info are embedded in the image metadata) 
   - `left-right`: left eye on the left, right eye on the right, Exif angle of view is used if present.
   - `right-left`: left eye on the right, right eye on the left, Exif angle of view is used if present.
   - `top-bottom`: left eye on the top, right eye on the bottom, Exif angle of view is used if present.
@@ -40,14 +40,17 @@ Then use the `<stereo-img>` custom element anywhere in your page or app, referen
 
 ## Compatibility
 
-### Image types and cameras
+### Supported cameras
 
-This component has been manually tested to load pictures taken with the following cameras with no attribute necessary:
+This component has been manually tested to load pictures taken with the following cameras:
 
-| Status | Camera                              | Attributes                            |  Field of view | Orientation |
-| ------ | ----------------------------------- | ------------------------------------- | ------------- | ----------- |
-| ✔️     | Lenovo Mirage Camera                | `type=vr180`                          |  ✓           | ✓ 
-| ✔️     | Canon RF5.2mm F2.8 L Duel Fisheye   | `type=right-left projection=fisheye`  |  X           | X 
+| Status | Camera                              | Picture type        | Attributes required                   |  Field of view | Orientation |
+| ------ | ----------------------------------- | ------------------- | ------------------------------------- | ------------- | ----------- |
+| ✔️     | Lenovo Mirage Camera                | unprocessed (VR180) | (none)                                |  ✓           | ✓ 
+| ✔️     | Canon RF5.2mm F2.8 L Duel Fisheye   | unprocessed         | (none)                                |  X           | X 
+| ✔️     | Canon RF5.2mm F2.8 L Duel Fisheye   | processed with EOS VR Utility | (none)                    |  X           | X 
+| ✔️     | CALF VR180                          | left-right          | (none)                                |  X           | X 
+| ✔️     | CALF VR180                          | "vr180"             | `angle="180"`                         |  X           | X 
 
 ### Viewers
 
