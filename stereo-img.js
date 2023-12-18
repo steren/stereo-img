@@ -153,6 +153,10 @@ class StereoImg extends HTMLElement {
       const eyeNumber = eye === "left" ? 1 : 2;
       const imageData = eye === "left" ? this.stereoData.leftEye : this.stereoData.rightEye;
 
+      if (this.debug) {
+        console.log(`${eye} image: width: ${imageData.width}, height: ${imageData.width}`);
+      }
+
       // left eye
       const texture = new THREE.Texture(imageData);
       texture.needsUpdate = true;
@@ -259,6 +263,10 @@ class StereoImg extends HTMLElement {
       this.renderer.xr.enabled = true;
       this.renderer.setSize(this.clientWidth, this.clientHeight);
       this.shadowRoot.appendChild(this.renderer.domElement);
+
+      if (this.debug) {
+        console.log(`Max Texture Size: ${this.renderer.capabilities.maxTextureSize}`);
+      }
 
       // TODO: Should we use component size instead?
       this.camera = new THREE.PerspectiveCamera( 70, this.clientWidth / this.clientHeight, 1, 2000 );
