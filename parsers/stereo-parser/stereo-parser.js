@@ -41,9 +41,14 @@ async function parseStereo(url, options) {
   // Images
   let type = options.type || 'left-right';
 
-  // If Canon RF5.2mm F2.8 L DUAL FISHEYE is used, assume right-left and fisheye
+  // Heuristics for Canon RF5.2mm F2.8 L DUAL FISHEYE
+  // Unprocessed pictures are right-left. Pictures processed with EOS VR Utility software are left-right.
   if(exif?.Make === 'Canon' && exif?.LensModel === 'RF5.2mm F2.8 L DUAL FISHEYE') {
-    type = 'right-left';
+    if(exif?.Software?.includes('EOS VR Utility')) {
+      type = 'left-right';
+    } else {
+      type = 'right-left';
+    }
   }
 
   let leftEye;
@@ -123,7 +128,9 @@ async function parseStereo(url, options) {
   let projection;
   if(options?.projection === 'fisheye') {
     projection = 'fisheye';
-  } else if(exif?.Make === 'Canon' && exif?.LensModel === 'RF5.2mm F2.8 L DUAL FISHEYE') {
+    
+  } else if(exif?.Make === 'Canon' && exif?.LensModel === 'RF5.2mm F2.8 L DUAL FISHEYE' && !exif?.Software?.includes('EOS VR Utility')) {
+    // Assume pictures unprocessed with EOS VR Utility are fisheye
     projection = 'fisheye';
   }
 
