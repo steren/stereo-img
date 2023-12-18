@@ -13,7 +13,7 @@
 // limitations under the License.
 
 /**
- * Parser for VR pictures: Cardboard camera, Pixel Camera panorama, VR180 pictures...
+ * Parser for VR Photos that embed left eye in GImage XMP image metadata: Cardboard camera, Pixel Camera panorama, VR180 pictures...
  */
 
 // see official spec at https://developers.google.com/vr/reference/cardboard-camera-vr-photo-format

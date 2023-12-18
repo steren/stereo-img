@@ -96,16 +96,21 @@ class StereoImg extends HTMLElement {
       if(this.src) {
         if(this.type === 'vr180' || this.type === 'vr') {
           this.stereoData = await parseVR(this.src);
+
         } else if(this.type === 'left-right' || this.type === 'right-left' || this.type === 'bottom-top' || this.type === 'top-bottom') {
           this.stereoData = await parseStereo(this.src, {
             type: this.type,
             angle: this.angle,
+            projection: this.projection,
           });
+
         } else if(this.type === 'anaglyph') {
           this.stereoData = await parseAnaglyph(this.src, {
             angle: this.angle,
+            projection: this.projection,
           });
         } else {
+          // No type specified, try to read XMP metadata to see if VR Photo, otherwise assume stereo-style (e.g. "left right")
           // Read XMP metadata
           const exif = await exifr.parse(this.src, {
             xmp: true,
@@ -115,13 +120,14 @@ class StereoImg extends HTMLElement {
           });
 
           if (exif?.GImage?.Data) {
-            // XMP for left eye found, assume VR Photo
+            // GImage XMP for left eye found, assume VR Photo
             this.stereoData = await parseVR(this.src);
           } else {
-            // no left eye found, assume left-right
+            // no left eye found, assume stereo (e.g. left-right)
             console.warn('<stereo-img> does not have a "type" attribute and image does not have XMP metadata of a VR picture.  Use "type" attribute to specify the type of stereoscopic image. Assuming left-right stereo image.');
             this.stereoData = await parseStereo(this.src, {
               angle: this.angle,
+              projection: this.projection,
             });
           }
         }
@@ -156,11 +162,11 @@ class StereoImg extends HTMLElement {
       // invert the geometry on the x-axis so that all of the faces point inward
       geometry.scale(-1, 1, 1);
 
-      if (this.projection === 'fisheye' || this.stereoData.projection === 'fisheye') {
+      if (this.stereoData.projection === 'fisheye') {
         // by default, the sphere UVs are equirectangular
         // re-set the UVs of the sphere to be compatible with a fisheye image
         // to do so, we use the spatial positions of the vertices
-        if(this.angle != "180") {
+        if(this.stereoData.phiLength !== Math.PI || this.stereoData.thetaLength !== Math.PI) {
           console.warn('Fisheye projection is only well supported for 180° stereoscopic images.');
         }
 

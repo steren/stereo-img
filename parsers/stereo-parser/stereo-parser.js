@@ -37,7 +37,14 @@ async function parseStereo(url, options) {
     multiSegment: true
   })
 
-  const type = options.type || 'left-right';
+
+  // Images
+  let type = options.type || 'left-right';
+
+  // If Canon RF5.2mm F2.8 L DUAL FISHEYE is used, assume right-left and fisheye
+  if(exif?.Make === 'Canon' && exif?.LensModel === 'RF5.2mm F2.8 L DUAL FISHEYE') {
+    type = 'right-left';
+  }
 
   let leftEye;
   let rightEye;
@@ -74,23 +81,34 @@ async function parseStereo(url, options) {
     return {diagonalAngle, horizontalAngle, verticalAngle};
   }
 
+
+  // Angles
   let phiLength;
   let thetaLength;
 
   if(options?.angle === "180" || options?.angle === 180) {
     phiLength = Math.PI;
     thetaLength = Math.PI;
+
   } else if(options?.angle === "360" || options?.angle === 360) {
     phiLength = Math.PI * 2;
     thetaLength = Math.PI;
+
   } else if(exif?.FocalLengthIn35mmFormat) {
     const angle = angleOfViewFocalLengthIn35mmFormat(exif.FocalLengthIn35mmFormat);
     phiLength = angle.horizontalAngle;
     thetaLength = angle.verticalAngle;
+
   } else if(exif?.Make === 'GoPro' || url.includes('gopro') || url.includes('GOPR') ) {
     // GoPro (https://gopro.com/help/articles/question_answer/hero7-field-of-view-fov-information?sf96748270=1)
     phiLength = 2.1397737; // 122.6º
     thetaLength = 1.647591;  // 94.4º
+
+  } else if(exif?.Make === 'Canon' && exif?.LensModel === 'RF5.2mm F2.8 L DUAL FISHEYE') {
+    // TODO: This lense has a 190º angle of view, but the viewer doesn't support any other angle than 180 for fisheye.
+    phiLength = Math.PI;
+    thetaLength = Math.PI;
+
   } else {
     const assumeFocalLengthIn35mmFormat = 27;
     const angle = angleOfViewFocalLengthIn35mmFormat(assumeFocalLengthIn35mmFormat);
@@ -100,7 +118,16 @@ async function parseStereo(url, options) {
 
   const thetaStart = Math.PI / 2 - thetaLength / 2;
 
-  return {leftEye, rightEye, phiLength, thetaStart, thetaLength};
+
+  // Projection
+  let projection;
+  if(options?.projection === 'fisheye') {
+    projection = 'fisheye';
+  } else if(exif?.Make === 'Canon' && exif?.LensModel === 'RF5.2mm F2.8 L DUAL FISHEYE') {
+    projection = 'fisheye';
+  }
+
+  return {leftEye, rightEye, phiLength, thetaStart, thetaLength, projection};
 }
 
 async function createImageFromURL(url) {
