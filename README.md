@@ -23,25 +23,31 @@ Then use the `<stereo-img>` custom element anywhere in your page or app, referen
 
 * `src`: (Required) source of the stereo picture (absolute or relative)
 * `type`: (Optional) type of stereo picture:
-  - `vr180`: [VR Photo](https://developers.google.com/vr/reference/cardboard-camera-vr-photo-format) - VR180, Google Camera panorama, Cardboard Camera, Photosphere images (Where right eye image and angle of view info are embedded in the image metadata) 
+  - `vr180` or `vr`: [VR Photo](https://developers.google.com/vr/reference/cardboard-camera-vr-photo-format) - VR180, Google Camera panorama, Cardboard Camera, Photosphere images (Where right eye image and angle of view info are embedded in the image metadata) 
   - `left-right`: left eye on the left, right eye on the right, Exif angle of view is used if present.
+  - `right-left`: left eye on the right, right eye on the left, Exif angle of view is used if present.
   - `top-bottom`: left eye on the top, right eye on the bottom, Exif angle of view is used if present.
+  - `bottom-top`: left eye on the bottom, right eye on the top, Exif angle of view is used if present.
   - `anaglyph`: [Anaglyph 3D](https://en.wikipedia.org/wiki/Anaglyph_3D) - currently only supporting red / green
   - If unset, type is inferred from heuristics.
 * `angle`: (Optional) hint at angle of view for `left-right` or `top-bottom` types
   - `180`: Half sphere (VR180)
   - `360`: Full sphere
   - If unset, Exif angle of view is used if present.
+* `projection`: (Optional) hint at projection (most VR pictures use equirectangular projection)
+  - `fisheye`: Fisheye projection
+  - If unset, projection is inferred from heuristics.
 
 ## Compatibility
 
 ### Image types and cameras
 
-This component has been manually tested to load pictures taken with the following cameras:
+This component has been manually tested to load pictures taken with the following cameras with no attribute necessary:
 
-| Image type             | Camera                 | Status | Field of view | Orientation |
-| ---------------------- | ---------------------- | ------ | ------------- | ----------- |
-| VR180                  | Lenovo Mirage Camera   | ✔️     |  ✓           | ✓ 
+| Status | Camera                              | Attributes                            |  Field of view | Orientation |
+| ------ | ----------------------------------- | ------------------------------------- | ------------- | ----------- |
+| ✔️     | Lenovo Mirage Camera                | `type=vr180`                          |  ✓           | ✓ 
+| ✔️     | Canon RF5.2mm F2.8 L Duel Fisheye   | `type=right-left projection=fisheye`  |  X           | X 
 
 ### Viewers
 
