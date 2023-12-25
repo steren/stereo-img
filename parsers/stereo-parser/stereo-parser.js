@@ -104,7 +104,7 @@ async function parseStereo(url, options) {
     phiLength = angle.horizontalAngle;
     thetaLength = angle.verticalAngle;
 
-  } else if(exif?.Make === 'GoPro' || url.includes('gopro') || url.includes('GOPR') ) {
+  } else if(exif?.Make === 'GoPro' || url.startsWith('gopro') || url.startsWith('GOPR') ) {
     // GoPro (https://gopro.com/help/articles/question_answer/hero7-field-of-view-fov-information?sf96748270=1)
     phiLength = 2.1397737; // 122.6º
     thetaLength = 1.647591;  // 94.4º
