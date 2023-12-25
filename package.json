@@ -30,7 +30,7 @@
   },
   "homepage": "https://github.com/steren/stereo-img#readme",
   "devDependencies": {
-    "serve": "^13.0.2"
+    "serve": "^14.2.1"
   },
   "dependencies": {
     "exifr": "^7.1.3",
