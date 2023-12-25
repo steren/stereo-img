@@ -8,7 +8,7 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "serve"
+    "start": "npx serve"
   },
   "repository": {
     "type": "git",
@@ -28,10 +28,7 @@
   "bugs": {
     "url": "https://github.com/steren/stereo-img/issues"
   },
-  "homepage": "https://github.com/steren/stereo-img#readme",
-  "devDependencies": {
-    "serve": "^14.2.1"
-  },
+  "homepage": "https://stereo-img.steren.fr/",
   "dependencies": {
     "exifr": "^7.1.3",
     "three": "^0.134.0"
