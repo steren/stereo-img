@@ -147,11 +147,26 @@ class StereoImg extends HTMLElement {
      * 
      * @param {String} eye: "left" or "right"
      */
-    createEye(eye, debug) {
+    async createEye(eye, debug) {
       const radius = 10; // 500
 
       const eyeNumber = eye === "left" ? 1 : 2;
-      const imageData = eye === "left" ? this.stereoData.leftEye : this.stereoData.rightEye;
+      let imageData = eye === "left" ? this.stereoData.leftEye : this.stereoData.rightEye;
+
+      // if max texture size supported by the GPU is below the eye image size, resize the image
+      const maxTextureSize = this.renderer.capabilities.maxTextureSize;
+      if (imageData.width > maxTextureSize || imageData.height > maxTextureSize) {
+        const newWidth = Math.min(imageData.width, maxTextureSize);
+        const newHeight = Math.min(imageData.height, maxTextureSize);
+        console.warn(`Image size (${imageData.width}x${imageData.height}) exceeds max texture size (${maxTextureSize}x${maxTextureSize}). Resizing to ${newWidth}x${newHeight}.`);
+        const canvas = document.createElement("canvas");
+        canvas.width = newWidth;
+        canvas.height = newHeight;
+        const ctx = canvas.getContext("2d");
+        const imageBitmap = await createImageBitmap(imageData);
+        ctx.drawImage(imageBitmap, 0, 0, newWidth, newHeight);
+        imageData = ctx.getImageData(0, 0, newWidth, newHeight);
+      }
 
       if (this.debug) {
         console.log(`${eye} image: width: ${imageData.width}, height: ${imageData.width}`);
@@ -220,17 +235,17 @@ class StereoImg extends HTMLElement {
       }
     }
 
-    initialize3DScene() {
+    async initialize3DScene() {
       this.scene = new THREE.Scene();
       this.scene.background = new THREE.Color( 0x101010 );
 
-      this.createEye("left");
-      this.createEye("right");
+      await this.createEye("left");
+      await this.createEye("right");
     }
 
     async parseImageAndInitialize3DScene() {
       await this.parse();
-      this.initialize3DScene();
+      await this.initialize3DScene();
     }
 
     async init() {
@@ -256,8 +271,6 @@ class StereoImg extends HTMLElement {
         this.style.height = this.clientWidth / aspectRatio + "px";
       }
 
-      await this.parseImageAndInitialize3DScene();
-
       this.renderer = new THREE.WebGLRenderer();
       this.renderer.setPixelRatio(window.devicePixelRatio);
       this.renderer.xr.enabled = true;
@@ -277,6 +290,8 @@ class StereoImg extends HTMLElement {
       controls.update();
 
       this.shadowRoot.appendChild(VRButton.createButton(this.renderer));
+
+      await this.parseImageAndInitialize3DScene();
 
       this.animate();
 
