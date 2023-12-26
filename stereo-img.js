@@ -168,11 +168,6 @@ class StereoImg extends HTMLElement {
         imageData = ctx.getImageData(0, 0, newWidth, newHeight);
       }
 
-      if (this.debug) {
-        console.log(`${eye} image: width: ${imageData.width}, height: ${imageData.width}`);
-      }
-
-      // left eye
       const texture = new THREE.Texture(imageData);
       texture.needsUpdate = true;
 
