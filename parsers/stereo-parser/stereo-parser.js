@@ -32,6 +32,27 @@ async function parseStereo(url, options) {
   canvas.height = height;
   ctx.drawImage(image, 0, 0);
 
+  // check if fisheye projection
+  let projection;
+  if(options?.projection === 'fisheye') {
+    projection = 'fisheye';
+  } else {
+    // Read pixels in each corner and middle to see if they are black. If black, assume fisheye image
+    const blackThreshold = 10;
+    const topLeft = ctx.getImageData(0, 0, 1, 1).data;
+    const topRight = ctx.getImageData(width - 1, 0, 1, 1).data;
+    const bottomLeft = ctx.getImageData(0, height - 1, 1, 1).data;
+    const bottomRight = ctx.getImageData(width - 1, height - 1, 1, 1).data;
+    const middle = ctx.getImageData(width / 2, height / 2, 1, 1).data;
+    if(topLeft[0] < blackThreshold && topLeft[1] < blackThreshold && topLeft[2] < blackThreshold &&
+      topRight[0] < blackThreshold && topRight[1] < blackThreshold && topRight[2] < blackThreshold &&
+      bottomLeft[0] < blackThreshold && bottomLeft[1] < blackThreshold && bottomLeft[2] < blackThreshold &&
+      bottomRight[0] < blackThreshold && bottomRight[1] < blackThreshold && bottomRight[2] < blackThreshold &&
+      middle[0] < blackThreshold && middle[1] < blackThreshold && middle[2] < blackThreshold) {
+        projection = 'fisheye';
+      }
+  }
+
   const exif = await exifr.parse(url, {
     xmp: true,
     multiSegment: true
@@ -123,16 +144,6 @@ async function parseStereo(url, options) {
 
   const thetaStart = Math.PI / 2 - thetaLength / 2;
 
-
-  // Projection
-  let projection;
-  if(options?.projection === 'fisheye') {
-    projection = 'fisheye';
-    
-  } else if(exif?.Make === 'Canon' && exif?.LensModel === 'RF5.2mm F2.8 L DUAL FISHEYE' && !exif?.Software?.includes('EOS VR Utility')) {
-    // Assume pictures unprocessed with EOS VR Utility are fisheye
-    projection = 'fisheye';
-  }
 
   return {leftEye, rightEye, phiLength, thetaStart, thetaLength, projection};
 }
