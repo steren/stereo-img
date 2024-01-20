@@ -64,7 +64,8 @@ This component has been manually tested on the following hardware, OS and browse
 | Cardboard   | Android     | Chrome          | ✔️⚠️ ([very large panoramas do not load](https://github.com/steren/stereo-img/issues/1))
 | Cardboard   | Android     | Firefox         | ❌
 | Cardboard   | iOS         |                 | ❌ [#18](https://github.com/steren/stereo-img/issues/18)
-| Quest 1     |             |                 | ✔️
+| Quest 1     |             | Default         | ✔️
+| Quest 2     |             | Default         | ✔️️
 
 ## Installing using npm
 
