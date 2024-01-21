@@ -124,7 +124,7 @@ class StereoImg extends HTMLElement {
             this.stereoData = await parseVR(this.src);
           } else {
             // no left eye found, assume stereo (e.g. left-right)
-            console.warn('<stereo-img> does not have a "type" attribute and image does not have XMP metadata of a VR picture.  Use "type" attribute to specify the type of stereoscopic image. Assuming left-right stereo image.');
+            console.info('<stereo-img> does not have a "type" attribute and image does not have XMP metadata of a VR picture.  Use "type" attribute to specify the type of stereoscopic image. Assuming stereo image of the "left-right" family.');
             this.stereoData = await parseStereo(this.src, {
               angle: this.angle,
               projection: this.projection,
