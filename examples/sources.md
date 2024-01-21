@@ -1,8 +1,8 @@
-Panorama: 
+Google Camera panorama: 
 
 * `pixel3xl.PANO.jpg`: personal panorama picture taken with Google Camera on Pixel 3 XL 
 * `pixel5.PANO.jpg`: personal panorama picture taken with Google Camera on Pixel 5
-* [`walrus-360.top-bottom.jpg`](https://github.com/googlearchive/vrview/blob/master/examples/hotspots/walrus.jpg): most likely a Cardboard Camera picture transforced to top - bottom image
+* [`walrus-360.top-bottom.jpg`](https://github.com/googlearchive/vrview/blob/master/examples/hotspots/walrus.jpg): most likely a Cardboard Camera picture transfomced to top - bottom image
 
 VR180: 
 
@@ -27,3 +27,7 @@ Canon EOS R5
 
 * `calf-vr180.jpg`: personal picture taken using the CALF 3D VR180 camera using VR180 option (Donated by [Arian Kulp](https://github.com/atkulp) in [this issue](https://github.com/steren/stereo-img/issues/20).
 * `calf-left-right.jpg`: personal picture taken using the CALF 3D VR180 camera using the flattened option (Donated by [Arian Kulp](https://github.com/atkulp) in [this issue](https://github.com/steren/stereo-img/issues/20).
+
+[Kandao QooCam EGO 3D Camera](https://us.kandaovr.com/products/qoocam-ego)
+
+* `kandao-qoocam-ego.jpg`: personal picture taken using the Kandao Qoocam Ego camera (Donated by [Adeo](https://twitter.com/deo_pepas))
