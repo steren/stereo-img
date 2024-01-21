@@ -32,28 +32,29 @@ async function parseStereo(url, options) {
   canvas.height = height;
   ctx.drawImage(image, 0, 0);
 
+  function pixelIsBlack(pixel) {
+    const blackThreshold = 10;
+    return pixel[0] < blackThreshold && pixel[1] < blackThreshold && pixel[2] < blackThreshold;
+  }
+
   // check if fisheye projection
   let projection;
   if(options?.projection === 'fisheye') {
     projection = 'fisheye';
   } else {
     // Read pixels in each corner and middle to see if they are black. If black, assume fisheye image
-    const blackThreshold = 10;
     const topLeft = ctx.getImageData(0, 0, 1, 1).data;
     const topRight = ctx.getImageData(width - 1, 0, 1, 1).data;
     const bottomLeft = ctx.getImageData(0, height - 1, 1, 1).data;
     const bottomRight = ctx.getImageData(width - 1, height - 1, 1, 1).data;
     const middle = ctx.getImageData(width / 2, height / 2, 1, 1).data;
-    if(topLeft[0] < blackThreshold && topLeft[1] < blackThreshold && topLeft[2] < blackThreshold &&
-      topRight[0] < blackThreshold && topRight[1] < blackThreshold && topRight[2] < blackThreshold &&
-      bottomLeft[0] < blackThreshold && bottomLeft[1] < blackThreshold && bottomLeft[2] < blackThreshold &&
-      bottomRight[0] < blackThreshold && bottomRight[1] < blackThreshold && bottomRight[2] < blackThreshold &&
-      middle[0] < blackThreshold && middle[1] < blackThreshold && middle[2] < blackThreshold) {
+    if(pixelIsBlack(topLeft) && pixelIsBlack(topRight) && pixelIsBlack(bottomLeft) && pixelIsBlack(bottomRight) && pixelIsBlack(middle)) {
         projection = 'fisheye';
+        console.log("Detected fisheye image");
       }
   }
 
-  const exif = await exifr.parse(url, {
+  const exif = await exifr.parse(image, {
     xmp: true,
     multiSegment: true
   })
@@ -75,14 +76,84 @@ async function parseStereo(url, options) {
   let leftEye;
   let rightEye;
 
+  let top = 0;
+  let leftLeft = 0;
+  let leftRight = width / 2;
+  let bottom = height;
+  let rightRight = width;
+  let rightLeft = width / 2;
+
+  // TODO: This assumes left-right or right-left. Make compatible with top-bottom and bottom-top.
+  // fisheye image might have black around image data, measure the actual top, left, bottom, right position of the fisheye circle
+  if(projection === 'fisheye') {
+
+    // top
+    for(let y = 0; y < height / 2; y++) {
+      const pixel = ctx.getImageData(width / 4, y, 1, 1).data;
+      if(!pixelIsBlack(pixel)) {
+        top = y;
+        break;
+      }
+    }
+
+    // bottom
+    for(let y = height - 1; y > height / 2; y--) {
+      const pixel = ctx.getImageData(width / 4, y, 1, 1).data;
+      if(!pixelIsBlack(pixel)) {
+        bottom = y;
+        break;
+      }
+    }
+
+    // left of the left fisheye
+    for(let x = 0; x < width / 4; x++) {
+      const pixel = ctx.getImageData(x, height / 2, 1, 1).data;
+      if(!pixelIsBlack(pixel)) {
+        leftLeft = x;
+        break;
+      }
+    }
+
+    // right of the left fisheye
+    for(let x = width / 2 - 1; x > width / 4; x--) {
+      const pixel = ctx.getImageData(x, height / 2, 1, 1).data;
+      if(!pixelIsBlack(pixel)) {
+        leftRight = x;
+        break;
+      }
+    }
+
+    // right of the right fisheye
+    for(let x = width  - 1; x > 3 * width / 4; x--) {
+      const pixel = ctx.getImageData(x, height / 2, 1, 1).data;
+      if(!pixelIsBlack(pixel)) {
+        rightRight = x;
+        break;
+      }
+    }
+
+    // left of the right fisheye
+    for(let x = width / 2 - 1; x > width / 4; x++) {
+      const pixel = ctx.getImageData(x, height / 2, 1, 1).data;
+      if(!pixelIsBlack(pixel)) {
+        rightLeft = x;
+        break;
+      }
+    }
+
+
+    console.log({top, bottom, leftLeft, leftRight, rightLeft, rightRight});
+  }
+  
+
   switch(type) {
     case 'left-right':
-      leftEye =  ctx.getImageData(0, 0, width / 2, height);
-      rightEye = ctx.getImageData(width / 2, 0, width / 2, height);
+      leftEye =  ctx.getImageData(leftLeft, top, leftRight - leftLeft, bottom - top);
+      rightEye = ctx.getImageData(rightLeft, top, rightRight - rightLeft, bottom - top);
       break;
     case 'right-left':
-      leftEye =  ctx.getImageData(width / 2, 0, width / 2, height);
-      rightEye = ctx.getImageData(0, 0, width / 2, height);
+      leftEye =  ctx.getImageData(rightLeft, top, rightRight - rightLeft, bottom - top);
+      rightEye = ctx.getImageData(leftLeft, top, leftRight - leftLeft, bottom - top);
       break;
     case 'top-bottom':
       leftEye = ctx.getImageData(0, 0, width, height / 2); 

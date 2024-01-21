@@ -197,12 +197,11 @@ class StereoImg extends HTMLElement {
   
           // TODO: understand and check this line of math. It is taken from https://github.com/mrdoob/three.js/blob/f32e6f14046b5affabe35a0f42f0cad7b5f2470e/examples/webgl_panorama_dualfisheye.html
           var correction = (y == 0 && z == 0) ? 1 : (Math.acos(x) / Math.sqrt(y * y + z * z)) * (2 / Math.PI);
-          // UVs expand the whole x axis
+          // We expect that the left/right eye images have already been cropped of any black border.
+          // Therefore, UVs expand the whole u and v axis 
           uvs[ i * 2 + 0 ] = z * 0.5 * correction + 0.5;
-          // fisheye images usually use the full width of the image, but not the full height
-          uvs[ i * 2 + 1 ] = y * 0.5 * imageWidth / imageHeight * correction + 0.5;
-  
-        }
+          uvs[ i * 2 + 1 ] = y * 0.5 * correction + 0.5;
+          }
       }
 
       const material = new THREE.MeshBasicMaterial({ map: texture });
