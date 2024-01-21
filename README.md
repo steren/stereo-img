@@ -52,7 +52,8 @@ This component has been manually tested to load pictures taken with the followin
 | ✔️     | CALF VR180                          | left-right          | (none)                                |  X           | X 
 | ✔️     | CALF VR180                          | "vr180"             | `angle="180"`                         |  X           | X 
 | ✔️     | Kandao QooCam EGO 3D Camera         | left-right          | (none)                                |  X           | X 
-### Viewers
+
+### Viewers and headsets
 
 This component has been manually tested on the following hardware, OS and browsers:
 
