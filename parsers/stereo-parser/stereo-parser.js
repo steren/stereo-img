@@ -206,6 +206,11 @@ async function parseStereo(url, options) {
     phiLength = 2.1397737; // 122.6º
     thetaLength = 1.647591;  // 94.4º
 
+  } else if(exif?.Make === 'Canon' && exif?.LensModel === 'RF5.2mm F2.8 L DUAL FISHEYE') {
+    // TODO: This lense has a 190º angle of view, but the viewer doesn't support any other angle than 180 for fisheye.
+    phiLength = Math.PI;
+    thetaLength = Math.PI;
+
   } else {
     const assumeFocalLengthIn35mmFormat = 27;
     const angle = angleOfViewFocalLengthIn35mmFormat(assumeFocalLengthIn35mmFormat);
