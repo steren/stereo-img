@@ -23,20 +23,20 @@ Then use the `<stereo-img>` custom element anywhere in your page or app, referen
 
 * `src`: (Required) source of the stereo picture (absolute or relative)
 * `type`: (Optional) type of stereo picture:
+  - If unset, type is inferred from heuristics
   - `vr`: [VR Photo](https://developers.google.com/vr/reference/cardboard-camera-vr-photo-format) - VR180, Google Camera panorama, Cardboard Camera, Photosphere images (Where right eye image and angle of view info are embedded in the image metadata) 
   - `left-right`: left eye on the left, right eye on the right, Exif angle of view is used if present.
   - `right-left`: left eye on the right, right eye on the left, Exif angle of view is used if present.
   - `top-bottom`: left eye on the top, right eye on the bottom, Exif angle of view is used if present.
   - `bottom-top`: left eye on the bottom, right eye on the top, Exif angle of view is used if present.
   - `anaglyph`: [Anaglyph 3D](https://en.wikipedia.org/wiki/Anaglyph_3D) - currently only supporting red / green
-  - If unset, type is inferred from heuristics.
 * `angle`: (Optional) hint at angle of view for `left-right` or `top-bottom` types
+  - If unset, Exif angle of view is used if present.
   - `180`: Half sphere (VR180)
   - `360`: Full sphere
-  - If unset, Exif angle of view is used if present.
 * `projection`: (Optional) hint at projection (most VR pictures use equirectangular projection)
-  - `fisheye`: Fisheye projection
   - If unset, projection is inferred from heuristics.
+  - `fisheye`: Fisheye projection
 
 ## Compatibility
 
