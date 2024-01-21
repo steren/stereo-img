@@ -191,6 +191,11 @@ async function parseStereo(url, options) {
     phiLength = Math.PI * 2;
     thetaLength = Math.PI;
 
+  } else if(projection === 'fisheye') {
+    // If fisheye, assume 180.
+    phiLength = Math.PI;
+    thetaLength = Math.PI;
+
   } else if(exif?.FocalLengthIn35mmFormat) {
     const angle = angleOfViewFocalLengthIn35mmFormat(exif.FocalLengthIn35mmFormat);
     phiLength = angle.horizontalAngle;
@@ -200,11 +205,6 @@ async function parseStereo(url, options) {
     // GoPro (https://gopro.com/help/articles/question_answer/hero7-field-of-view-fov-information?sf96748270=1)
     phiLength = 2.1397737; // 122.6º
     thetaLength = 1.647591;  // 94.4º
-
-  } else if(exif?.Make === 'Canon' && exif?.LensModel === 'RF5.2mm F2.8 L DUAL FISHEYE') {
-    // TODO: This lense has a 190º angle of view, but the viewer doesn't support any other angle than 180 for fisheye.
-    phiLength = Math.PI;
-    thetaLength = Math.PI;
 
   } else {
     const assumeFocalLengthIn35mmFormat = 27;
