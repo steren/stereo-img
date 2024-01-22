@@ -8,9 +8,12 @@ VR180:
 
 * `vr180-lenovo-mirage.vr.jpg`: personal picture taken with Lenovo Mirage camera
 
-Left-right stereo: 
+Stereograph: 
 
 * [`stereograph.left-right.jpg`](https://en.wikipedia.org/wiki/File:Stereograph_as_an_educator.jpg)
+
+GoPro:
+
 * `hand-made.left-right.jpg`: personal picture, taken with 2 Go Pro cameras side by side
 
 Anaglyph: 
@@ -31,3 +34,8 @@ Canon EOS R5
 [Kandao QooCam EGO 3D Camera](https://us.kandaovr.com/products/qoocam-ego)
 
 * `kandao-qoocam-ego.jpg`: personal picture taken using the Kandao Qoocam Ego camera (Donated by [Adeo](https://twitter.com/deo_pepas))
+
+Panasonic DMC-GX8 with H-FT012
+
+* `Panasonic-DMC-GX8.mpo`: personal picture taken using the Panasonic DMC-GX8 camera with a H-FT012 lens (Donated by [Adeo](https://twitter.com/deo_pepas))
+* `Panasonic-DMC-GX8.jpg`: personal picture taken using the Panasonic DMC-GX8 camera with a H-FT012 lens, then converted from `. mpo` to `.jpg` (Donated by [Adeo](https://twitter.com/deo_pepas))
