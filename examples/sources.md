@@ -8,9 +8,12 @@ VR180:
 
 * `vr180-lenovo-mirage.vr.jpg`: personal picture taken with Lenovo Mirage camera
 
-Left-right stereo: 
+Stereograph: 
 
 * [`stereograph.left-right.jpg`](https://en.wikipedia.org/wiki/File:Stereograph_as_an_educator.jpg)
+
+GoPro:
+
 * `hand-made.left-right.jpg`: personal picture, taken with 2 Go Pro cameras side by side
 
 Anaglyph: 
@@ -31,3 +34,13 @@ Canon EOS R5
 [Kandao QooCam EGO 3D Camera](https://us.kandaovr.com/products/qoocam-ego)
 
 * `kandao-qoocam-ego.jpg`: personal picture taken using the Kandao Qoocam Ego camera (Donated by [Adeo](https://twitter.com/deo_pepas))
+
+Panasonic DMC-GX8 with H-FT012
+
+* `Panasonic-DMC-GX8.mpo`: personal picture taken using the Panasonic DMC-GX8 camera with a H-FT012 lens (Donated by [Adeo](https://twitter.com/deo_pepas))
+* `Panasonic-DMC-GX8.jpg`: personal picture taken using the Panasonic DMC-GX8 camera with a H-FT012 lens, then converted from `. mpo` to `.jpg` (Donated by [Adeo](https://twitter.com/deo_pepas))
+
+Leia [Lume Pad 2](https://www.leiainc.com/lume-pad-2)
+
+* `leia_lume_pad2.jpg`: personal picture taken using Lume Pad 2. In Leia Image Format (LIF) (Donated by [Nima Zeighami](https://github.com/VR-Nima))
+* `leia_lume_pad2_2x1.jpg`: personal picture taken using Lume Pad 2 converted to regular side by side left-right.
