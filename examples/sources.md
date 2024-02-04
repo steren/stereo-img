@@ -44,3 +44,7 @@ Leia [Lume Pad 2](https://www.leiainc.com/lume-pad-2)
 
 * `leia_lume_pad2.jpg`: personal picture taken using Lume Pad 2. In Leia Image Format (LIF) (Donated by [Nima Zeighami](https://github.com/VR-Nima))
 * `leia_lume_pad2_2x1.jpg`: personal picture taken using Lume Pad 2 converted to regular side by side left-right.
+
+Apple Vision Pro
+
+* [`vision-pro.HEIC`](vision-pro.HEIC): personal picture taken using Apple Vision Pro camera (Donated by [Cyril Dorsaz](https://twitter.com/cyrildorsaz))
