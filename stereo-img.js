@@ -144,6 +144,25 @@ class StereoImg extends HTMLElement {
     }
 
     /**
+     * When called, the element should flicker between the left and right eye images
+     * @param {Boolean} toggle: if true, enable flicker, if false, disable flicker
+     */
+    flicker(toggle) {
+      let intervalMilliseconds = 1000 / 10;
+      let layer = 1;
+      let intervalID;
+
+      if(toggle) {
+        setInterval(() => {
+          layer = layer === 1 ? 2 : 1;
+          this.camera.layers.set(layer);
+        }, intervalMilliseconds);
+      } else {
+        clearInterval(intervalID);
+      }
+    } 
+
+    /**
      * 
      * @param {String} eye: "left" or "right"
      */
@@ -248,6 +267,9 @@ class StereoImg extends HTMLElement {
 
       await this.createEye("left");
       await this.createEye("right");
+
+      // TODO: enable flickering if not in VR mode.
+      //this.flicker(true);
     }
 
     async parseImageAndInitialize3DScene() {
