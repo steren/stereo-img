@@ -171,10 +171,26 @@ class StereoImg extends HTMLElement {
       const texture = new THREE.Texture(imageData);
       texture.needsUpdate = true;
 
-      // TODO: Screen size should depend on image aspect ratio, camera fov...
-      const geometry = new THREE.SphereGeometry(radius, 60, 40, -1 * this.stereoData.phiLength / 2, this.stereoData.phiLength, this.stereoData.thetaStart, this.stereoData.thetaLength);
-      // invert the geometry on the x-axis so that all of the faces point inward
-      geometry.scale(-1, 1, 1);
+      let geometry;
+      // if angle is less than Pi / 2, use a plane, otherwise use a sphere
+      if(this.stereoData.phiLength < Math.PI / 2) {
+        const imageWidth = imageData.width;
+        const imageHeight = imageData.height;
+        const aspectRatio = imageWidth / imageHeight;
+
+        const planeWidth = radius * 2;
+        const planeHeight = planeWidth / aspectRatio;
+        const planeDistance = radius;
+
+        geometry = new THREE.PlaneGeometry(planeWidth, planeHeight, 1, 1);
+        // Put the plane in front of the camera (rotate and translate it)
+        geometry.rotateY(-Math.PI / 2);
+        geometry.translate(planeDistance, 0, 0);
+      } else {
+        geometry = new THREE.SphereGeometry(radius, 60, 40, -1 * this.stereoData.phiLength / 2, this.stereoData.phiLength, this.stereoData.thetaStart, this.stereoData.thetaLength);
+        // invert the geometry on the x-axis so that all of the faces point inward
+        geometry.scale(-1, 1, 1);
+      }
 
       if (this.stereoData.projection === 'fisheye') {
         // by default, the sphere UVs are equirectangular
@@ -183,9 +199,6 @@ class StereoImg extends HTMLElement {
         if(this.stereoData.phiLength !== Math.PI || this.stereoData.thetaLength !== Math.PI) {
           console.warn('Fisheye projection is only well supported for 180° stereoscopic images.');
         }
-
-        const imageWidth = imageData.width;
-        const imageHeight = imageData.height;
   
         const normals = geometry.attributes.normal.array;
         const uvs = geometry.attributes.uv.array;
