@@ -200,6 +200,7 @@ class StereoImg extends HTMLElement {
 
       const texture = new THREE.Texture(imageData);
       texture.needsUpdate = true;
+      texture.colorSpace = THREE.SRGBColorSpace;
 
       let geometry;
       // if angle is less than Pi / 2, use a plane, otherwise use a sphere
