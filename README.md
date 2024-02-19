@@ -7,16 +7,22 @@ See the [demo](https://stereo-img.steren.fr/) for an example.
 
 ## How to use
 
-Load the module and its dependencies from a CDN:
+Load the module:
 
 ```html
-<script type="module" src="https://cdn.skypack.dev/stereo-img"></script>
+<script type="module" src="https://stereo-img.steren.fr/stereo-img.js"></script>
 ```
 
 Then use the `<stereo-img>` custom element anywhere in your page or app, reference a stereo picture in the `src` attribute:
 
 ```html
 <stereo-img src="picture.vr.jpg"></stereo-img>
+```
+
+Alternatively, you can serve the module from your own server, install it via npm:
+
+```bash
+npm install stereo-img
 ```
 
 ## Attributes

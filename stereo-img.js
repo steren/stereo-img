@@ -15,11 +15,11 @@
 import { parseVR } from './parsers/vr-parser/vr-parser.js';
 import { parseStereo } from './parsers/stereo-parser/stereo-parser.js';
 import { parseAnaglyph } from './parsers/anaglyph-parser/anaglyph-parser.js';
-import exifr from 'exifr';
+import exifr from './vendor/exifr/full.esm.js';
 
-import * as THREE from 'three';
-import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
-import { OrbitControls  } from 'three/examples/jsm/controls/OrbitControls.js';
+import * as THREE from './vendor/three/three.module.min.js';
+import { VRButton } from './lib/VRButton.js';
+import { OrbitControls  } from './lib/OrbitControls.js';
 
 
 class StereoImg extends HTMLElement {

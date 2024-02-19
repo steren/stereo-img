@@ -46,21 +46,7 @@ limitations under the License.
     window.polyfill = new WebXRPolyfill();
   </script>
 
-  <!-- Load from CDN-->
-  <script type="module" src="https://cdn.skypack.dev/stereo-img"></script>
-
-  <!-- In development, use dependencies from local node_modules -->
-  <!-- <script type="importmap">
-    {
-      "imports": {
-        "stereo-img": "./stereo-img.js",
-        "exifr": "./node_modules/exifr/dist/full.esm.js",
-        "three": "./node_modules/three/build/three.module.js",
-        "three/": "./node_modules/three/"
-      }
-    }
-  </script>
-  <script type="module">import "stereo-img";</script> -->
+  <script type="module" src="./stereo-img.js"></script>
 
   <style>
     html {
@@ -142,7 +128,7 @@ limitations under the License.
 
     <p>To add this viewer to your page or app:
       <pre><code>
-&lt;script type="module" src="https://cdn.skypack.dev/stereo-img">&lt;/script>
+&lt;script type="module" src="https://stereo-img.steren.fr/stereo-img.js">&lt;/script>
 &lt;stereo-img src="picture.vr.jpg">&lt;/stereo-img>
       </code></pre>
     </p>

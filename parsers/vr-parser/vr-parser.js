@@ -18,7 +18,7 @@
 
 // see official spec at https://developers.google.com/vr/reference/cardboard-camera-vr-photo-format
 
-import exifr from 'exifr';
+import exifr from './../../vendor/exifr/full.esm.js';
 
 async function parseVR(url) {
   const image = await createImageFromURL(url);
