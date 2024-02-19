@@ -68,6 +68,17 @@ class StereoImg extends HTMLElement {
       }
     }
 
+    get wiggle() {
+      return this.getAttribute('wiggle');
+    }
+    set wiggle(val) {
+      if (val) {
+        this.setAttribute('wiggle', val);
+      } else {
+        this.removeAttribute('wiggle');
+      }
+    }
+
     get src() {
       return this.getAttribute('src');
     }
@@ -144,10 +155,10 @@ class StereoImg extends HTMLElement {
     }
 
     /**
-     * When called, the element should flicker between the left and right eye images
-     * @param {Boolean} toggle: if true, enable flicker, if false, disable flicker
+     * When called, the element should wiggle between the left and right eye images
+     * @param {Boolean} toggle: if true, enable wiggle, if false, disable wiggle
      */
-    flicker(toggle) {
+    toggleWiggle(toggle) {
       let intervalMilliseconds = 1000 / 10;
       let layer = 1;
       let intervalID;
@@ -268,8 +279,9 @@ class StereoImg extends HTMLElement {
       await this.createEye("left");
       await this.createEye("right");
 
-      // TODO: enable flickering if not in VR mode.
-      //this.flicker(true);
+      if(this.wiggle === 'enabled' || !this.wiggle) {
+        this.toggleWiggle(true);
+      }
     }
 
     async parseImageAndInitialize3DScene() {

@@ -37,6 +37,9 @@ Then use the `<stereo-img>` custom element anywhere in your page or app, referen
 * `projection`: (Optional) hint at projection (most VR pictures use equirectangular projection)
   - If unset, projection is inferred from heuristics.
   - `fisheye`: Fisheye projection
+* `wiggle`: (Optional) When viewing in 2D, alternate between left and right images to help the user see the 3D effect
+  - `enabled`: wiggle is enabled
+  - `disabled`: wiggle is disabled
 
 ## Compatibility
 
