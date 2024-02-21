@@ -15,6 +15,7 @@
 import { parseVR } from './parsers/vr-parser/vr-parser.js';
 import { parseStereo } from './parsers/stereo-parser/stereo-parser.js';
 import { parseAnaglyph } from './parsers/anaglyph-parser/anaglyph-parser.js';
+import { parseDepth } from './parsers/depth-parser/depth-parser.js';
 import exifr from './vendor/exifr/full.esm.js';
 
 import * as THREE from './vendor/three/three.module.min.js';
@@ -120,26 +121,37 @@ class StereoImg extends HTMLElement {
             angle: this.angle,
             projection: this.projection,
           });
-        } else {
-          // No type specified, try to read XMP metadata to see if VR Photo, otherwise assume stereo-style (e.g. "left right")
-          // Read XMP metadata
-          const exif = await exifr.parse(this.src, {
-            xmp: true,
-            multiSegment: true,
-            mergeOutput: false,
-            ihdr: true, //unclear why we need this, but if not enabled, some VR180 XMP Data are not parsed
-          });
 
-          if (exif?.GImage?.Data) {
-            // GImage XMP for left eye found, assume VR Photo
-            this.stereoData = await parseVR(this.src);
+        } else if(this.type === 'depth') {
+          this.stereoData = await parseDepth(this.src);
+
+        } else {
+          // No type specified
+
+          // if url ends with `PORTRAIT.jpg` assume type = depth
+          if (this.src.toUpperCase().endsWith('PORTRAIT.JPG')) {
+            this.stereoData = await parseDepth(this.src);
           } else {
-            // no left eye found, assume stereo (e.g. left-right)
-            console.info('<stereo-img> does not have a "type" attribute and image does not have XMP metadata of a VR picture.  Use "type" attribute to specify the type of stereoscopic image. Assuming stereo image of the "left-right" family.');
-            this.stereoData = await parseStereo(this.src, {
-              angle: this.angle,
-              projection: this.projection,
+            // try to read XMP metadata to see if VR Photo, otherwise assume stereo-style (e.g. "left right")
+            // Read XMP metadata
+            const exif = await exifr.parse(this.src, {
+              xmp: true,
+              multiSegment: true,
+              mergeOutput: false,
+              ihdr: true, //unclear why we need this, but if not enabled, some VR180 XMP Data are not parsed
             });
+
+            if (exif?.GImage?.Data) {
+              // GImage XMP for left eye found, assume VR Photo
+              this.stereoData = await parseVR(this.src);
+            } else {
+              // no left eye found, assume stereo (e.g. left-right)
+              console.info('<stereo-img> does not have a "type" attribute and image does not have XMP metadata of a VR picture.  Use "type" attribute to specify the type of stereoscopic image. Assuming stereo image of the "left-right" family.');
+              this.stereoData = await parseStereo(this.src, {
+                angle: this.angle,
+                projection: this.projection,
+              });
+            }
           }
         }
       } else {

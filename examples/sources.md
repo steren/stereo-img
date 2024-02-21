@@ -48,3 +48,7 @@ Leia [Lume Pad 2](https://www.leiainc.com/lume-pad-2)
 Apple Vision Pro
 
 * [`vision-pro.HEIC`](vision-pro.HEIC): personal picture taken using Apple Vision Pro camera (Donated by [Cyril Dorsaz](https://twitter.com/cyrildorsaz))
+
+Depth 
+
+* [`Pixel7Pro.PORTRAIT.jpg`](Pixel7Pro.PORTRAIT.jpg): personal picture taken with Google Camera on Pixel 7 Pro, in portrait mode.
