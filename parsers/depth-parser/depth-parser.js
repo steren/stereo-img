@@ -41,16 +41,6 @@ function parseConcatenatedJFIF(imageData) {
 async function parseDepth(url, options) {
   const image = await createImageFromURL(url);
 
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  const width = image.width;
-  const height = image.height;
-  canvas.width = width;
-  canvas.height = height;
-  ctx.drawImage(image, 0, 0);
-
-  const colorImage = ctx.getImageData(0, 0, width, height);
-
   const exif = await exifr.parse(url, {
     xmp: true,
     multiSegment: true,
@@ -58,6 +48,7 @@ async function parseDepth(url, options) {
     ihdr: true, //unclear why we need this, but if not enabled, some XMP Data are not parsed
   });
 
+  // TODO: Check exif data for depth map
   console.log(exif);  
 
   // exif?.Device?.Cameras
@@ -71,17 +62,7 @@ async function parseDepth(url, options) {
   const parsedImages = parseConcatenatedJFIF(imageData);
 
   const depthImageArray = parsedImages[4];
-
-  const depthCanvas = document.createElement('canvas');
-  // TODO: this isn't the right width and height. Use the image's
-  depthCanvas.width = width;
-  depthCanvas.height = height;
-  const depthCtx = depthCanvas.getContext('2d');
-  depthCtx.drawImage(await createImageFromURL(URL.createObjectURL(new Blob([depthImageArray], {type: 'image/jpeg'}))), 0, 0);
-  const depthImage = depthCtx.getImageData(0, 0, width, height);  
-
-  //const depthImage = new ImageData(new Uint8ClampedArray(depthImageArray), width, height);
-  console.log(depthImage);
+  const depth = await createImageFromURL(URL.createObjectURL(new Blob([depthImageArray], {type: 'image/jpeg'})))
   
   // TODO: use same method as for left-right stereo (share helper function)
   const phiLength = 1.02278;
@@ -89,11 +70,11 @@ async function parseDepth(url, options) {
 
   const thetaStart = Math.PI / 2 - thetaLength / 2;
 
-  // TODO: this is temporary
-  const leftEye = depthImage;
+  // return same image in both left and right eyes. Also add depth map. 
+  const leftEye = image;
   const rightEye = leftEye;
 
-  return {leftEye, rightEye, phiLength, thetaStart, thetaLength};
+  return {depth, leftEye, rightEye, phiLength, thetaStart, thetaLength};
 }
 
 async function createImageFromURL(url) {

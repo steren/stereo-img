@@ -191,6 +191,10 @@ class StereoImg extends HTMLElement {
      */
     async createEye(eye, debug) {
       const radius = 10; // 500
+      const depth = radius / 5;
+      const planeSegments = this.stereoData.depth ? 256 : 1;
+      const sphereWidthSegments = 60;
+      const sphereHeightSegments = 40;
 
       const eyeNumber = eye === "left" ? 1 : 2;
       let imageData = eye === "left" ? this.stereoData.leftEye : this.stereoData.rightEye;
@@ -225,12 +229,12 @@ class StereoImg extends HTMLElement {
         const planeHeight = planeWidth / aspectRatio;
         const planeDistance = radius;
 
-        geometry = new THREE.PlaneGeometry(planeWidth, planeHeight, 1, 1);
+        geometry = new THREE.PlaneGeometry(planeWidth, planeHeight, planeSegments, planeSegments);
         // Put the plane in front of the camera (rotate and translate it)
         geometry.rotateY(-Math.PI / 2);
         geometry.translate(planeDistance, 0, 0);
       } else {
-        geometry = new THREE.SphereGeometry(radius, 60, 40, -1 * this.stereoData.phiLength / 2, this.stereoData.phiLength, this.stereoData.thetaStart, this.stereoData.thetaLength);
+        geometry = new THREE.SphereGeometry(radius, sphereWidthSegments, sphereHeightSegments, -1 * this.stereoData.phiLength / 2, this.stereoData.phiLength, this.stereoData.thetaStart, this.stereoData.thetaLength);
         // invert the geometry on the x-axis so that all of the faces point inward
         geometry.scale(-1, 1, 1);
       }
@@ -260,7 +264,17 @@ class StereoImg extends HTMLElement {
           }
       }
 
-      const material = new THREE.MeshBasicMaterial({ map: texture });
+      const material = new THREE.MeshStandardMaterial({ 
+        map: texture,
+        displacementScale: -1 * depth,
+        displacementBias: depth / 2,
+        flatShading: true,
+      });
+      if(this.stereoData.depth) {
+        material.displacementMap = new THREE.Texture(this.stereoData.depth);
+        material.displacementMap.needsUpdate = true;
+        // material.displacementMap.colorSpace = THREE.SRGBColorSpace;
+      }
 
       const mesh = new THREE.Mesh(geometry, material);
       mesh.rotation.reorder('YXZ');
@@ -288,6 +302,10 @@ class StereoImg extends HTMLElement {
     async initialize3DScene() {
       this.scene = new THREE.Scene();
       this.scene.background = new THREE.Color( 0x101010 );
+      const light = new THREE.AmbientLight( 0xffffff, 3 );
+      light.layers.enable(1);
+      light.layers.enable(2);
+      this.scene.add( light );
 
       await this.createEye("left");
       await this.createEye("right");
