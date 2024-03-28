@@ -79,6 +79,7 @@ This component has been manually tested on the following hardware, OS and browse
 | Cardboard   | iOS         |                 | ❌ [#18](https://github.com/steren/stereo-img/issues/18)
 | Quest 1     |             | Default         | ✔️
 | Quest 2     |             | Default         | ✔️️
+| Quest 3     |             | Default         | ✔️️
 | Vision Pro  |             | Safari          | ❌ [#34](https://github.com/steren/stereo-img/issues/34)
 
 ## Installing using npm
