@@ -41,6 +41,8 @@ async function parseStereo(url, options) {
   let projection;
   if(options?.projection === 'fisheye') {
     projection = 'fisheye';
+  } else if(options?.projection === 'equirectangular') { 
+    ;
   } else {
     // Read pixels in each corner and middle to see if they are black. If black, assume fisheye image
     const topLeft = ctx.getImageData(0, 0, 1, 1).data;
