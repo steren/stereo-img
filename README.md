@@ -43,6 +43,7 @@ npm install stereo-img
   - `360`: Full sphere
 * `projection`: (Optional) hint at projection (most VR pictures use equirectangular projection)
   - If unset, projection is inferred from heuristics.
+  - `equirectangular`: Equirectangular projection
   - `fisheye`: Fisheye projection
 * `wiggle`: (Optional) When viewing in 2D, alternate between left and right images to help the user see the 3D effect
   - `enabled`: wiggle is enabled
