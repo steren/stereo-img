@@ -52,3 +52,7 @@ Apple Vision Pro
 Depth 
 
 * [`Pixel7Pro.PORTRAIT.jpg`](Pixel7Pro.PORTRAIT.jpg): personal picture taken with Google Camera on Pixel 7 Pro, in portrait mode.
+
+Insta360 Evo
+
+* [`insta360evo.jpg`](insta360evo.jpg): personal picture taken using Insta360 Evo donated by @azw413 [here](https://github.com/steren/stereo-img/issues/48)
