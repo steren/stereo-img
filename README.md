@@ -57,9 +57,10 @@ This component has been manually tested to load pictures taken with the followin
 
 | Status | Camera                              | Picture type        | Attributes required                   |  Field of view | Orientation |
 | ------ | ----------------------------------- | ------------------- | ------------------------------------- | ------------- | ----------- |
-| ✔️     | Lenovo Mirage Camera                | unprocessed (VR180) | (none)                                |  ✓           | ✓ 
-| ✔️     | Canon RF5.2mm F2.8 L Duel Fisheye   | unprocessed         | (none)                                |  X           | X 
-| ✔️     | Canon RF5.2mm F2.8 L Duel Fisheye   | processed with EOS VR Utility | (none)                      |  X           | X 
+| ✔️     | Lenovo Mirage Camera                | VR180               | (none)                                |  ✓           | ✓ 
+| ✔️     | Canon RF5.2mm F2.8 L Duel Fisheye unprocessed | left-right fisheye           | (none)             |  X           | X 
+| ✔️     | Canon RF5.2mm F2.8 L Duel Fisheye processed with EOS VR Utility | left-right | (none)             |  X           | X 
+| ✔️     | Insta360 Evo                        | left-right          | (none)                                |  X           | X 
 | ✔️     | CALF VR180                          | left-right          | (none)                                |  X           | X 
 | ✔️     | CALF VR180                          | "vr180"             | `angle="180"`                         |  X           | X 
 | ✔️     | Kandao QooCam EGO 3D Camera         | left-right          | (none)                                |  X           | X 
