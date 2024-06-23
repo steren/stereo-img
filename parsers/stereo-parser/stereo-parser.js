@@ -213,6 +213,10 @@ async function parseStereo(url, options) {
     phiLength = Math.PI;
     thetaLength = Math.PI;
 
+  } else if(exif?.Model === 'insta360 evo') {
+    phiLength = Math.PI;
+    thetaLength = Math.PI;
+
   } else {
     const assumeFocalLengthIn35mmFormat = 27;
     const angle = angleOfViewFocalLengthIn35mmFormat(assumeFocalLengthIn35mmFormat);
