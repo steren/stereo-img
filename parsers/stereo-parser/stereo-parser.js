@@ -21,6 +21,18 @@ import exifr from './../../vendor/exifr/full.esm.js';
  * @Param {Object} (options) - Parsing options: type: 'left-right' (default), 'right-left' or 'top-bottom', angle: '180' or '360'
  * */
 async function parseStereo(url, options) {
+  return parseStereoPair(url, null, options);
+}
+
+/**
+ * fetch the image from separate url (primary) and secondaryURL
+ * if secondaryURL is null, assume url contains a stereo images with both included
+ * return left and right eye images from either left / right, right / left, top / bottom, bottom / top, url / secondaryURL.
+ * @Param {string} url - image url left, or combined left and right
+ * @Param {string} secondaryURL - image url right, or null
+ * @Param {Object} (options) - Parsing options: type: 'left-right' (default), 'right-left' or 'top-bottom', angle: '180' or '360'
+ * */
+async function parseStereoPair(url, secondaryURL, options) {
   const image = await createImageFromURL(url);
   //image.crossOrigin = "Anonymous";
   
@@ -31,6 +43,23 @@ async function parseStereo(url, options) {
   canvas.width = width;
   canvas.height = height;
   ctx.drawImage(image, 0, 0);
+
+  var secondaryImage = null;
+  var secondaryCanvas = null;
+  var secondaryCtx = null;
+  var secondaryWidth = 0;
+  var secondaryHeight = 0;
+  if (secondaryURL) {
+    secondaryImage = await createImageFromURL(secondaryURL);
+    //secondaryImage.crossOrigin = "Anonymous";
+    secondaryCanvas = document.createElement('canvas');
+    secondaryCtx = secondaryCanvas.getContext('2d', {willReadFrequently: true});
+    secondaryWidth = secondaryImage.width;
+    secondaryHeight = secondaryImage.height;
+    secondaryCanvas.width = secondaryWidth;
+    secondaryCanvas.height = secondaryHeight;
+    secondaryCtx.drawImage(secondaryImage, 0, 0);
+  }
 
   function pixelIsBlack(pixel) {
     const blackThreshold = 10;
@@ -165,6 +194,10 @@ async function parseStereo(url, options) {
       leftEye = ctx.getImageData(0, height / 2, width, height / 2);
       rightEye = ctx.getImageData(0, 0, width, height / 2);
       break;
+    case 'pair':
+      leftEye =  ctx.getImageData(0, 0, width, height);
+      rightEye = secondaryCtx.getImageData(0, 0, secondaryWidth, secondaryHeight);
+      break;
   }
   
   let angleOfViewFocalLengthIn35mmFormat = function(focalLengthIn35mmFormat) {
@@ -217,6 +250,11 @@ async function parseStereo(url, options) {
     phiLength = Math.PI;
     thetaLength = Math.PI;
 
+  } else if(options?.angle > 0 && options?.angle <= 360) {
+    const angle = options?.angle * Math.PI/180.0;
+    phiLength = angle;
+    thetaLength = angle * height/width;
+
   } else {
     const assumeFocalLengthIn35mmFormat = 27;
     const angle = angleOfViewFocalLengthIn35mmFormat(assumeFocalLengthIn35mmFormat);
@@ -242,4 +280,4 @@ async function createImageFromURL(url) {
   });
 }
 
-export {parseStereo}
+export {parseStereo, parseStereoPair}

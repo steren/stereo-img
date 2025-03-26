@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { parseVR } from './parsers/vr-parser/vr-parser.js';
-import { parseStereo } from './parsers/stereo-parser/stereo-parser.js';
+import { parseStereo, parseStereoPair } from './parsers/stereo-parser/stereo-parser.js';
 import { parseAnaglyph } from './parsers/anaglyph-parser/anaglyph-parser.js';
 import { parseDepth } from './parsers/depth-parser/depth-parser.js';
 import exifr from './vendor/exifr/full.esm.js';
@@ -124,6 +124,14 @@ class StereoImg extends HTMLElement {
 
         } else if(this.type === 'depth') {
           this.stereoData = await parseDepth(this.src);
+
+        } else if(this.type === 'pair') {
+          const righturl = this.getAttribute('rightsrc');
+          this.stereoData = await parseStereoPair(this.src, righturl, {
+            type: this.type,
+            angle: this.angle,
+            projection: this.projection,
+          });
 
         } else {
           // No type specified
