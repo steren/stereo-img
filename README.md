@@ -40,7 +40,7 @@ npm install stereo-img
   - `depth`: Picture with depth map (e.g. portrait mode on Google Camera)
 * `angle`: (Optional) hint at angle of view for `left-right` or `top-bottom` types
   - If unset, Exif angle of view is used if present.
-  - 'DEGREE': any degree number betweeb 0 and 360
+  - `DEGREE`: any degree number between 0 and 360
   - `180`: Half sphere (VR180)
   - `360`: Full sphere
 * `projection`: (Optional) hint at projection (most VR pictures use equirectangular projection)
