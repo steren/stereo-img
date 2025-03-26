@@ -35,10 +35,12 @@ npm install stereo-img
   - `right-left`: left eye on the right, right eye on the left, Exif angle of view is used if present.
   - `top-bottom`: left eye on the top, right eye on the bottom, Exif angle of view is used if present.
   - `bottom-top`: left eye on the bottom, right eye on the top, Exif angle of view is used if present.
+  - `pair`: separate files for left and right image. Left eye image read from src attribute, right eye image read from attribute rightsrc.
   - `anaglyph`: [Anaglyph 3D](https://en.wikipedia.org/wiki/Anaglyph_3D) - currently only supporting red / green
   - `depth`: Picture with depth map (e.g. portrait mode on Google Camera)
 * `angle`: (Optional) hint at angle of view for `left-right` or `top-bottom` types
   - If unset, Exif angle of view is used if present.
+  - 'DEGREE': any degree number betweeb 0 and 360
   - `180`: Half sphere (VR180)
   - `360`: Full sphere
 * `projection`: (Optional) hint at projection (most VR pictures use equirectangular projection)
