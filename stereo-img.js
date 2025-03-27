@@ -125,13 +125,22 @@ class StereoImg extends HTMLElement {
         } else if(this.type === 'depth') {
           this.stereoData = await parseDepth(this.src);
 
-        } else if(this.type === 'pair') {
-          const righturl = this.getAttribute('rightsrc');
-          this.stereoData = await parseStereoPair(this.src, righturl, {
-            type: this.type,
-            angle: this.angle,
-            projection: this.projection,
-          });
+        } else if(this.type === 'pair' || (!this.type && this.hasAttribute('src-right'))) {
+          if(this.hasAttribute('src-right')) {
+            const righturl = this.getAttribute('src-right');
+            this.type = 'pair';
+            this.stereoData = await parseStereoPair(this.src, righturl, {
+              type: this.type,
+              angle: this.angle,
+              projection: this.projection,
+            });
+          } else {
+            console.error('<stereo-img> type "pair" is missing the "src-right" attribute for the right eye image.');
+            this.stereoData = await parseStereo(this.src, {
+              angle: this.angle,
+              projection: this.projection,
+            });
+          }
 
         } else {
           // No type specified

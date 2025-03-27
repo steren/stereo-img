@@ -28,6 +28,7 @@ npm install stereo-img
 ## Attributes
 
 * `src`: (Required) source of the stereo picture (absolute or relative)
+* `src-right`: (Optional) source of the right eye picture (absolute or relative) for the `pair` type. If used, the source for the left eye picture is read from the `src` attribute.
 * `type`: (Optional) type of stereo picture:
   - If unset, type is inferred from heuristics
   - `vr`: [VR Photo](https://developers.google.com/vr/reference/cardboard-camera-vr-photo-format) - VR180, Google Camera panorama, Cardboard Camera, Photosphere images (Where right eye image and angle of view info are embedded in the image metadata) 
@@ -35,10 +36,10 @@ npm install stereo-img
   - `right-left`: left eye on the right, right eye on the left, Exif angle of view is used if present.
   - `top-bottom`: left eye on the top, right eye on the bottom, Exif angle of view is used if present.
   - `bottom-top`: left eye on the bottom, right eye on the top, Exif angle of view is used if present.
-  - `pair`: separate files for left and right image. Left eye image read from src attribute, right eye image read from attribute rightsrc.
+  - `pair`: separate files for left and right image. Left eye image read from `src` attribute, right eye image read from attribute `src-right`. Adding the `src-right` attribute will enable the `pair` type without the need to use the `type` attribute.
   - `anaglyph`: [Anaglyph 3D](https://en.wikipedia.org/wiki/Anaglyph_3D) - currently only supporting red / green
   - `depth`: Picture with depth map (e.g. portrait mode on Google Camera)
-* `angle`: (Optional) hint at angle of view for `left-right` or `top-bottom` types
+* `angle`: (Optional) hint at angle of view for `left-right`, `top-bottom`, or `pair` types
   - If unset, Exif angle of view is used if present.
   - `DEGREE`: any degree number between 0 and 360
   - `180`: Half sphere (VR180)
