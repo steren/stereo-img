@@ -116,7 +116,8 @@ limitations under the License.
         <option value='{"src": "examples/calf-left-right.jpg"}'>                                  CALF (left-right)</option>
         <option value='{"src": "examples/insta360evo.jpg"}'>                                      Insta360 Evo</option>
         <option value='{"src": "examples/stereograph.left-right.jpg", "type": "left-right"}'>     Stereograph from 1901</option>
-        <option value='{"src": "examples/wikipedia.anaglyph.jpg", "type": "anaglyph"}'>           Anaglyph</option>          
+        <option value='{"src": "examples/wikipedia.anaglyph.jpg", "type": "anaglyph"}'>           Anaglyph</option>  
+        <option value='{"src": "examples/Panasonic-DMC-GX8-left.jpg", "src-right": "examples/Panasonic-DMC-GX8-right.jpg", "type": "pair"}'>Left / Right images</option>          
       </select>
     </p>
 
@@ -145,11 +146,29 @@ limitations under the License.
     // On dropdown item selection, update <stereo-img>
     const examples = document.getElementById('examples');
     examples.addEventListener('change', (e) => {
-      const { src, type, angle } = JSON.parse(e.target.value);
+      const parsed = JSON.parse(e.target.value);
+      const src = parsed["src"];
+      const type = parsed["type"];
+      const angle = parsed["angle"];
+      const srcRight = parsed["src-right"];
+
       const stereoImg = document.querySelector('stereo-img');
       stereoImg.src = src;
-      stereoImg.type = type;
-      stereoImg.angle = angle;
+      if (srcRight) {
+        stereoImg.srcRight = srcRight;
+      } else {
+        stereoImg.srcRight = null;
+      }
+      if (type === undefined) {
+        stereoImg.type = null;
+      } else {
+        stereoImg.type = type;
+      }
+      if (angle === undefined) {
+        stereoImg.angle = 0;
+      } else {
+        stereoImg.angle = angle;
+      }
 
       const img = document.getElementById('img-ref');
       img.src = src;
