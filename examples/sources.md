@@ -39,6 +39,7 @@ Panasonic DMC-GX8 with H-FT012
 
 * `Panasonic-DMC-GX8.mpo`: personal picture taken using the Panasonic DMC-GX8 camera with a H-FT012 lens (Donated by [Adeo](https://twitter.com/deo_pepas))
 * `Panasonic-DMC-GX8.jpg`: personal picture taken using the Panasonic DMC-GX8 camera with a H-FT012 lens, then converted from `. mpo` to `.jpg` (Donated by [Adeo](https://twitter.com/deo_pepas))
+* `Panasonic-DMC-GX8-left.jpg` and `Panasonic-DMC-GX8-right.jpg`: personal picture taken using the Panasonic DMC-GX8 camera with a H-FT012 lens, then converted from `. mpo` to `.jpg`, then split between left and right images.
 
 Leia [Lume Pad 2](https://www.leiainc.com/lume-pad-2)
 
