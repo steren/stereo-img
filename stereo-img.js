@@ -98,6 +98,24 @@ class StereoImg extends HTMLElement {
       }, 0);
     }
 
+    get srcRight() {
+      return this.getAttribute('src-right');
+    }
+    set srcRight(val) {
+      if (val) {
+        this.setAttribute('src-right', val);
+      } else {
+        this.removeAttribute('src-right');
+      }
+
+      // use setTimeout to ensure all DOM updates have finished, it's indeed common to update both src= and type= at the same time.
+      // There is probably a cleaner way to do this.
+      let that = this;
+      window.setTimeout(() => {
+        that.parseImageAndInitialize3DScene();
+      }, 0);
+    }
+
     animate() {
       this.renderer.setAnimationLoop( () => {
         this.renderer.render( this.scene, this.camera );
@@ -125,9 +143,9 @@ class StereoImg extends HTMLElement {
         } else if(this.type === 'depth') {
           this.stereoData = await parseDepth(this.src);
 
-        } else if(this.type === 'pair' || (!this.type && this.hasAttribute('src-right'))) {
-          if(this.hasAttribute('src-right')) {
-            const righturl = this.getAttribute('src-right');
+        } else if(this.type === 'pair' || (!this.type && this.srcRight)) {
+          if(this.srcRight) {
+            const righturl = this.srcRight;
             this.type = 'pair';
             this.stereoData = await parseStereoPair(this.src, righturl, {
               type: this.type,
