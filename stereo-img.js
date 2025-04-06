@@ -80,6 +80,19 @@ class StereoImg extends HTMLElement {
       }
     }
 
+    // `deltax`: (Optional) Horizontal correction in percent of image width to match the convergence point between
+    // right and left image for type pair. Positive means the right image needs to be moved right to match the left image.
+    get deltax() {
+      return this.getAttribute('deltax');
+    }
+    set baseline(val) {
+      if (val) {
+        this.setAttribute('deltax', val);
+      } else {
+        this.removeAttribute('deltax');
+      }
+    }
+
     get src() {
       return this.getAttribute('src');
     }
@@ -132,6 +145,7 @@ class StereoImg extends HTMLElement {
             this.stereoData = await parseStereoPair(this.src, righturl, {
               type: this.type,
               angle: this.angle,
+              deltax: this.deltax ?? 0,
               projection: this.projection,
             });
           } else {

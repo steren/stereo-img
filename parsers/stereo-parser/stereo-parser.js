@@ -195,8 +195,10 @@ async function parseStereoPair(url, secondaryURL, options) {
       rightEye = ctx.getImageData(0, 0, width, height / 2);
       break;
     case 'pair':
-      leftEye =  ctx.getImageData(0, 0, width, height);
-      rightEye = secondaryCtx.getImageData(0, 0, secondaryWidth, secondaryHeight);
+      const dx = Math.round(width * (options.deltax ?? 0) / 100 / 2);
+      options.angle = options.angle * (100-Math.abs(dx))/100;
+      leftEye =  ctx.getImageData(Math.max(0, dx), 0, width-Math.abs(dx), height);
+      rightEye = secondaryCtx.getImageData(Math.max(0, -dx), 0, secondaryWidth-Math.abs(dx), secondaryHeight);
       break;
   }
   
@@ -281,3 +283,4 @@ async function createImageFromURL(url) {
 }
 
 export {parseStereo, parseStereoPair}
+
