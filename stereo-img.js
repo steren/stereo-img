@@ -80,8 +80,6 @@ class StereoImg extends HTMLElement {
       }
     }
 
-    // `deltax`: (Optional) Horizontal correction in percent of image width to match the convergence point between
-    // right and left image for type pair. Positive means the right image needs to be moved right to match the left image.
     get deltax() {
       return this.getAttribute('deltax');
     }
