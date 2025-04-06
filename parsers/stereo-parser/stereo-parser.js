@@ -283,4 +283,3 @@ async function createImageFromURL(url) {
 }
 
 export {parseStereo, parseStereoPair}
-
