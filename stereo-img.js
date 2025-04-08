@@ -83,7 +83,7 @@ class StereoImg extends HTMLElement {
     get deltax() {
       return this.getAttribute('deltax');
     }
-    set baseline(val) {
+    set deltax(val) {
       if (val) {
         this.setAttribute('deltax', val);
       } else {
