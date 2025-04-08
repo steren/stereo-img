@@ -220,16 +220,21 @@ class StereoImg extends HTMLElement {
     toggleWiggle(toggle) {
       let intervalMilliseconds = 1000 / 10;
       let layer = 1;
-      let intervalID;
+      
+      // Clear any existing interval first
+      if (this.wiggleIntervalID) {
+        clearInterval(this.wiggleIntervalID);
+        this.wiggleIntervalID = null; // Reset the ID
+      }
 
       if(toggle) {
-        setInterval(() => {
+        // Store the new interval ID
+        this.wiggleIntervalID = setInterval(() => {
           layer = layer === 1 ? 2 : 1;
           this.camera.layers.set(layer);
         }, intervalMilliseconds);
-      } else {
-        clearInterval(intervalID);
-      }
+      } 
+      // No need for an else block, as clearing is handled at the beginning
     } 
 
     /**
@@ -357,7 +362,8 @@ class StereoImg extends HTMLElement {
       await this.createEye("left");
       await this.createEye("right");
 
-      if(this.wiggle === 'enabled' || !this.wiggle) {
+      // Check the wiggle attribute value explicitly
+      if(this.getAttribute('wiggle') !== 'disabled') {
         this.toggleWiggle(true);
       }
     }
@@ -427,6 +433,7 @@ class StereoImg extends HTMLElement {
 
     constructor() {
       super();
+      this.wiggleIntervalID = null; // Initialize the interval ID property
       this.init();
     }
 
