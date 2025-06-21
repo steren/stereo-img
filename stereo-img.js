@@ -19,6 +19,7 @@ import { parseDepth } from './parsers/depth-parser/depth-parser.js';
 import exifr from './vendor/exifr/full.esm.js';
 
 import * as THREE from './vendor/three/three.module.min.js';
+import { AnaglyphEffect } from './vendor/three/effects/AnaglyphEffect.js';
 import { VRButton } from './lib/VRButton.js';
 import { OrbitControls  } from './lib/OrbitControls.js';
 
@@ -77,6 +78,17 @@ class StereoImg extends HTMLElement {
         this.setAttribute('wiggle', val);
       } else {
         this.removeAttribute('wiggle');
+      }
+    }
+
+    get display2d() {
+      return this.getAttribute('display-2d');
+    }
+    set display2d(val) {
+      if (val) {
+        this.setAttribute('display-2d', val);
+      } else {
+        this.removeAttribute('display-2d');
       }
     }
 
@@ -351,8 +363,41 @@ class StereoImg extends HTMLElement {
       await this.createEye("right");
 
       // Check the wiggle attribute value explicitly
-      if(this.getAttribute('wiggle') !== 'disabled') {
+      // if(this.getAttribute('wiggle') !== 'disabled') {
+      //   this.toggleWiggle(true);
+      // }
+      this.update2DMode();
+    }
+
+    update2DMode() {
+      const display2dMode = this.getAttribute('display-2d');
+      const wiggleMode = this.getAttribute('wiggle');
+
+      if (display2dMode === 'wiggle' || (wiggleMode !== null && wiggleMode !== 'disabled' && !display2dMode)) { // Added !display2dMode for legacy wiggle
         this.toggleWiggle(true);
+        // Disable anaglyph if wiggle is active
+        if (this.anaglyphEffect) {
+          this.renderer.setAnimationLoop(() => {
+            this.renderer.render(this.scene, this.camera);
+          });
+        }
+      } else if (display2dMode === 'anaglyph') {
+        this.toggleWiggle(false); // Disable wiggle if anaglyph is active
+        if (!this.anaglyphEffect) {
+          this.anaglyphEffect = new THREE.AnaglyphEffect(this.renderer);
+          this.anaglyphEffect.setSize(this.clientWidth, this.clientHeight);
+        }
+        this.renderer.setAnimationLoop(() => {
+          this.anaglyphEffect.render(this.scene, this.camera);
+        });
+      } else { // static mode or disabled
+        this.toggleWiggle(false);
+        // Disable anaglyph effect
+        if (this.anaglyphEffect) {
+          this.renderer.setAnimationLoop(() => {
+            this.renderer.render(this.scene, this.camera);
+          });
+        }
       }
     }
 
@@ -374,8 +419,25 @@ class StereoImg extends HTMLElement {
         :host {
           display: block;
           contain: content;
+          position: relative; /* Ensure button is positioned relative to the component */
+        }
+        #modeButton {
+          position: absolute;
+          top: 10px;
+          left: 10px;
+          z-index: 10;
+          padding: 8px 12px;
+          background-color: rgba(0,0,0,0.5);
+          color: white;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+        }
+        #modeButton:hover {
+          background-color: rgba(0,0,0,0.7);
         }
       </style>
+      <button id="modeButton">Mode: Static</button>
       `;
 
       // TODO: should we also read width and height attributes and resize element accordingly?
@@ -403,6 +465,48 @@ class StereoImg extends HTMLElement {
       controls.update();
 
       this.shadowRoot.appendChild(VRButton.createButton(this.renderer));
+
+      this.modeButton = this.shadowRoot.getElementById('modeButton');
+      this.available2DModes = ['static', 'wiggle', 'anaglyph'];
+      // Default to 'wiggle' if no 'display-2d' attribute is set, or if 'wiggle' (legacy) attribute is present
+      const initialAttributeDisplay2d = this.getAttribute('display-2d');
+      const legacyWiggleAttribute = this.getAttribute('wiggle');
+
+      let defaultMode = 'wiggle'; // New default
+      if (initialAttributeDisplay2d) {
+        defaultMode = initialAttributeDisplay2d;
+      } else if (legacyWiggleAttribute === 'disabled') {
+        defaultMode = 'static';
+      } else if (legacyWiggleAttribute !== null && legacyWiggleAttribute !== 'disabled') { // if wiggle is present and not disabled
+        defaultMode = 'wiggle';
+      }
+
+
+      this.current2DModeIndex = this.available2DModes.indexOf(defaultMode);
+      if (this.current2DModeIndex === -1) {
+        // Fallback to wiggle if the attribute value is invalid
+        this.current2DModeIndex = this.available2DModes.indexOf('wiggle');
+      }
+
+      this.setAttribute('display-2d', this.available2DModes[this.current2DModeIndex]);
+      this.modeButton.textContent = `Mode: ${this.available2DModes[this.current2DModeIndex].charAt(0).toUpperCase() + this.available2DModes[this.current2DModeIndex].slice(1)}`;
+
+      this.modeButton.addEventListener('click', () => {
+        this.current2DModeIndex = (this.current2DModeIndex + 1) % this.available2DModes.length;
+        const newMode = this.available2DModes[this.current2DModeIndex];
+        this.setAttribute('display-2d', newMode);
+        this.modeButton.textContent = `Mode: ${newMode.charAt(0).toUpperCase() + newMode.slice(1)}`;
+        this.update2DMode();
+      });
+
+      // Hide button in VR
+      this.renderer.xr.addEventListener('sessionstart', () => {
+        this.modeButton.style.display = 'none';
+      });
+      this.renderer.xr.addEventListener('sessionend', () => {
+        this.modeButton.style.display = 'block';
+      });
+
 
       await this.parseImageAndInitialize3DScene();
 
