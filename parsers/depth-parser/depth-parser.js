@@ -98,4 +98,4 @@ async function urlToUint8Array(url)
   return new Uint8Array(arrayBuffer);
 }
 
-export { parseDepth, parseConcatenatedJFIF }
+export { parseDepth }
