@@ -35,10 +35,10 @@ function parseConcatenatedJFIF(imageData) {
 /**
  * Fetch the image from the provided URL and parse a portrait mode JPEG that
  * contains concatenated left and right eye images plus an embedded depth map.
- * The function returns the left/right images alongside the extracted depth
- * map.
+ *
  * @param {string} url - image url
- * @param {Object} options - Parsing options
+ * @param {Object} [options] - Parsing options
+ * @returns {Promise<{depth: HTMLImageElement, leftEye: HTMLImageElement, rightEye: HTMLImageElement, phiLength: number, thetaStart: number, thetaLength: number}>} A promise that resolves with an object containing the parsed data.
  */
 async function parseDepth(url, options) {
   const image = await createImageFromURL(url);
