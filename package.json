@@ -34,6 +34,7 @@
     "three": "^0.161.0"
   },
   "module": "./stereo-img.js",
+  "type": "module",
   "exports": {
     ".": "./stereo-img.js"
   }
