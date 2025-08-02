@@ -21,6 +21,8 @@ import exifr from './vendor/exifr/full.esm.js';
 import * as THREE from './vendor/three/three.module.min.js';
 import { VRButton } from './lib/VRButton.js';
 import { OrbitControls  } from './lib/OrbitControls.js';
+import { AnaglyphEffect } from './lib/AnaglyphEffect.js';
+import { flatModeButton } from './lib/flatModeButton.js';
 
 
 class StereoImg extends HTMLElement {
@@ -69,10 +71,35 @@ class StereoImg extends HTMLElement {
       }
     }
 
+    get controlslist() {
+      return this.getAttribute('controlslist');
+    }
+    set controlslist(val) {
+      if (val) {
+        this.setAttribute('controlslist', val);
+      } else {
+        this.removeAttribute('controlslist');
+      }
+    }
+
+    get flat() {
+      return this.getAttribute('flat');
+    }
+    set flat(val) {
+      if (val) {
+        this.setAttribute('flat', val);
+      } else {
+        this.removeAttribute('flat');
+      }
+      this.updateflatMode();
+    }
+
     get wiggle() {
+      console.warn('<stereo-img>: The "wiggle" attribute is deprecated. Use the "flat" attribute with a value of "wiggle" instead.');
       return this.getAttribute('wiggle');
     }
     set wiggle(val) {
+      console.warn('<stereo-img>: The "wiggle" attribute is deprecated. Use the "flat" attribute with a value of "wiggle" instead.');
       if (val) {
         this.setAttribute('wiggle', val);
       } else {
@@ -350,9 +377,28 @@ class StereoImg extends HTMLElement {
       await this.createEye("left");
       await this.createEye("right");
 
-      // Check the wiggle attribute value explicitly
-      if(this.getAttribute('wiggle') !== 'disabled') {
+      this.updateflatMode();
+    }
+
+    updateflatMode() {
+      const flatMode = this.getAttribute('flat');
+
+      if (flatMode === 'static') {
+        this.toggleWiggle(false);
+        this.renderer.setAnimationLoop(() => {
+          this.camera.layers.set(1);
+          this.renderer.render(this.scene, this.camera);
+        });
+      } else if (flatMode === 'anaglyph') {
+        this.toggleWiggle(false);
+        this.renderer.setAnimationLoop(() => {
+          this.anaglyphEffect.render(this.scene, this.camera);
+        });
+      } else { // 'wiggle' is the default
         this.toggleWiggle(true);
+        this.renderer.setAnimationLoop(() => {
+          this.renderer.render(this.scene, this.camera);
+        });
       }
     }
 
@@ -390,6 +436,9 @@ class StereoImg extends HTMLElement {
       this.renderer.setSize(this.clientWidth, this.clientHeight);
       this.shadowRoot.appendChild(this.renderer.domElement);
 
+      this.anaglyphEffect = new AnaglyphEffect(this.renderer);
+      this.anaglyphEffect.setSize(this.clientWidth, this.clientHeight);
+
       if (this.debug) {
         console.log(`Max Texture Size: ${this.renderer.capabilities.maxTextureSize}`);
       }
@@ -402,7 +451,7 @@ class StereoImg extends HTMLElement {
       this.camera.position.set(0, 0, 0.1);
       controls.update();
 
-      this.shadowRoot.appendChild(VRButton.createButton(this.renderer));
+      this.updateButtons();
 
       await this.parseImageAndInitialize3DScene();
 
@@ -413,9 +462,46 @@ class StereoImg extends HTMLElement {
         this.renderer.setSize(this.clientWidth, this.clientHeight);
         this.camera.aspect = this.clientWidth / this.clientHeight;
         this.camera.updateProjectionMatrix();
+        this.anaglyphEffect.setSize(this.clientWidth, this.clientHeight);
       });
 
       resizeObserver.observe(this);
+    }
+
+    static get observedAttributes() {
+      return ['controlslist', 'flat'];
+    }
+
+    attributeChangedCallback(name, oldValue, newValue) {
+      if (oldValue === newValue) {
+        return;
+      }
+      if (name === 'controlslist') {
+        this.updateButtons();
+      }
+      if (name === 'flat') {
+        this.updateflatMode();
+      }
+    }
+
+    updateButtons() {
+      // Remove existing buttons first to avoid duplicates
+      const vrButton = this.shadowRoot.querySelector('#VRButton');
+      const flatButton = this.shadowRoot.querySelector('#flatModeButton');
+      if (vrButton) vrButton.remove();
+      if (flatButton) flatButton.remove();
+
+      const controlslist = this.getAttribute('controlslist') || 'vr wiggle static anaglyph';
+      const availableFlatModes = ['static', 'wiggle', 'anaglyph'].filter(mode => controlslist.includes(mode));
+
+      if (controlslist.includes('vr')) {
+          this.shadowRoot.appendChild(VRButton.createButton(this.renderer));
+      }
+
+      // Only show the flatModeButton if there is more than one mode to cycle through.
+      if (availableFlatModes.length > 1) {
+          this.shadowRoot.appendChild(flatModeButton.createButton(this));
+      }
     }
 
 

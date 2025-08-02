@@ -48,9 +48,16 @@ npm install stereo-img
   - If unset, projection is inferred from heuristics.
   - `equirectangular`: Equirectangular projection
   - `fisheye`: Fisheye projection
-* `wiggle`: (Optional) When viewing in 2D, alternate between left and right images to help the user see the 3D effect
-  - `enabled`: wiggle is enabled
-  - `disabled`: wiggle is disabled
+* `flat`: (Optional) When viewing in 2D, set the display mode.
+  - `wiggle`: (Default) Alternate between left and right images to help the user see the 3D effect.
+  - `static`: Show the left eye image.
+  - `anaglyph`: Show a red-cyan anaglyph image.
+* `wiggle`: (Deprecated) Use the `flat="wiggle"` attribute instead.
+* `controlslist`: (Optional) A space-separated list of controls to display.
+  - `vr`: Show the "Enter VR" button.
+  - `static`: Allow the "static" flat mode.
+  - `wiggle`: Allow the "wiggle" flat mode.
+  - `anaglyph`: Allow the "anaglyph" flat mode.
 
 ## Compatibility
 
