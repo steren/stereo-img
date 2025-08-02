@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Button Tests for stereo-img</title>
+  <script type="module" src="stereo-img.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 800px;
+      margin: 2em auto;
+      line-height: 1.6;
+    }
+    stereo-img {
+      width: 100%;
+      height: 400px;
+      margin-bottom: 1em;
+    }
+    .test-case {
+      margin-bottom: 3em;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 2em;
+    }
+    h2 {
+      color: #333;
+    }
+    code {
+      background-color: #eee;
+      padding: 2px 4px;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1><code>&lt;stereo-img&gt;</code>: Button Rendering Tests</h1>
+
+  <div class="test-case">
+    <h2>Default Behavior (no <code>controlslist</code>)</h2>
+    <p>Expect to see the VR button and all three static mode buttons (static, wiggle, and anaglyph).</p>
+    <stereo-img src="examples/GOPR0.left-right.jpg"></stereo-img>
+  </div>
+
+  <div class="test-case">
+    <h2><code>controlslist="vr"</code></h2>
+    <p>Expect to see only the VR button.</p>
+    <stereo-img src="examples/GOPR0.left-right.jpg" controlslist="vr"></stereo-img>
+  </div>
+
+  <div class="test-case">
+    <h2><code>controlslist="static wiggle"</code></h2>
+    <p>Expect to not see the VR button, and see only the static and wiggle buttons in the static mode group.</p>
+    <stereo-img src="examples/GOPR0.left-right.jpg" controlslist="static wiggle"></stereo-img>
+  </div>
+
+  <div class="test-case">
+    <h2><code>controlslist="wiggle static"</code> (order insensitive)</h2>
+    <p>Order insensitive, expect to not see VR, and see only the static and wiggle buttons in the static mode group.</p>
+    <stereo-img src="examples/GOPR0.left-right.jpg" controlslist="wiggle static"></stereo-img>
+  </div>
+
+  <div class="test-case">
+    <h2><code>controlslist="vr static"</code></h2>
+    <p>Expect to see the VR button and no static mode group, since there is only one choice available.</p>
+    <stereo-img src="examples/GOPR0.left-right.jpg" controlslist="vr static"></stereo-img>
+  </div>
+
+  <div class="test-case">
+    <h2><code>controlslist="vr static wiggle anaglyph"</code></h2>
+    <p>Expect to see the VR button and the static, wiggle, and anaglyph buttons in the static mode group.</p>
+    <stereo-img src="examples/GOPR0.left-right.jpg" controlslist="vr static wiggle anaglyph"></stereo-img>
+  </div>
+
+</body>
+</html>
