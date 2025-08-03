@@ -36,7 +36,7 @@
 
   <div class="test-case">
     <h2>Default Behavior (no <code>controlslist</code>)</h2>
-    <p>Expect to see the VR button and all three static mode buttons (static, wiggle, and anaglyph).</p>
+    <p>Expect to see the VR button and all four flat mode buttons (left, right, wiggle, and anaglyph).</p>
     <stereo-img src="examples/GOPR0.left-right.jpg"></stereo-img>
   </div>
 
@@ -47,27 +47,27 @@
   </div>
 
   <div class="test-case">
-    <h2><code>controlslist="static wiggle"</code></h2>
-    <p>Expect to not see the VR button, and see only the static and wiggle buttons in the static mode group.</p>
-    <stereo-img src="examples/GOPR0.left-right.jpg" controlslist="static wiggle"></stereo-img>
+    <h2><code>controlslist="left right wiggle"</code></h2>
+    <p>Expect to not see the VR button, and see only the left, right, and wiggle buttons in the flat mode group.</p>
+    <stereo-img src="examples/GOPR0.left-right.jpg" controlslist="left right wiggle"></stereo-img>
   </div>
 
   <div class="test-case">
-    <h2><code>controlslist="wiggle static"</code> (order insensitive)</h2>
-    <p>Order insensitive, expect to not see VR, and see only the static and wiggle buttons in the static mode group.</p>
-    <stereo-img src="examples/GOPR0.left-right.jpg" controlslist="wiggle static"></stereo-img>
+    <h2><code>controlslist="wiggle left right"</code> (order insensitive)</h2>
+    <p>Order insensitive, expect to not see VR, and see only the left, right, and wiggle buttons in the flat mode group.</p>
+    <stereo-img src="examples/GOPR0.left-right.jpg" controlslist="wiggle left right"></stereo-img>
   </div>
 
   <div class="test-case">
-    <h2><code>controlslist="vr static"</code></h2>
-    <p>Expect to see the VR button and no static mode group, since there is only one choice available.</p>
-    <stereo-img src="examples/GOPR0.left-right.jpg" controlslist="vr static"></stereo-img>
+    <h2><code>controlslist="vr left"</code></h2>
+    <p>Expect to see the VR button and no flat mode group, since there is only one choice available.</p>
+    <stereo-img src="examples/GOPR0.left-right.jpg" controlslist="vr left"></stereo-img>
   </div>
 
   <div class="test-case">
-    <h2><code>controlslist="vr static wiggle anaglyph"</code></h2>
-    <p>Expect to see the VR button and the static, wiggle, and anaglyph buttons in the static mode group.</p>
-    <stereo-img src="examples/GOPR0.left-right.jpg" controlslist="vr static wiggle anaglyph"></stereo-img>
+    <h2><code>controlslist="vr left right wiggle anaglyph"</code></h2>
+    <p>Expect to see the VR button and the left, right, wiggle, and anaglyph buttons in the flat mode group.</p>
+    <stereo-img src="examples/GOPR0.left-right.jpg" controlslist="vr left right wiggle anaglyph"></stereo-img>
   </div>
 
 </body>

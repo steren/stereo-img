@@ -383,10 +383,16 @@ class StereoImg extends HTMLElement {
     updateflatMode() {
       const flatMode = this.getAttribute('flat');
 
-      if (flatMode === 'static') {
+      if (flatMode === 'left') {
         this.toggleWiggle(false);
         this.renderer.setAnimationLoop(() => {
           this.camera.layers.set(1);
+          this.renderer.render(this.scene, this.camera);
+        });
+      } else if (flatMode === 'right') {
+        this.toggleWiggle(false);
+        this.renderer.setAnimationLoop(() => {
+          this.camera.layers.set(2);
           this.renderer.render(this.scene, this.camera);
         });
       } else if (flatMode === 'anaglyph') {
@@ -491,8 +497,8 @@ class StereoImg extends HTMLElement {
       if (vrButton) vrButton.remove();
       if (flatButton) flatButton.remove();
 
-      const controlslist = this.getAttribute('controlslist') || 'vr wiggle static anaglyph';
-      const availableFlatModes = ['static', 'wiggle', 'anaglyph'].filter(mode => controlslist.includes(mode));
+      const controlslist = this.getAttribute('controlslist') || 'vr wiggle left right anaglyph';
+      const availableFlatModes = ['left', 'right', 'wiggle', 'anaglyph'].filter(mode => controlslist.includes(mode));
 
       if (controlslist.includes('vr')) {
           this.shadowRoot.appendChild(VRButton.createButton(this.renderer));
