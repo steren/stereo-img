@@ -383,10 +383,9 @@ class StereoImg extends HTMLElement {
     updateflatMode() {
       const flatMode = this.getAttribute('flat');
 
-      if (flatMode === 'left') {
-        this.toggleWiggle(false);
+      if (flatMode === 'wiggle') {
+        this.toggleWiggle(true);
         this.renderer.setAnimationLoop(() => {
-          this.camera.layers.set(1);
           this.renderer.render(this.scene, this.camera);
         });
       } else if (flatMode === 'right') {
@@ -400,9 +399,10 @@ class StereoImg extends HTMLElement {
         this.renderer.setAnimationLoop(() => {
           this.anaglyphEffect.render(this.scene, this.camera);
         });
-      } else { // 'wiggle' is the default
-        this.toggleWiggle(true);
+      } else { // 'left' is the default
+        this.toggleWiggle(false);
         this.renderer.setAnimationLoop(() => {
+          this.camera.layers.set(1);
           this.renderer.render(this.scene, this.camera);
         });
       }
