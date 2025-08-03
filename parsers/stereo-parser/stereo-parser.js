@@ -66,25 +66,6 @@ async function parseStereoPair(url, secondaryURL, options) {
     return pixel[0] < blackThreshold && pixel[1] < blackThreshold && pixel[2] < blackThreshold;
   }
 
-  // check if fisheye projection
-  let projection;
-  if(options?.projection === 'fisheye') {
-    projection = 'fisheye';
-  } else if(options?.projection === 'equirectangular') { 
-    ;
-  } else {
-    // Read pixels in each corner and middle to see if they are black. If black, assume fisheye image
-    const topLeft = ctx.getImageData(0, 0, 1, 1).data;
-    const topRight = ctx.getImageData(width - 1, 0, 1, 1).data;
-    const bottomLeft = ctx.getImageData(0, height - 1, 1, 1).data;
-    const bottomRight = ctx.getImageData(width - 1, height - 1, 1, 1).data;
-    const middle = ctx.getImageData(width / 2, height / 2, 1, 1).data;
-    if(pixelIsBlack(topLeft) && pixelIsBlack(topRight) && pixelIsBlack(bottomLeft) && pixelIsBlack(bottomRight) && pixelIsBlack(middle)) {
-        projection = 'fisheye';
-        console.log("Detected fisheye image");
-      }
-  }
-
   const exif = await exifr.parse(image, {
     xmp: true,
     multiSegment: true
@@ -104,6 +85,25 @@ async function parseStereoPair(url, secondaryURL, options) {
     }
   }
 
+  // check if fisheye projection
+  let projection;
+  if(options?.projection === 'fisheye') {
+    projection = 'fisheye';
+  } else if(options?.projection === 'equirectangular') { 
+    ;
+  } else {
+    // Read pixels in each corner and middle to see if they are black. If black, assume fisheye image
+    const topLeft = ctx.getImageData(0, 0, 1, 1).data;
+    const topRight = ctx.getImageData(width - 1, 0, 1, 1).data;
+    const bottomLeft = ctx.getImageData(0, height - 1, 1, 1).data;
+    const bottomRight = ctx.getImageData(width - 1, height - 1, 1, 1).data;
+    const middle = ctx.getImageData(width / 2, height / 2, 1, 1).data;
+    if(pixelIsBlack(topLeft) && pixelIsBlack(topRight) && pixelIsBlack(bottomLeft) && pixelIsBlack(bottomRight) && pixelIsBlack(middle)) {
+        projection = 'fisheye';
+        console.log("Detected fisheye image");
+      }
+  }
+
   let leftEye;
   let rightEye;
 
@@ -114,64 +114,88 @@ async function parseStereoPair(url, secondaryURL, options) {
   let rightRight = width;
   let rightLeft = width / 2;
 
-  // TODO: This assumes left-right or right-left. Make compatible with top-bottom and bottom-top.
   // fisheye image might have black around image data, measure the actual top, left, bottom, right position of the fisheye circle
+  // TODO: This assumes left-right or right-left. Make compatible with top-bottom and bottom-top.
   if(projection === 'fisheye') {
 
-    // top
-    for(let y = 0; y < height / 2; y++) {
-      const pixel = ctx.getImageData(width / 4, y, 1, 1).data;
-      if(!pixelIsBlack(pixel)) {
-        top = y;
-        break;
+    // Heuristics for Canon RF5.2mm F2.8 L DUAL FISHEYE
+    if(exif?.Make === 'Canon' && exif?.LensModel === 'RF5.2mm F2.8 L DUAL FISHEYE') {
+
+      // Measured values on a reference image, see excmples/canon-eos-r5-dual-fisheye.jpg
+      const referenceImageWidth = 8192;
+      const referenceImageHeight = 5464;
+
+      const referenceEyeDiameter = 3750;
+      const referenceLeftEyeCenter = 1980;
+
+      top        = Math.round( (referenceImageHeight / 2 - referenceEyeDiameter / 2)                      * height / referenceImageHeight );
+      bottom     = Math.round( (referenceImageHeight / 2 + referenceEyeDiameter / 2)                      * height / referenceImageHeight );
+      leftLeft   = Math.round( (referenceLeftEyeCenter - referenceEyeDiameter / 2)                        * width / referenceImageWidth );
+      leftRight  = Math.round( (referenceLeftEyeCenter + referenceEyeDiameter / 2)                        * width / referenceImageWidth );
+      rightLeft  = Math.round( (referenceImageWidth - referenceLeftEyeCenter - referenceEyeDiameter / 2)  * width / referenceImageWidth );
+      rightRight = Math.round( (referenceImageWidth - referenceLeftEyeCenter + referenceEyeDiameter / 2)  * width / referenceImageWidth );
+
+    } else {
+      // March from the edges and the middle to find hte actual edges of the fisheye image.
+      // TODO: This is not a robust approach at all:
+      // 1. centers are not necesserarlly at width / 4, top find the top, we should look for lines.
+      // 2. the fisheye images might need cropping, so looking at the first non black pixel is not enough.
+      // 3. there might be lense flare that makes black not black, and the eye pixels might be black .
+
+      // top
+      for(let y = 0; y < height / 2; y++) {
+        const pixel = ctx.getImageData(width / 4, y, 1, 1).data;
+        if(!pixelIsBlack(pixel)) {
+          top = y;
+          break;
+        }
+      }
+
+      // bottom
+      for(let y = height - 1; y > height / 2; y--) {
+        const pixel = ctx.getImageData(width / 4, y, 1, 1).data;
+        if(!pixelIsBlack(pixel)) {
+          bottom = y;
+          break;
+        }
+      }
+
+      // left of the left fisheye
+      for(let x = 0; x < width / 4; x++) {
+        const pixel = ctx.getImageData(x, height / 2, 1, 1).data;
+        if(!pixelIsBlack(pixel)) {
+          leftLeft = x;
+          break;
+        }
+      }
+
+      // right of the left fisheye
+      for(let x = width / 2 - 1; x > width / 4; x--) {
+        const pixel = ctx.getImageData(x, height / 2, 1, 1).data;
+        if(!pixelIsBlack(pixel)) {
+          leftRight = x;
+          break;
+        }
+      }
+
+      // right of the right fisheye
+      for(let x = width  - 1; x > 3 * width / 4; x--) {
+        const pixel = ctx.getImageData(x, height / 2, 1, 1).data;
+        if(!pixelIsBlack(pixel)) {
+          rightRight = x;
+          break;
+        }
+      }
+
+      // left of the right fisheye
+      for(let x = width / 2 - 1; x > width / 4; x++) {
+        const pixel = ctx.getImageData(x, height / 2, 1, 1).data;
+        if(!pixelIsBlack(pixel)) {
+          rightLeft = x;
+          break;
+        }
       }
     }
-
-    // bottom
-    for(let y = height - 1; y > height / 2; y--) {
-      const pixel = ctx.getImageData(width / 4, y, 1, 1).data;
-      if(!pixelIsBlack(pixel)) {
-        bottom = y;
-        break;
-      }
-    }
-
-    // left of the left fisheye
-    for(let x = 0; x < width / 4; x++) {
-      const pixel = ctx.getImageData(x, height / 2, 1, 1).data;
-      if(!pixelIsBlack(pixel)) {
-        leftLeft = x;
-        break;
-      }
-    }
-
-    // right of the left fisheye
-    for(let x = width / 2 - 1; x > width / 4; x--) {
-      const pixel = ctx.getImageData(x, height / 2, 1, 1).data;
-      if(!pixelIsBlack(pixel)) {
-        leftRight = x;
-        break;
-      }
-    }
-
-    // right of the right fisheye
-    for(let x = width  - 1; x > 3 * width / 4; x--) {
-      const pixel = ctx.getImageData(x, height / 2, 1, 1).data;
-      if(!pixelIsBlack(pixel)) {
-        rightRight = x;
-        break;
-      }
-    }
-
-    // left of the right fisheye
-    for(let x = width / 2 - 1; x > width / 4; x++) {
-      const pixel = ctx.getImageData(x, height / 2, 1, 1).data;
-      if(!pixelIsBlack(pixel)) {
-        rightLeft = x;
-        break;
-      }
-    }
-
 
     console.log({top, bottom, leftLeft, leftRight, rightLeft, rightRight});
   }
