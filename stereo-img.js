@@ -427,6 +427,9 @@ class StereoImg extends HTMLElement {
           display: block;
           contain: content;
         }
+        #flatModeButton:hover {
+          opacity: 1.0 !important;
+        }
       </style>
       `;
 
@@ -472,22 +475,6 @@ class StereoImg extends HTMLElement {
       });
 
       resizeObserver.observe(this);
-    }
-
-    static get observedAttributes() {
-      return ['controlslist', 'flat'];
-    }
-
-    attributeChangedCallback(name, oldValue, newValue) {
-      if (oldValue === newValue) {
-        return;
-      }
-      if (name === 'controlslist') {
-        this.updateButtons();
-      }
-      if (name === 'flat') {
-        this.updateflatMode();
-      }
     }
 
     updateButtons() {
