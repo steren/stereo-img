@@ -61,8 +61,8 @@ async function parseStereoPair(url, secondaryURL, options) {
     secondaryCtx.drawImage(secondaryImage, 0, 0);
   }
 
-  function pixelIsBlack(pixel) {
-    const blackThreshold = 10;
+  function pixelIsBlack(pixel, threshold) {
+    const blackThreshold = threshold || 10;
     return pixel[0] < blackThreshold && pixel[1] < blackThreshold && pixel[2] < blackThreshold;
   }
 
@@ -98,7 +98,7 @@ async function parseStereoPair(url, secondaryURL, options) {
     const bottomLeft = ctx.getImageData(0, height - 1, 1, 1).data;
     const bottomRight = ctx.getImageData(width - 1, height - 1, 1, 1).data;
     const middle = ctx.getImageData(width / 2, height / 2, 1, 1).data;
-    if(pixelIsBlack(topLeft) && pixelIsBlack(topRight) && pixelIsBlack(bottomLeft) && pixelIsBlack(bottomRight) && pixelIsBlack(middle)) {
+    if(pixelIsBlack(topLeft) && pixelIsBlack(topRight) && pixelIsBlack(bottomLeft) && pixelIsBlack(bottomRight) && pixelIsBlack(middle, 50)) {
         projection = 'fisheye';
         console.log("Detected fisheye image");
       }
