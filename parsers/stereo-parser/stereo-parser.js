@@ -66,10 +66,15 @@ async function parseStereoPair(url, secondaryURL, options) {
     return pixel[0] < blackThreshold && pixel[1] < blackThreshold && pixel[2] < blackThreshold;
   }
 
-  const exif = await exifr.parse(image, {
-    xmp: true,
-    multiSegment: true
-  })
+  let exif = {};
+  try {
+    exif = await exifr.parse(image, {
+      xmp: true,
+      multiSegment: true
+    })
+  } catch (e) {
+    // ignore
+  }
 
 
   // Images
