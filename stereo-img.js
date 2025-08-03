@@ -91,7 +91,6 @@ class StereoImg extends HTMLElement {
       } else {
         this.removeAttribute('flat');
       }
-      this.updateflatMode();
     }
 
     get wiggle() {
@@ -116,13 +115,6 @@ class StereoImg extends HTMLElement {
       } else {
         this.removeAttribute('src');
       }
-
-      // use setTimeout to ensure all DOM updates have finished, it's indeed common to update both src= and type= at the same time.
-      // There is probably a cleaner way to do this.
-      let that = this;
-      window.setTimeout(() => {
-        that.parseImageAndInitialize3DScene();
-      }, 0);
     }
 
     get srcRight() {
@@ -134,13 +126,45 @@ class StereoImg extends HTMLElement {
       } else {
         this.removeAttribute('src-right');
       }
+    }
 
-      // use setTimeout to ensure all DOM updates have finished, it's indeed common to update both src= and type= at the same time.
-      // There is probably a cleaner way to do this.
-      let that = this;
-      window.setTimeout(() => {
-        that.parseImageAndInitialize3DScene();
-      }, 0);
+    static get observedAttributes() {
+      return ['type', 'angle', 'debug', 'projection', 'controlslist', 'flat', 'wiggle', 'src', 'src-right'];
+    }
+
+    _scheduleRenderUpdate() {
+      if (this._needsRenderUpdate) {
+        return;
+      }
+      this._needsRenderUpdate = true;
+      // Use a microtask to batch attribute changes.
+      Promise.resolve().then(() => {
+        this.parseImageAndInitialize3DScene();
+        this._needsRenderUpdate = false;
+      });
+    }
+
+    attributeChangedCallback(name, oldValue, newValue) {
+      if (oldValue === newValue || !this.renderer) {
+        return;
+      }
+
+      switch (name) {
+        case 'src':
+        case 'src-right':
+        case 'type':
+        case 'angle':
+        case 'projection':
+        case 'debug':
+          this._scheduleRenderUpdate();
+          break;
+        case 'flat':
+          this.updateflatMode();
+          break;
+        case 'controlslist':
+          this.updateButtons();
+          break;
+      }
     }
 
     animate() {
@@ -501,6 +525,7 @@ class StereoImg extends HTMLElement {
     constructor() {
       super();
       this.wiggleIntervalID = null; // Initialize the interval ID property
+      this._needsRenderUpdate = false;
       this.init();
     }
 
