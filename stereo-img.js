@@ -169,6 +169,10 @@ class StereoImg extends HTMLElement {
 
     animate() {
       this.renderer.setAnimationLoop( () => {
+        if (this.loadingIndicator && this.loadingIndicator.visible) {
+          this.loadingIndicator.rotation.y += 0.01;
+          this.loadingIndicator.rotation.x += 0.01;
+        }
         this.renderer.render( this.scene, this.camera );
       } );
     }
@@ -373,7 +377,7 @@ class StereoImg extends HTMLElement {
       mesh.rotation.x = this.stereoData.roll || 0;
       mesh.rotation.z = this.stereoData.pitch || 0;
       mesh.layers.set(eyeNumber); // display in left/right eye only
-      this.scene.add(mesh);
+      this.stereoImageGroup.add(mesh);
 
       if(this.debug) {
         const wireframe = new THREE.WireframeGeometry(geometry);
@@ -386,17 +390,18 @@ class StereoImg extends HTMLElement {
         line.rotation.x = this.stereoData.roll || 0;
         line.rotation.z = this.stereoData.pitch || 0;
         line.layers.set(eyeNumber);
-        this.scene.add(line);
+        this.stereoImageGroup.add(line);
       }
     }
 
     async initialize3DScene() {
-      this.scene = new THREE.Scene();
+      if (this.stereoImageGroup) {
+        this.scene.remove(this.stereoImageGroup);
+      }
+      this.stereoImageGroup = new THREE.Group();
+      this.scene.add(this.stereoImageGroup);
+
       this.scene.background = new THREE.Color( 0x101010 );
-      const light = new THREE.AmbientLight( 0xffffff, 3 );
-      light.layers.enable(1);
-      light.layers.enable(2);
-      this.scene.add( light );
 
       await this.createEye("left");
       await this.createEye("right");
@@ -407,34 +412,55 @@ class StereoImg extends HTMLElement {
     updateflatMode() {
       const flatMode = this.getAttribute('flat');
 
-      if (flatMode === 'wiggle') {
-        this.toggleWiggle(true);
-        this.renderer.setAnimationLoop(() => {
+      const animation = () => {
+        if (this.loadingIndicator && this.loadingIndicator.visible) {
+          this.loadingIndicator.rotation.y += 0.01;
+          this.loadingIndicator.rotation.x += 0.01;
+        }
+
+        if (flatMode === 'wiggle') {
           this.renderer.render(this.scene, this.camera);
-        });
-      } else if (flatMode === 'right') {
-        this.toggleWiggle(false);
-        this.renderer.setAnimationLoop(() => {
+        } else if (flatMode === 'right') {
           this.camera.layers.set(2);
           this.renderer.render(this.scene, this.camera);
-        });
-      } else if (flatMode === 'anaglyph') {
-        this.toggleWiggle(false);
-        this.renderer.setAnimationLoop(() => {
+        } else if (flatMode === 'anaglyph') {
           this.anaglyphEffect.render(this.scene, this.camera);
-        });
-      } else { // 'left' is the default
-        this.toggleWiggle(false);
-        this.renderer.setAnimationLoop(() => {
+        } else { // 'left' is the default
           this.camera.layers.set(1);
           this.renderer.render(this.scene, this.camera);
-        });
+        }
+      };
+
+      if (flatMode === 'wiggle') {
+        this.toggleWiggle(true);
+      } else {
+        this.toggleWiggle(false);
       }
+      this.renderer.setAnimationLoop(animation);
     }
 
     async parseImageAndInitialize3DScene() {
+      if (this.loadingIndicator) {
+        this.loadingIndicator.visible = true;
+      }
+
       await this.parse();
       await this.initialize3DScene();
+
+      if (this.loadingIndicator) {
+        this.loadingIndicator.visible = false;
+      }
+    }
+
+    setupLoadingIndicator() {
+      const loaderGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+      const loaderMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true });
+      this.loadingIndicator = new THREE.Mesh(loaderGeometry, loaderMaterial);
+      this.loadingIndicator.position.set(0, 0, -1);
+      this.loadingIndicator.visible = false;
+      this.loadingIndicator.layers.enable(1);
+      this.loadingIndicator.layers.enable(2);
+      this.scene.add(this.loadingIndicator);
     }
 
     async init() {
@@ -469,6 +495,14 @@ class StereoImg extends HTMLElement {
       this.renderer.setSize(this.clientWidth, this.clientHeight);
       this.shadowRoot.appendChild(this.renderer.domElement);
 
+      this.scene = new THREE.Scene();
+      this.setupLoadingIndicator();
+
+      const light = new THREE.AmbientLight( 0xffffff, 3 );
+      light.layers.enable(1);
+      light.layers.enable(2);
+      this.scene.add( light );
+
       this.anaglyphEffect = new AnaglyphEffect(this.renderer);
       this.anaglyphEffect.setSize(this.clientWidth, this.clientHeight);
 
@@ -487,8 +521,6 @@ class StereoImg extends HTMLElement {
       this.updateButtons();
 
       await this.parseImageAndInitialize3DScene();
-
-      this.animate();
 
       // Listen for component resize
       const resizeObserver = new ResizeObserver(() => {
@@ -526,6 +558,7 @@ class StereoImg extends HTMLElement {
       super();
       this.wiggleIntervalID = null; // Initialize the interval ID property
       this._needsRenderUpdate = false;
+      this.stereoImageGroup = null;
       this.init();
     }
 
