@@ -224,8 +224,22 @@ async function parseStereoPair(url, secondaryURL, options) {
       rightEye = ctx.getImageData(0, 0, width, height / 2);
       break;
     case 'pair':
-      leftEye =  ctx.getImageData(0, 0, width, height);
-      rightEye = secondaryCtx.getImageData(0, 0, secondaryWidth, secondaryHeight);
+      // dx is the horizontal shift between left and right eye image to adjust for the difference
+      // in eye distance between the camera and human vision.
+      // Input deltax is in percent of a single image width. 100% would mean the images are shifted
+      // by a full single image width against each other, which would be no overlapping at all, a theoretical value.
+      // Result dx is in pixels of the shift for each of the 2 images
+      // and half of the deltax as the total shift is the sum of both images's shifts.
+      const dx = Math.round(width * (options.deltax ?? 0) / 100 / 2);
+      // the field of view is reduced because during the shift,
+      // non-overlapping parts between left and right image must be cropped away
+      options.angle = options.angle * (100-Math.abs(dx))/100;
+      // for positive dx, shift the left image left and right image right,
+      // i.e. crop a slice from the left image's left side and right image's right side
+      // for negative dx, shift the left image right and right image left,
+      // i.e. crop a slice from the left image's right side and right image's left side
+      leftEye =  ctx.getImageData(Math.max(0, dx), 0, width-Math.abs(dx), height);
+      rightEye = secondaryCtx.getImageData(Math.max(0, -dx), 0, secondaryWidth-Math.abs(dx), secondaryHeight);
       break;
   }
   

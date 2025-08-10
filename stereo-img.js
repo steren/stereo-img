@@ -106,6 +106,17 @@ class StereoImg extends HTMLElement {
       }
     }
 
+    get deltax() {
+      return this.getAttribute('deltax');
+    }
+    set deltax(val) {
+      if (val) {
+        this.setAttribute('deltax', val);
+      } else {
+        this.removeAttribute('deltax');
+      }
+    }
+
     get src() {
       return this.getAttribute('src');
     }
@@ -205,6 +216,7 @@ class StereoImg extends HTMLElement {
             this.stereoData = await parseStereoPair(this.src, righturl, {
               type: this.type,
               angle: this.angle,
+              deltax: this.deltax ?? 0,
               projection: this.projection,
             });
           } else {
