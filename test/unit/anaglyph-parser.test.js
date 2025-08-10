@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseAnaglyph } from '../parsers/anaglyph-parser/anaglyph-parser.js';
+import { parseAnaglyph } from '../../parsers/anaglyph-parser/anaglyph-parser.js';
 
 class FakeImage {
   constructor() {

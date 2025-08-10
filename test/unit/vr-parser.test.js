@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseVR } from '../parsers/vr-parser/vr-parser.js';
+import { parseVR } from '../../parsers/vr-parser/vr-parser.js';
 
 class FakeImage {
   constructor() {

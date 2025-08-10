@@ -7,17 +7,15 @@ just a few small guidelines you need to follow.
 
 Thre is no compilation step.
 
-### Update index.html to load local files
+### Starting a local development server
 
-In `index.html`, comment `<script type="module" src="https://cdn.skypack.dev/stereo-img"></script>`
-and uncomment the lines below loading from local files.
+Install dependencies with `npm install`.
+
+Run the local web server with `npm start`.
 
 ### Starting a local development server
 
-Install dependencies with `npm install`	
-
-Run the local web server with `npm start`
-
+Run tests with `npm test`.
 
 ## Publishing to npm
 
@@ -25,6 +23,7 @@ To update the [npm package](https://www.npmjs.com/package/stereo-img)
 
 Run the following:
 
+* `npm test`
 * `npm version minor`
 * `git push --follow-tags`
 

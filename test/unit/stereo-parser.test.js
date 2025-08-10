@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseStereo, parseStereoPair } from '../parsers/stereo-parser/stereo-parser.js';
+import { parseStereo, parseStereoPair } from '../../parsers/stereo-parser/stereo-parser.js';
 
 // Helper to create a minimal JPEG payload
 function makeJPEG(payload) {

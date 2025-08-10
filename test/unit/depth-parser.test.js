@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseDepth } from '../parsers/depth-parser/depth-parser.js';
+import { parseDepth } from '../../parsers/depth-parser/depth-parser.js';
 
 // Helper to create a minimal JPEG payload
 function makeJPEG(payload) {
