@@ -20,28 +20,15 @@
 
 import exifr from './../../vendor/exifr/full.esm.js';
 
-async function parseVR(url) {
-  const image = await createImageFromURL(url);
-  //image.crossOrigin = "Anonymous";
-
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  const width = image.width;
-  const height = image.height;
-  canvas.width = width;
-  canvas.height = height;
-  ctx.drawImage(image, 0, 0);
-
-  const leftEye = ctx.getImageData(0, 0, width, height);
-
-  const result = {leftEye};
-
-  const exif = await exifr.parse(url, {
+async function parseVR(data) {
+  const exif = await exifr.parse(data, {
     xmp: true,
     multiSegment: true,
     mergeOutput: false,
     ihdr: true, //unclear why we need this, but if not enabled, some VR180 XMP Data are not parsed
   });
+
+  const result = {};
 
   // VR180 are a half sphere, but are just a special case.
   if(exif.GPano?.CroppedAreaImageWidthPixels && exif.GPano?.FullPanoWidthPixels) {
@@ -79,29 +66,10 @@ async function parseVR(url) {
     return result;
   }
 
-  var image2 = await createImageFromURL("data:image/jpg;base64," + exif.GImage.Data);
-
-  const canvas2 = document.createElement('canvas');
-  const ctx2 = canvas2.getContext('2d');
-  canvas2.width = width;
-  canvas2.height = height;
-  ctx2.drawImage(image2, 0, 0);
-
-  result.rightEye = ctx2.getImageData(0, 0, width, height);
+  result.rightEye = "data:image/jpg;base64," + exif.GImage.Data;
+  result.leftEye = data;
 
   return result;
-}
-
-async function createImageFromURL(url) {
-  const image = new Image();
-  image.src = url;
-  return new Promise((resolve, reject) => {
-    image.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve(image);
-    };
-    image.onerror = reject;
-  });
 }
 
 export {parseVR}
