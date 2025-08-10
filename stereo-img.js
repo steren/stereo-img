@@ -12,11 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { parseVR } from './parsers/vr-parser/vr-parser.js';
-import { parseStereo, parseStereoPair } from './parsers/stereo-parser/stereo-parser.js';
-import { parseAnaglyph } from './parsers/anaglyph-parser/anaglyph-parser.js';
-import { parseDepth } from './parsers/depth-parser/depth-parser.js';
-import { parseMono } from './parsers/mono-parser/mono-parser.js';
 import exifr from './vendor/exifr/full.esm.js';
 
 import * as THREE from './vendor/three/three.module.min.js';
@@ -238,9 +233,11 @@ class StereoImg extends HTMLElement {
     async parse() {
       if(this.src) {
         if(this.type === 'vr180' || this.type === 'vr') {
+          const { parseVR } = await import('./parsers/vr-parser/vr-parser.js');
           this.stereoData = await parseVR(this.src);
 
         } else if(this.type === 'left-right' || this.type === 'right-left' || this.type === 'bottom-top' || this.type === 'top-bottom') {
+          const { parseStereo } = await import('./parsers/stereo-parser/stereo-parser.js');
           this.stereoData = await parseStereo(this.src, {
             type: this.type,
             angle: this.angle,
@@ -248,15 +245,18 @@ class StereoImg extends HTMLElement {
           });
 
         } else if(this.type === 'anaglyph') {
+          const { parseAnaglyph } = await import('./parsers/anaglyph-parser/anaglyph-parser.js');
           this.stereoData = await parseAnaglyph(this.src, {
             angle: this.angle,
             projection: this.projection,
           });
 
         } else if(this.type === 'depth') {
+          const { parseDepth } = await import('./parsers/depth-parser/depth-parser.js');
           this.stereoData = await parseDepth(this.src);
 
         } else if (this.type === 'mono') {
+          const { parseMono } = await import('./parsers/mono-parser/mono-parser.js');
           this.stereoData = await parseMono(this.src, {
             angle: this.angle,
             projection: this.projection,
@@ -266,6 +266,7 @@ class StereoImg extends HTMLElement {
           if(this.srcRight) {
             const righturl = this.srcRight;
             this.type = 'pair';
+            const { parseStereoPair } = await import('./parsers/stereo-parser/stereo-parser.js');
             this.stereoData = await parseStereoPair(this.src, righturl, {
               type: this.type,
               angle: this.angle,
@@ -273,6 +274,7 @@ class StereoImg extends HTMLElement {
             });
           } else {
             console.error('<stereo-img> type "pair" is missing the "src-right" attribute for the right eye image.');
+            const { parseStereo } = await import('./parsers/stereo-parser/stereo-parser.js');
             this.stereoData = await parseStereo(this.src, {
               angle: this.angle,
               projection: this.projection,
@@ -284,6 +286,7 @@ class StereoImg extends HTMLElement {
 
           // if url ends with `PORTRAIT.jpg` assume type = depth
           if (this.src.toUpperCase().endsWith('PORTRAIT.JPG')) {
+            const { parseDepth } = await import('./parsers/depth-parser/depth-parser.js');
             this.stereoData = await parseDepth(this.src);
           } else {
             // try to read XMP metadata to see if VR Photo, otherwise assume stereo-style (e.g. "left right")
@@ -297,11 +300,13 @@ class StereoImg extends HTMLElement {
 
             if (exif?.GImage?.Data) {
               // GImage XMP for left eye found, assume VR Photo
+              const { parseVR } = await import('./parsers/vr-parser/vr-parser.js');
               this.stereoData = await parseVR(this.src);
             } else {
               // no left eye found, check if it is a stereo or mono image
               if (await this._isStereo(this.src)) {
                 console.info('<stereo-img> does not have a "type" attribute and image does not have XMP metadata of a VR picture. Use "type" attribute to specify the type of stereoscopic image. Image seems to be "left-right" stereo.');
+                const { parseStereo } = await import('./parsers/stereo-parser/stereo-parser.js');
                 this.stereoData = await parseStereo(this.src, {
                   angle: this.angle,
                   projection: this.projection,
@@ -309,6 +314,7 @@ class StereoImg extends HTMLElement {
               } else {
                 this.type = 'mono';
                 console.info('<stereo-img> does not have a "type" attribute and image does not have XMP metadata of a VR picture. Image does not seem to be stereoscopic. Displaying as mono.');
+                const { parseMono } = await import('./parsers/mono-parser/mono-parser.js');
                 this.stereoData = await parseMono(this.src, {
                   angle: this.angle,
                   projection: this.projection,
