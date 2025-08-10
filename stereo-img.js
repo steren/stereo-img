@@ -16,6 +16,7 @@ import { parseVR } from './parsers/vr-parser/vr-parser.js';
 import { parseStereo, parseStereoPair } from './parsers/stereo-parser/stereo-parser.js';
 import { parseAnaglyph } from './parsers/anaglyph-parser/anaglyph-parser.js';
 import { parseDepth } from './parsers/depth-parser/depth-parser.js';
+import { parseMono } from './parsers/mono-parser/mono-parser.js';
 import exifr from './vendor/exifr/full.esm.js';
 
 import * as THREE from './vendor/three/three.module.min.js';
@@ -167,6 +168,63 @@ class StereoImg extends HTMLElement {
       }
     }
 
+    /**
+     * Checks if an image is stereoscopic
+     * @param {string} imageUrl - The URL of the image to check.
+     * @returns {Promise<boolean>} - True if the image is likely stereoscopic, false otherwise.
+     * @private
+     */
+    async _isStereo(imageUrl) {
+      // Compare the left and right halves.
+      // Renders the image to a small canvas and calculates the average pixel difference.
+      const image = await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
+        img.onload = () => resolve(img);
+        img.onerror = (err) => reject(err);
+        img.src = imageUrl;
+      });
+  
+      const canvas = document.createElement('canvas');
+      const width = 20;
+      const height = 10;
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(image, 0, 0, width, height);
+  
+      const imageData = ctx.getImageData(0, 0, width, height).data;
+  
+      let totalDiff = 0;
+      const halfWidth = width / 2;
+  
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < halfWidth; x++) {
+          const leftIndex = (y * width + x) * 4;
+          const rightIndex = (y * width + x + halfWidth) * 4;
+  
+          const r1 = imageData[leftIndex];
+          const g1 = imageData[leftIndex + 1];
+          const b1 = imageData[leftIndex + 2];
+  
+          const r2 = imageData[rightIndex];
+          const g2 = imageData[rightIndex + 1];
+          const b2 = imageData[rightIndex + 2];
+  
+          totalDiff += Math.abs(r1 - r2) + Math.abs(g1 - g2) + Math.abs(b1 - b2);
+        }
+      }
+  
+      const avgDiff = totalDiff / (halfWidth * height * 3);
+      const threshold = 25;
+      
+      if (this.debug) {
+        console.log(`Stereo difference: ${avgDiff}`);
+      }
+  
+      return avgDiff < threshold;
+    }
+
     animate() {
       this.renderer.setAnimationLoop( () => {
         if (this.loadingIndicator && this.loadingIndicator.visible) {
@@ -198,6 +256,12 @@ class StereoImg extends HTMLElement {
         } else if(this.type === 'depth') {
           this.stereoData = await parseDepth(this.src);
 
+        } else if (this.type === 'mono') {
+          this.stereoData = await parseMono(this.src, {
+            angle: this.angle,
+            projection: this.projection,
+          });
+        
         } else if(this.type === 'pair' || (!this.type && this.srcRight)) {
           if(this.srcRight) {
             const righturl = this.srcRight;
@@ -235,12 +299,21 @@ class StereoImg extends HTMLElement {
               // GImage XMP for left eye found, assume VR Photo
               this.stereoData = await parseVR(this.src);
             } else {
-              // no left eye found, assume stereo (e.g. left-right)
-              console.info('<stereo-img> does not have a "type" attribute and image does not have XMP metadata of a VR picture.  Use "type" attribute to specify the type of stereoscopic image. Assuming stereo image of the "left-right" family.');
-              this.stereoData = await parseStereo(this.src, {
-                angle: this.angle,
-                projection: this.projection,
-              });
+              // no left eye found, check if it is a stereo or mono image
+              if (await this._isStereo(this.src)) {
+                console.info('<stereo-img> does not have a "type" attribute and image does not have XMP metadata of a VR picture. Use "type" attribute to specify the type of stereoscopic image. Image seems to be "left-right" stereo.');
+                this.stereoData = await parseStereo(this.src, {
+                  angle: this.angle,
+                  projection: this.projection,
+                });
+              } else {
+                this.type = 'mono';
+                console.info('<stereo-img> does not have a "type" attribute and image does not have XMP metadata of a VR picture. Image does not seem to be stereoscopic. Displaying as mono.');
+                this.stereoData = await parseMono(this.src, {
+                  angle: this.angle,
+                  projection: this.projection,
+                });
+              }
             }
           }
         }

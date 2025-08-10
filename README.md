@@ -41,6 +41,7 @@ npm install stereo-img
   - `pair`: separate files for left and right image. Left eye image read from `src` attribute, right eye image read from attribute `src-right`. Adding the `src-right` attribute will enable the `pair` type without the need to use the `type` attribute.
   - `anaglyph`: [Anaglyph 3D](https://en.wikipedia.org/wiki/Anaglyph_3D) - currently only supporting red / green
   - `depth`: Picture with depth map (e.g. portrait mode on Google Camera)
+  - `mono`: A regular, non-stereo picture. The same image is displayed on both eyes.
 * `angle`: (Optional) hint at angle of view for `left-right`, `top-bottom`, or `pair` types
   - If unset, Exif angle of view is used if present.
   - `DEGREE`: any degree number between 0 and 360
