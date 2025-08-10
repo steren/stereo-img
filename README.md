@@ -3,7 +3,9 @@
 `<stereo-img>` is a web component to display stereographic pictures on web pages, with VR support.
 It supports various stereo picture formats: VR Photos (VR180, Google Camera panorama, Photosphere), left-right, and anaglyph.
 
-See the [demo](https://stereo-img.steren.fr/) for an example.
+See the [demo](https://stereo-img.steren.fr/) for an example of the component in action.
+
+See [stereo-viewer.com](https://stereo-viewer.com/) for a real-world stereo viewer web app using this component.
 
 ## How to use
 
