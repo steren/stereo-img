@@ -15,7 +15,8 @@ Run the local web server with `npm start`.
 
 ### Starting a local development server
 
-Run tests with `npm test`.
+Run unist tests with `npm test`.
+Run integration tests with `npm test:integration`.
 
 ## Publishing to npm
 
@@ -24,6 +25,7 @@ To update the [npm package](https://www.npmjs.com/package/stereo-img)
 Run the following:
 
 * `npm test`
+* `npm test:integration`
 * `npm version minor`
 * `git push --follow-tags`
 

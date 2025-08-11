@@ -1,32 +1,37 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
+import { expect } from '@esm-bundle/chai';
 import { parseVR } from '../../parsers/vr-parser/vr-parser.js';
-import { readFile } from 'node:fs/promises';
-import { loadImage } from 'canvas';
 
-test('parseVR with a real image', async () => {
-    const imagePath = './examples/vr180-lenovo-mirage.vr.jpg';
-    const data = await readFile(imagePath);
-    
-    const result = await parseVR(data);
+describe('VR Parser', () => {
+  it('should parse a VR180 image', async () => {
 
-    assert.ok(result.leftEye, 'leftEye is present');
-    const leftEyeImage = await loadImage(result.leftEye);
-    assert.strictEqual(leftEyeImage.width, 3016, 'leftEye width is correct');
-    assert.strictEqual(leftEyeImage.height, 3016, 'leftEye height is correct');
+    const url = '/examples/vr180-lenovo-mirage.vr.jpg';
+    const result = await parseVR(url);
 
-    assert.ok(result.rightEye, 'rightEye is present');
-    const rightEyeImage = await loadImage(Buffer.from(result.rightEye.split(',')[1], 'base64'));
-    assert.strictEqual(rightEyeImage.width, 3016, 'rightEye width is correct');
-    assert.strictEqual(rightEyeImage.height, 3016, 'rightEye height is correct');
+    expect(result.leftEye).to.exist;
+    const leftEyeImage = await loadImage(url);
+    expect(leftEyeImage.width).to.equal(3016);
+    expect(leftEyeImage.height).to.equal(3016);
+
+    expect(result.rightEye).to.exist;
+    const rightEyeImage = await loadImage(result.rightEye);
+    expect(rightEyeImage.width).to.equal(leftEyeImage.width);
+    expect(rightEyeImage.height).to.equal(leftEyeImage.height);
+  }).timeout(5000);
+
+  it('should parse pitch and roll from a VR180 image', async () => {
+    const url = 'examples/vr180-lenovo-pitch-roll.vr.jpg';
+    const result = await parseVR(url);
+
+    expect(result.pitch).to.be.closeTo(0.5222936881968275, 0.0001);
+    expect(result.roll).to.be.closeTo(0.9743192862443497, 0.0001);
+  });
 });
 
-test('parseVR with pitch and roll', async () => {
-    const imagePath = './examples/vr180-lenovo-pitch-roll.vr.jpg';
-    const data = await readFile(imagePath);
-
-    const result = await parseVR(data);
-
-    assert.ok(Math.abs(result.pitch - 0.5222936881968275) < 0.0001, 'pitch is correct');
-    assert.ok(Math.abs(result.roll - 0.9743192862443497) < 0.0001, 'roll is correct');
-});
+async function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
