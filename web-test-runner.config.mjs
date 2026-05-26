@@ -2,6 +2,6 @@ import { fromRollup } from '@web/dev-server-rollup';
 import resolve from '@rollup/plugin-node-resolve';
 
 export default {
-  files: 'test/integration/**/*.test.js',
+  files: 'tests/integration/**/*.integration.js',
   plugins: [fromRollup(resolve)()],
 };
