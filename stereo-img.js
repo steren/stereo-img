@@ -554,13 +554,16 @@ class StereoImg extends HTMLElement {
   }
 
   async init() {
+    if (this._initialized) {
+      return;
+    }
+    this._initialized = true;
+
     if (this.debug) {
       console.log('Debug mode enabled');
       this.debug = true;
     }
 
-
-    this.attachShadow({ mode: 'open' });
     this.shadowRoot.innerHTML = `
       <style>
         :host {
@@ -613,14 +616,14 @@ class StereoImg extends HTMLElement {
     await this.parseImageAndInitialize3DScene();
 
     // Listen for component resize
-    const resizeObserver = new ResizeObserver(() => {
+    this._resizeObserver = new ResizeObserver(() => {
       this.renderer.setSize(this.clientWidth, this.clientHeight);
       this.camera.aspect = this.clientWidth / this.clientHeight;
       this.camera.updateProjectionMatrix();
       this.anaglyphEffect.setSize(this.clientWidth, this.clientHeight);
     });
 
-    resizeObserver.observe(this);
+    this._resizeObserver.observe(this);
   }
 
   updateButtons() {
@@ -644,12 +647,27 @@ class StereoImg extends HTMLElement {
   }
 
 
+  connectedCallback() {
+    this.init();
+  }
+
+  disconnectedCallback() {
+    if (this._resizeObserver) {
+      this._resizeObserver.disconnect();
+    }
+    if (this.wiggleIntervalID) {
+      clearInterval(this.wiggleIntervalID);
+      this.wiggleIntervalID = null;
+    }
+  }
+
   constructor() {
     super();
     this.wiggleIntervalID = null; // Initialize the interval ID property
     this._needsRenderUpdate = false;
     this.stereoImageGroup = null;
-    this.init();
+    this._initialized = false;
+    this.attachShadow({ mode: 'open' });
   }
 
 }
