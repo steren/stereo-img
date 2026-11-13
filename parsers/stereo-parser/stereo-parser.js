@@ -297,6 +297,18 @@ async function parseStereoPair(url, secondaryURL, options) {
   return {leftEye, rightEye, phiLength, thetaStart, thetaLength, projection};
 }
 
+async function createImageFromURL(url) {
+  const image = new Image();
+  image.src = url;
+  return new Promise((resolve, reject) => {
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = reject;
+  });
+}
+
 /**
  * GoPro cameras name their pictures "GOPR0001.JPG".
  * @param {string} url - image url, absolute or relative
@@ -308,18 +320,6 @@ function isGoProFilename(url) {
   }
   const filename = url.split(/[?#]/)[0].split('/').pop();
   return /^gopr/i.test(filename);
-}
-
-async function createImageFromURL(url) {
-  const image = new Image();
-  image.src = url;
-  return new Promise((resolve, reject) => {
-    image.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve(image);
-    };
-    image.onerror = reject;
-  });
 }
 
 export {parseStereo, parseStereoPair}
