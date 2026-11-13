@@ -262,6 +262,12 @@ async function parseStereoPair(url, secondaryURL, options) {
     phiLength = Math.PI;
     thetaLength = Math.PI;
 
+  } else if(options?.angle > 0 && options?.angle <= 360) {
+    // An angle set explicitly takes precedence over what is inferred from the image metadata.
+    const angle = options?.angle * Math.PI/180.0;
+    phiLength = angle;
+    thetaLength = angle * height/width;
+
   } else if(exif?.FocalLengthIn35mmFormat) {
     const angle = angleOfViewFocalLengthIn35mmFormat(exif.FocalLengthIn35mmFormat);
     phiLength = angle.horizontalAngle;
@@ -280,11 +286,6 @@ async function parseStereoPair(url, secondaryURL, options) {
   } else if(exif?.Model === 'insta360 evo') {
     phiLength = Math.PI;
     thetaLength = Math.PI;
-
-  } else if(options?.angle > 0 && options?.angle <= 360) {
-    const angle = options?.angle * Math.PI/180.0;
-    phiLength = angle;
-    thetaLength = angle * height/width;
 
   } else {
     const assumeFocalLengthIn35mmFormat = 27;
