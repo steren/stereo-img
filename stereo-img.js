@@ -325,13 +325,7 @@ class StereoImg extends HTMLElement {
       }
     } else {
       // no src attribute. Use fake stereo data to render a black sphere
-      this.stereoData = {
-        leftEye: new ImageData(10, 10),
-        rightEye: new ImageData(10, 10),
-        phiLength: 0,
-        thetaStart: 0,
-        thetaLength: 0
-      };
+      this.stereoData = this._emptyStereoData();
     }
   }
 
@@ -530,16 +524,69 @@ class StereoImg extends HTMLElement {
   }
 
   async parseImageAndInitialize3DScene() {
-    if (this.loadingIndicator) {
-      this.loadingIndicator.visible = true;
+    if (this._loading) {
+      // A picture is already loading. Load again once it is done, so that the latest
+      // attributes always win, whatever the order in which pictures finish loading.
+      this._loadAgain = true;
+      return this._loading;
     }
 
-    await this.parse();
-    await this.initialize3DScene();
+    this._loading = (async () => {
+      if (this.loadingIndicator) {
+        this.loadingIndicator.visible = true;
+      }
+      try {
+        do {
+          this._loadAgain = false;
+          await this._parseAndDisplay();
+        } while (this._loadAgain);
+      } finally {
+        this._loading = null;
+        if (this.loadingIndicator) {
+          this.loadingIndicator.visible = false;
+        }
+      }
+    })();
+    return this._loading;
+  }
 
-    if (this.loadingIndicator) {
-      this.loadingIndicator.visible = false;
+  /**
+   * Parse the picture and display it. If that fails, report the error and display an empty scene.
+   */
+  async _parseAndDisplay() {
+    try {
+      await this.parse();
+      if (this._loadAgain) {
+        // Attributes changed in the meantime, this picture is already outdated.
+        return;
+      }
+      if (!this.stereoData?.leftEye || !this.stereoData?.rightEye) {
+        throw new Error(this.stereoData?.error || 'No image found for the left and right eyes.');
+      }
+      await this.initialize3DScene();
+    } catch (error) {
+      console.error(`<stereo-img> could not display "${this.src}":`, error);
+      try {
+        // Do not keep displaying the previous picture.
+        this.stereoData = this._emptyStereoData();
+        await this.initialize3DScene();
+      } catch (e) {
+        // Nothing more can be done.
+      }
     }
+  }
+
+  /**
+   * Stereo data rendering an empty scene.
+   */
+  _emptyStereoData() {
+    return {
+      leftEye: new ImageData(10, 10),
+      rightEye: new ImageData(10, 10),
+      phiLength: 0,
+      thetaStart: 0,
+      thetaLength: 0
+    };
   }
 
   setupLoadingIndicator() {
