@@ -22,22 +22,24 @@ import exifr from './../../vendor/exifr/full.esm.js';
 
 /**
  * @param {string} data - image url
- * @param {Object} [options] - Parsing options: signal: AbortSignal to cancel the parsing
+ * @param {Object} [options] - Parsing options: signal: AbortSignal to cancel the parsing, exif: metadata of the image, when already read (with the options used below)
  */
 async function parseVR(data, options) {
   const signal = options?.signal;
   signal?.throwIfAborted();
-  let exif;
-  try {
-    exif = await exifr.parse(data, {
-      xmp: true,
-      multiSegment: true,
-      mergeOutput: false,
-      ihdr: true, //unclear why we need this, but if not enabled, some VR180 XMP Data are not parsed
-    });
-  } finally {
-    // Once aborted, the outcome of reading the metadata does not matter anymore.
-    signal?.throwIfAborted();
+  let exif = options?.exif;
+  if (!exif) {
+    try {
+      exif = await exifr.parse(data, {
+        xmp: true,
+        multiSegment: true,
+        mergeOutput: false,
+        ihdr: true, //unclear why we need this, but if not enabled, some VR180 XMP Data are not parsed
+      });
+    } finally {
+      // Once aborted, the outcome of reading the metadata does not matter anymore.
+      signal?.throwIfAborted();
+    }
   }
 
   const result = {};

@@ -73,13 +73,16 @@ function findDepthMapFromMetadata(jpeg, exif) {
  * contains concatenated left and right eye images plus an embedded depth map.
  *
  * @param {string} url - image url
- * @param {Object} [options] - Parsing options
+ * @param {Object} [options] - Parsing options: signal: AbortSignal to cancel the parsing
  * @returns {Promise<{depth: HTMLImageElement, leftEye: HTMLImageElement, rightEye: HTMLImageElement, phiLength: number, thetaStart: number, thetaLength: number}>} A promise that resolves with an object containing the parsed data.
  */
 async function parseDepth(url, options) {
+  const signal = options?.signal;
+  signal?.throwIfAborted();
   const image = await createImageFromURL(url);
+  signal?.throwIfAborted();
 
-  const imageData = await urlToUint8Array(url);
+  const imageData = await urlToUint8Array(url, signal);
 
   let exif;
   try {
@@ -92,6 +95,7 @@ async function parseDepth(url, options) {
   } catch (e) {
     // no metadata, fall back to the position of the depth map in the file
   }
+  signal?.throwIfAborted();
 
   // TODO: use the depth range of the depth map:
   // exif?.Device?.Cameras?.value?.DepthMap.Near
@@ -102,7 +106,13 @@ async function parseDepth(url, options) {
   if (!depthImageArray) {
     throw new Error('No depth map found in image');
   }
-  const depth = await createImageFromURL(URL.createObjectURL(new Blob([depthImageArray], {type: 'image/jpeg'})))
+  const depthUrl = URL.createObjectURL(new Blob([depthImageArray], {type: 'image/jpeg'}));
+  let depth;
+  try {
+    depth = await createImageFromURL(depthUrl);
+  } finally {
+    URL.revokeObjectURL(depthUrl);
+  }
   
   // TODO: use same method as for left-right stereo (share helper function)
   const phiLength = 1.02278;
@@ -122,16 +132,15 @@ async function createImageFromURL(url) {
   image.src = url;
   return new Promise((resolve, reject) => {
     image.onload = () => {
-      URL.revokeObjectURL(url);
       resolve(image);
     };
     image.onerror = reject;
   });
 }
 
-async function urlToUint8Array(url)
+async function urlToUint8Array(url, signal)
 {
-  const response = await fetch(url);
+  const response = await fetch(url, { signal });
   const arrayBuffer = await response.arrayBuffer();
   return new Uint8Array(arrayBuffer);
 }
