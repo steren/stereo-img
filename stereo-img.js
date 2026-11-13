@@ -23,6 +23,7 @@ import { soundButton } from './lib/soundButton.js';
 import { loadingHints } from './lib/https.js';
 import { Picture } from './lib/picture.js';
 import { edgeColors } from './lib/edgeColors.js';
+import { tilePadding, planTiles, pickTriangles, tileUvs, cropPixels } from './lib/tiles.js';
 
 
 /**
@@ -585,24 +586,14 @@ class StereoImg extends HTMLElement {
       });
     }
 
-    // if max texture size supported by the GPU is below the eye image size, resize the image
-    const maxTextureSize = this.renderer.capabilities.maxTextureSize;
-    if (imageData.width > maxTextureSize || imageData.height > maxTextureSize) {
-      const newWidth = Math.min(imageData.width, maxTextureSize);
-      const newHeight = Math.min(imageData.height, maxTextureSize);
-      console.warn(`Image size (${imageData.width}x${imageData.height}) exceeds max texture size (${maxTextureSize}x${maxTextureSize}). Resizing to ${newWidth}x${newHeight}.`);
-      const canvas = document.createElement("canvas");
-      canvas.width = newWidth;
-      canvas.height = newHeight;
-      const ctx = canvas.getContext("2d");
-      const imageBitmap = await createImageBitmap(imageData);
-      ctx.drawImage(imageBitmap, 0, 0, newWidth, newHeight);
-      imageData = ctx.getImageData(0, 0, newWidth, newHeight);
+    if (eye === "left") {
+      // the surroundings take their colours from this picture
+      this._leftPicture = imageData;
     }
 
-    const texture = new THREE.Texture(imageData);
-    texture.needsUpdate = true;
-    texture.colorSpace = THREE.SRGBColorSpace;
+    // A picture larger than the largest texture of the GPU is cut into tiles: several textures, on several meshes.
+    const maxTextureSize = this._maxTextureSize();
+    const fitsInOneTexture = imageData.width <= maxTextureSize && imageData.height <= maxTextureSize;
 
     let geometry;
     // if angle is less than Pi / 2, use a plane, otherwise use a sphere
@@ -615,7 +606,12 @@ class StereoImg extends HTMLElement {
       const planeHeight = planeWidth / aspectRatio;
       const planeDistance = radius;
 
-      geometry = new THREE.PlaneGeometry(planeWidth, planeHeight, planeSegments, planeSegments);
+      // Tiles are made of whole triangles: a large picture needs at least a pair of triangles per tile.
+      const tileSize = maxTextureSize - 2 * tilePadding(maxTextureSize);
+      const widthSegments = fitsInOneTexture ? planeSegments : Math.max(planeSegments, Math.ceil(imageWidth / tileSize));
+      const heightSegments = fitsInOneTexture ? planeSegments : Math.max(planeSegments, Math.ceil(imageHeight / tileSize));
+
+      geometry = new THREE.PlaneGeometry(planeWidth, planeHeight, widthSegments, heightSegments);
       // Put the plane in front of the camera (rotate and translate it)
       geometry.rotateY(-Math.PI / 2);
       geometry.translate(planeDistance, 0, 0);
@@ -650,25 +646,60 @@ class StereoImg extends HTMLElement {
       }
     }
 
-    const material = new THREE.MeshStandardMaterial({
-      map: texture,
-      displacementScale: -1 * depth,
-      displacementBias: depth / 2,
-      flatShading: true,
-    });
+    let displacementMap = null;
     if (this.stereoData.depth) {
-      material.displacementMap = new THREE.Texture(this.stereoData.depth);
-      material.displacementMap.needsUpdate = true;
-      // material.displacementMap.colorSpace = THREE.SRGBColorSpace;
+      displacementMap = new THREE.Texture(this.stereoData.depth);
+      displacementMap.needsUpdate = true;
+      // displacementMap.colorSpace = THREE.SRGBColorSpace;
     }
 
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.rotation.reorder('YXZ');
-    mesh.rotation.y = Math.PI / 2;
-    mesh.rotation.x = this.stereoData.roll || 0;
-    mesh.rotation.z = this.stereoData.pitch || 0;
-    mesh.layers.set(eyeNumber); // display in left/right eye only
-    this.stereoImageGroup.add(mesh);
+    // The parts of the picture: all of it on the whole geometry, or tiles, each on some of the triangles.
+    let parts = null;
+    if (fitsInOneTexture) {
+      parts = [{ geometry, image: imageData }];
+    } else {
+      parts = this._cutIntoTiles(geometry, imageData, maxTextureSize);
+      if (parts) {
+        // The depth map is not cut: tiles also know where they are on the whole picture.
+        if (displacementMap) {
+          displacementMap.channel = 1;
+        }
+      } else {
+        parts = [{ geometry, image: await this._shrinkPicture(imageData, maxTextureSize) }];
+      }
+    }
+
+    for (const part of parts) {
+      const texture = new THREE.Texture(part.image);
+      texture.needsUpdate = true;
+      texture.colorSpace = THREE.SRGBColorSpace;
+
+      const material = new THREE.MeshStandardMaterial({
+        map: texture,
+        displacementScale: -1 * depth,
+        displacementBias: depth / 2,
+        flatShading: true,
+      });
+      material.displacementMap = displacementMap;
+
+      const mesh = new THREE.Mesh(part.geometry, material);
+      mesh.rotation.reorder('YXZ');
+      mesh.rotation.y = Math.PI / 2;
+      mesh.rotation.x = this.stereoData.roll || 0;
+      mesh.rotation.z = this.stereoData.pitch || 0;
+      mesh.layers.set(eyeNumber); // display in left/right eye only
+      this.stereoImageGroup.add(mesh);
+
+      if (part.tile) {
+        /** Which pixels of the picture this mesh draws, when the picture is cut into tiles. */
+        mesh.userData.tile = part.tile;
+        // Tiles are copies of parts of the picture. Send each to the GPU now and let go of the copy:
+        // the memory of a large picture is not needed twice.
+        this.renderer.initTexture(texture);
+        texture.image = null;
+        this._hasTiles = true;
+      }
+    }
 
     if (this.debug) {
       const wireframe = new THREE.WireframeGeometry(geometry);
@@ -683,6 +714,82 @@ class StereoImg extends HTMLElement {
       line.layers.set(eyeNumber);
       this.stereoImageGroup.add(line);
     }
+  }
+
+  /**
+   * The largest width and height of a texture, in pixels: a limit of the GPU.
+   * @returns {number}
+   * @private
+   */
+  _maxTextureSize() {
+    return this.renderer.capabilities.maxTextureSize;
+  }
+
+  /**
+   * Cut the picture of an eye, too large for one texture, into tiles.
+   * @param {THREE.BufferGeometry} geometry - What the whole picture is drawn on.
+   * @param {ImageData|HTMLImageElement|ImageBitmap|HTMLCanvasElement} picture - The picture.
+   * @param {number} maxSize - The largest width and height of a tile, in pixels.
+   * @returns {Array<{geometry: THREE.BufferGeometry, image: ImageData|HTMLCanvasElement, tile: Object}>|null} - For each tile, the triangles it is drawn on and its pixels. Null if the picture cannot be cut.
+   * @private
+   */
+  _cutIntoTiles(geometry, picture, maxSize) {
+    const { width, height } = picture;
+    // every triangle with its own corners, to give triangles to tiles
+    const triangles = geometry.index ? geometry.toNonIndexed() : geometry;
+    const { position, normal, uv } = triangles.attributes;
+
+    const tiles = planTiles(uv.array, width, height, maxSize);
+    if (triangles !== geometry) {
+      triangles.dispose();
+    }
+    if (!tiles) {
+      return null;
+    }
+
+    return tiles.map(tile => {
+      const part = new THREE.BufferGeometry();
+      part.setAttribute('position', new THREE.BufferAttribute(pickTriangles(position.array, 3, tile.triangles), 3));
+      part.setAttribute('normal', new THREE.BufferAttribute(pickTriangles(normal.array, 3, tile.triangles), 3));
+      // where the triangles are on the tile, and on the whole picture
+      part.setAttribute('uv', new THREE.BufferAttribute(tileUvs(uv.array, tile, width, height), 2));
+      part.setAttribute('uv1', new THREE.BufferAttribute(pickTriangles(uv.array, 2, tile.triangles), 2));
+      // A tile keeps the shape of the picture it is a part of: what looks at the shape of the picture sees no difference.
+      part.type = geometry.type;
+      part.parameters = geometry.parameters;
+
+      const rectangle = { x: tile.x, y: tile.y, width: tile.width, height: tile.height };
+      let image;
+      if (picture instanceof ImageData) {
+        image = new ImageData(cropPixels(picture.data, width, rectangle), tile.width, tile.height);
+      } else {
+        image = document.createElement('canvas');
+        image.width = tile.width;
+        image.height = tile.height;
+        image.getContext('2d').drawImage(picture, tile.x, tile.y, tile.width, tile.height, 0, 0, tile.width, tile.height);
+      }
+      return { geometry: part, image, tile: rectangle };
+    });
+  }
+
+  /**
+   * Reduce a picture to the largest size of a texture. Only for a picture that cannot be cut into tiles.
+   * @param {ImageData|HTMLImageElement|ImageBitmap|HTMLCanvasElement} picture - The picture.
+   * @param {number} maxSize - The largest width and height of a texture, in pixels.
+   * @returns {Promise<ImageData>} - The reduced picture.
+   * @private
+   */
+  async _shrinkPicture(picture, maxSize) {
+    const newWidth = Math.min(picture.width, maxSize);
+    const newHeight = Math.min(picture.height, maxSize);
+    console.warn(`Image size (${picture.width}x${picture.height}) exceeds max texture size (${maxSize}x${maxSize}). Resizing to ${newWidth}x${newHeight}.`);
+    const canvas = document.createElement("canvas");
+    canvas.width = newWidth;
+    canvas.height = newHeight;
+    const ctx = canvas.getContext("2d");
+    const imageBitmap = await createImageBitmap(picture);
+    ctx.drawImage(imageBitmap, 0, 0, newWidth, newHeight);
+    return ctx.getImageData(0, 0, newWidth, newHeight);
   }
 
   /**
@@ -796,6 +903,8 @@ class StereoImg extends HTMLElement {
   async initialize3DScene() {
     if (this.stereoImageGroup) {
       this.scene.remove(this.stereoImageGroup);
+    }
+    if (this.stereoImageGroup && !this._gpuWasEmptied) {
       // Free the GPU memory used by the previous picture.
       this.stereoImageGroup.traverse(object => {
         object.geometry?.dispose();
@@ -808,6 +917,8 @@ class StereoImg extends HTMLElement {
     }
     this.stereoImageGroup = new THREE.Group();
     this.scene.add(this.stereoImageGroup);
+    this._leftPicture = null;
+    this._hasTiles = false;
 
     this.scene.background = new THREE.Color(0x101010);
 
@@ -893,6 +1004,33 @@ class StereoImg extends HTMLElement {
         }
       }
     }
+  }
+
+  /**
+   * Build the scene of the picture being displayed again, without moving the view.
+   * Like any other change of the scene, it waits for the one in progress.
+   * @private
+   */
+  async _rebuildScene() {
+    const previous = this._displaying;
+    const rebuild = (async () => {
+      await previous;
+      if (!this.stereoData || !this.renderer) {
+        return;
+      }
+      try {
+        // What the previous scene had on the GPU went away with it: there is nothing to free.
+        this._gpuWasEmptied = true;
+        await this.initialize3DScene();
+        this.updateSurroundings();
+      } catch (error) {
+        console.error(`<stereo-img> could not display "${this.src}" again.`, error);
+      } finally {
+        this._gpuWasEmptied = false;
+      }
+    })();
+    this._displaying = rebuild;
+    await rebuild;
   }
 
   /**
@@ -1005,8 +1143,8 @@ class StereoImg extends HTMLElement {
 
     try {
       const mesh = this.stereoImageGroup?.children.find(object => object.isMesh && object.material.map);
-      if (mesh) {
-        let pixels = mesh.material.map.image;
+      if (mesh && this._leftPicture) {
+        let pixels = this._leftPicture;
         if (!(pixels instanceof ImageData)) {
           // a small copy of the picture is enough to know the colours of its edges
           const canvas = document.createElement('canvas');
@@ -1091,6 +1229,13 @@ class StereoImg extends HTMLElement {
     });
     this.renderer.setSize(this.clientWidth, this.clientHeight);
     this.shadowRoot.appendChild(this.renderer.domElement);
+    // A browser can take the GPU away from a page, then give it back empty: phones do when the page is in the background.
+    // The renderer sends what it still has again. The tiles of a large picture are not kept: cut them again.
+    this.renderer.domElement.addEventListener('webglcontextrestored', () => {
+      if (this._hasTiles) {
+        this._rebuildScene();
+      }
+    });
 
     this.scene = new THREE.Scene();
     this.setupLoadingIndicator();
