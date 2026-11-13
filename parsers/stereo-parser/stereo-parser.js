@@ -273,7 +273,7 @@ async function parseStereoPair(url, secondaryURL, options) {
     phiLength = angle.horizontalAngle;
     thetaLength = angle.verticalAngle;
 
-  } else if(exif?.Make === 'GoPro' || url.startsWith('gopro') || url.startsWith('GOPR') ) {
+  } else if(exif?.Make === 'GoPro' || isGoProFilename(url)) {
     // GoPro (https://gopro.com/help/articles/question_answer/hero7-field-of-view-fov-information?sf96748270=1)
     phiLength = 2.1397737; // 122.6º
     thetaLength = 1.647591;  // 94.4º
@@ -323,6 +323,19 @@ async function createImageFromURL(url, signal) {
       reject(error);
     };
   });
+}
+
+/**
+ * GoPro cameras name their pictures "GOPR0001.JPG".
+ * @param {string} url - image url, absolute or relative
+ * @returns {boolean} true if the file name of the URL looks like a GoPro one
+ */
+function isGoProFilename(url) {
+  if (url.startsWith('data:')) {
+    return false;
+  }
+  const filename = url.split(/[?#]/)[0].split('/').pop();
+  return /^gopr/i.test(filename);
 }
 
 export {parseStereo, parseStereoPair}
