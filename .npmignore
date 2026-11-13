@@ -3,3 +3,10 @@ examples
 .vscode
 index.html
 CNAME
+tests
+test.html
+test-buttons.html
+web-test-runner.config.mjs
+title.png
+title.svg
+icon.svg
