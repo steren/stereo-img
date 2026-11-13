@@ -5,7 +5,7 @@ just a few small guidelines you need to follow.
 
 ## Develop locally
 
-Thre is no compilation step.
+There is no compilation step.
 
 ### Starting a local development server
 
@@ -13,10 +13,10 @@ Install dependencies with `npm install`.
 
 Run the local web server with `npm start`.
 
-### Starting a local development server
+### Running tests
 
-Run unist tests with `npm test`.
-Run integration tests with `npm test:integration`.
+Run unit tests with `npm test`.
+Run integration tests with `npm run test:integration`. They run in a headless Chrome.
 
 ## Publishing to npm
 
@@ -25,7 +25,7 @@ To update the [npm package](https://www.npmjs.com/package/stereo-img)
 Run the following:
 
 * `npm test`
-* `npm test:integration`
+* `npm run test:integration`
 * `npm version minor`
 * `git push --follow-tags`
 
