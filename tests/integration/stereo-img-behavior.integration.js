@@ -301,20 +301,27 @@ describe('stereo-img', () => {
   });
 
   describe('"flat" attribute', () => {
-    /** Collect the eyes the camera looks at for some time. */
-    async function eyesSeen(duration = 400) {
+    /** Wait for the element to draw some frames. They can be late when the browser is busy with other test files. */
+    async function frames(count = 3) {
+      const frame = element.renderer.info.render.frame;
+      await waitFor(() => element.renderer.info.render.frame >= frame + count, 'frames to be drawn');
+    }
+
+    /** Collect the eyes the camera looks at while a few frames are drawn. */
+    async function eyesSeen() {
+      await frames();
       const seen = new Set();
-      const start = Date.now();
-      while (Date.now() - start < duration) {
+      const frame = element.renderer.info.render.frame;
+      while (element.renderer.info.render.frame < frame + 5) {
         seen.add(element.camera.layers.mask);
         await wait(10);
       }
+      seen.add(element.camera.layers.mask);
       return [...seen].sort();
     }
 
     it('should display the left eye by default', async () => {
       await create();
-      await wait(100);
 
       expect(await eyesSeen()).to.deep.equal([LEFT_EYE]);
       expect(element.wiggleIntervalID).to.not.exist;
@@ -322,7 +329,6 @@ describe('stereo-img', () => {
 
     it('should display the right eye with "right"', async () => {
       await create({ flat: 'right' });
-      await wait(100);
 
       expect(await eyesSeen()).to.deep.equal([RIGHT_EYE]);
     });
@@ -331,14 +337,15 @@ describe('stereo-img', () => {
       await create({ flat: 'wiggle' });
 
       expect(element.wiggleIntervalID).to.exist;
-      expect(await eyesSeen(1000)).to.deep.equal([LEFT_EYE, RIGHT_EYE]);
+      const seen = new Set();
+      await waitFor(() => seen.add(element.camera.layers.mask).size === 2, 'both eyes to be displayed');
+      expect([...seen].sort()).to.deep.equal([LEFT_EYE, RIGHT_EYE]);
     });
 
     it('should stop alternating when leaving "wiggle"', async () => {
       await create({ flat: 'wiggle' });
 
       element.setAttribute('flat', 'left');
-      await wait(100);
 
       expect(element.wiggleIntervalID).to.not.exist;
       expect(await eyesSeen()).to.deep.equal([LEFT_EYE]);
@@ -352,11 +359,11 @@ describe('stereo-img', () => {
         anaglyphFrames++;
         return render(...args);
       };
-      await wait(100);
+      await frames();
       expect(anaglyphFrames).to.equal(0);
 
       element.setAttribute('flat', 'anaglyph');
-      await waitFor(() => anaglyphFrames > 2, 'anaglyph frames', 5000);
+      await waitFor(() => anaglyphFrames > 2, 'anaglyph frames');
 
       element.setAttribute('flat', 'left');
       await wait(50);
@@ -369,7 +376,6 @@ describe('stereo-img', () => {
       await create();
 
       element.flat = 'right';
-      await wait(100);
 
       expect(element.getAttribute('flat')).to.equal('right');
       expect(await eyesSeen()).to.deep.equal([RIGHT_EYE]);
@@ -458,7 +464,7 @@ describe('stereo-img', () => {
 
       element.style.width = '200px';
       element.style.height = '200px';
-      await waitFor(() => element.renderer.domElement.style.width === '200px', 'the canvas to be resized', 5000);
+      await waitFor(() => element.renderer.domElement.style.width === '200px', 'the canvas to be resized');
 
       expect(element.renderer.domElement.style.height).to.equal('200px');
       expect(element.camera.aspect).to.equal(1);
