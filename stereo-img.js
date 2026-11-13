@@ -166,17 +166,32 @@ class StereoImg extends HTMLElement {
   /**
    * Checks if an image is stereoscopic
    * @param {string} imageUrl - The URL of the image to check.
+   * @param {AbortSignal} [signal] - Aborted when the answer is not needed anymore.
    * @returns {Promise<boolean>} - True if the image is likely stereoscopic, false otherwise.
    * @private
    */
-  async _isStereo(imageUrl) {
+  async _isStereo(imageUrl, signal) {
     // Compare the left and right halves.
     // Renders the image to a small canvas and calculates the average pixel difference.
     const image = await new Promise((resolve, reject) => {
       const img = new Image();
+      const onAbort = () => {
+        // Stop downloading the image.
+        img.onload = null;
+        img.onerror = null;
+        img.src = '';
+        reject(signal.reason);
+      };
+      signal?.addEventListener('abort', onAbort, { once: true });
       img.crossOrigin = "Anonymous";
-      img.onload = () => resolve(img);
-      img.onerror = (err) => reject(err);
+      img.onload = () => {
+        signal?.removeEventListener('abort', onAbort);
+        resolve(img);
+      };
+      img.onerror = (err) => {
+        signal?.removeEventListener('abort', onAbort);
+        reject(err);
+      };
       img.src = imageUrl;
     });
 
@@ -230,109 +245,92 @@ class StereoImg extends HTMLElement {
     });
   }
 
-  async parse() {
-    if (this.src) {
-      if (this.type === 'vr180' || this.type === 'vr') {
-        const { parseVR } = await import('./parsers/vr-parser/vr-parser.js');
-        this.stereoData = await parseVR(this.src);
+  /**
+   * Parse the picture described by the attributes of the element.
+   * @param {AbortSignal} [signal] - Aborted when the picture is not needed anymore.
+   * @returns {Promise<Object>} - The stereo data of the picture.
+   * @private
+   */
+  async parse(signal) {
+    // Read the attributes once: they can change while the picture is being parsed.
+    const { src, srcRight, type, angle, projection } = this;
 
-      } else if (this.type === 'left-right' || this.type === 'right-left' || this.type === 'bottom-top' || this.type === 'top-bottom') {
-        const { parseStereo } = await import('./parsers/stereo-parser/stereo-parser.js');
-        this.stereoData = await parseStereo(this.src, {
-          type: this.type,
-          angle: this.angle,
-          projection: this.projection,
-        });
-
-      } else if (this.type === 'anaglyph') {
-        const { parseAnaglyph } = await import('./parsers/anaglyph-parser/anaglyph-parser.js');
-        this.stereoData = await parseAnaglyph(this.src, {
-          angle: this.angle,
-          projection: this.projection,
-        });
-
-      } else if (this.type === 'depth') {
-        const { parseDepth } = await import('./parsers/depth-parser/depth-parser.js');
-        this.stereoData = await parseDepth(this.src);
-
-      } else if (this.type === 'mono') {
-        const { parseMono } = await import('./parsers/mono-parser/mono-parser.js');
-        this.stereoData = await parseMono(this.src, {
-          angle: this.angle,
-          projection: this.projection,
-        });
-
-      } else if (this.type === 'pair' || (!this.type && this.srcRight)) {
-        if (this.srcRight) {
-          const righturl = this.srcRight;
-          this.type = 'pair';
-          const { parseStereoPair } = await import('./parsers/stereo-parser/stereo-parser.js');
-          this.stereoData = await parseStereoPair(this.src, righturl, {
-            type: this.type,
-            angle: this.angle,
-            projection: this.projection,
-          });
-        } else {
-          console.error('<stereo-img> type "pair" is missing the "src-right" attribute for the right eye image.');
-          const { parseStereo } = await import('./parsers/stereo-parser/stereo-parser.js');
-          this.stereoData = await parseStereo(this.src, {
-            angle: this.angle,
-            projection: this.projection,
-          });
-        }
-
-      } else {
-        // No type specified
-
-        // if url ends with `PORTRAIT.jpg` assume type = depth
-        if (this.src.toUpperCase().endsWith('PORTRAIT.JPG')) {
-          const { parseDepth } = await import('./parsers/depth-parser/depth-parser.js');
-          this.stereoData = await parseDepth(this.src);
-        } else {
-          // try to read XMP metadata to see if VR Photo, otherwise assume stereo-style (e.g. "left right")
-          // Read XMP metadata
-          const exif = await exifr.parse(this.src, {
-            xmp: true,
-            multiSegment: true,
-            mergeOutput: false,
-            ihdr: true, //unclear why we need this, but if not enabled, some VR180 XMP Data are not parsed
-          });
-
-          if (exif?.GImage?.Data) {
-            // GImage XMP for left eye found, assume VR Photo
-            const { parseVR } = await import('./parsers/vr-parser/vr-parser.js');
-            this.stereoData = await parseVR(this.src);
-          } else {
-            // no left eye found, check if it is a stereo or mono image
-            if (await this._isStereo(this.src)) {
-              console.info('<stereo-img> does not have a "type" attribute and image does not have XMP metadata of a VR picture. Use "type" attribute to specify the type of stereoscopic image. Image seems to be "left-right" stereo.');
-              const { parseStereo } = await import('./parsers/stereo-parser/stereo-parser.js');
-              this.stereoData = await parseStereo(this.src, {
-                angle: this.angle,
-                projection: this.projection,
-              });
-            } else {
-              this.type = 'mono';
-              console.info('<stereo-img> does not have a "type" attribute and image does not have XMP metadata of a VR picture. Image does not seem to be stereoscopic. Displaying as mono.');
-              const { parseMono } = await import('./parsers/mono-parser/mono-parser.js');
-              this.stereoData = await parseMono(this.src, {
-                angle: this.angle,
-                projection: this.projection,
-              });
-            }
-          }
-        }
-      }
-    } else {
+    if (!src) {
       // no src attribute. Use fake stereo data to render a black sphere
-      this.stereoData = {
-        leftEye: new ImageData(10, 10),
-        rightEye: new ImageData(10, 10),
-        phiLength: 0,
-        thetaStart: 0,
-        thetaLength: 0
-      };
+      return this._emptyStereoData();
     }
+
+    if (type === 'vr180' || type === 'vr') {
+      const { parseVR } = await import('./parsers/vr-parser/vr-parser.js');
+      return parseVR(src, { signal });
+    }
+
+    if (type === 'left-right' || type === 'right-left' || type === 'bottom-top' || type === 'top-bottom') {
+      const { parseStereo } = await import('./parsers/stereo-parser/stereo-parser.js');
+      return parseStereo(src, { type, angle, projection, signal });
+    }
+
+    if (type === 'anaglyph') {
+      const { parseAnaglyph } = await import('./parsers/anaglyph-parser/anaglyph-parser.js');
+      return parseAnaglyph(src, { angle, projection, signal });
+    }
+
+    if (type === 'depth') {
+      const { parseDepth } = await import('./parsers/depth-parser/depth-parser.js');
+      return parseDepth(src, { signal });
+    }
+
+    if (type === 'mono') {
+      const { parseMono } = await import('./parsers/mono-parser/mono-parser.js');
+      return parseMono(src, { angle, projection, signal });
+    }
+
+    if (type === 'pair' || (!type && srcRight)) {
+      if (srcRight) {
+        const { parseStereoPair } = await import('./parsers/stereo-parser/stereo-parser.js');
+        return parseStereoPair(src, srcRight, { type: 'pair', angle, projection, signal });
+      }
+      console.error('<stereo-img> type "pair" is missing the "src-right" attribute for the right eye image.');
+      const { parseStereo } = await import('./parsers/stereo-parser/stereo-parser.js');
+      return parseStereo(src, { angle, projection, signal });
+    }
+
+    // No type specified
+
+    // if url ends with `PORTRAIT.jpg` assume type = depth
+    if (src.toUpperCase().endsWith('PORTRAIT.JPG')) {
+      const { parseDepth } = await import('./parsers/depth-parser/depth-parser.js');
+      return parseDepth(src, { signal });
+    }
+
+    // try to read XMP metadata to see if VR Photo, otherwise assume stereo-style (e.g. "left right")
+    // Read XMP metadata
+    const exif = await exifr.parse(src, {
+      xmp: true,
+      multiSegment: true,
+      mergeOutput: false,
+      ihdr: true, //unclear why we need this, but if not enabled, some VR180 XMP Data are not parsed
+    });
+    signal?.throwIfAborted();
+
+    if (exif?.GImage?.Data) {
+      // GImage XMP for left eye found, assume VR Photo
+      const { parseVR } = await import('./parsers/vr-parser/vr-parser.js');
+      return parseVR(src, { signal });
+    }
+
+    // no left eye found, check if it is a stereo or mono image
+    const isStereo = await this._isStereo(src, signal);
+
+    if (isStereo) {
+      console.info('<stereo-img> does not have a "type" attribute and image does not have XMP metadata of a VR picture. Use "type" attribute to specify the type of stereoscopic image. Image seems to be "left-right" stereo.');
+      const { parseStereo } = await import('./parsers/stereo-parser/stereo-parser.js');
+      return parseStereo(src, { angle, projection, signal });
+    }
+
+    console.info('<stereo-img> does not have a "type" attribute and image does not have XMP metadata of a VR picture. Image does not seem to be stereoscopic. Displaying as mono.');
+    const { parseMono } = await import('./parsers/mono-parser/mono-parser.js');
+    return parseMono(src, { angle, projection, signal });
   }
 
   /**
@@ -529,17 +527,90 @@ class StereoImg extends HTMLElement {
     this.renderer.setAnimationLoop(animation);
   }
 
+  /**
+   * Parse the picture described by the attributes and display it.
+   * Only the latest call counts: it cancels the load in progress, if any.
+   */
   async parseImageAndInitialize3DScene() {
+    this._loadController?.abort();
+    const controller = new AbortController();
+    this._loadController = controller;
+    const { signal } = controller;
+
     if (this.loadingIndicator) {
       this.loadingIndicator.visible = true;
     }
 
-    await this.parse();
-    await this.initialize3DScene();
-
-    if (this.loadingIndicator) {
-      this.loadingIndicator.visible = false;
+    try {
+      let stereoData;
+      try {
+        stereoData = await this.parse(signal);
+        if (!stereoData?.leftEye || !stereoData?.rightEye) {
+          throw new Error(stereoData?.error || 'No image found for the left and right eyes.');
+        }
+      } catch (error) {
+        if (signal.aborted) {
+          // Cancelled: a more recent load is in charge.
+          return;
+        }
+        console.error(`<stereo-img> could not display "${this.src}":`, error);
+        // Do not keep displaying the previous picture.
+        stereoData = this._emptyStereoData();
+      }
+      await this._display(stereoData, signal);
+    } finally {
+      if (this._loadController === controller) {
+        this._loadController = null;
+        if (this.loadingIndicator) {
+          this.loadingIndicator.visible = false;
+        }
+      }
     }
+  }
+
+  /**
+   * Display stereo data, unless the load it comes from has been cancelled.
+   * Scenes are built one at a time: building one is asynchronous and relies on the state of the element.
+   */
+  async _display(stereoData, signal) {
+    const previous = this._displaying;
+    const display = (async () => {
+      await previous;
+      if (signal.aborted) {
+        return;
+      }
+      try {
+        this.stereoData = stereoData;
+        await this.initialize3DScene();
+      } catch (error) {
+        if (signal.aborted) {
+          // The more recent load replaces this scene.
+          return;
+        }
+        console.error(`<stereo-img> could not display "${this.src}":`, error);
+        try {
+          this.stereoData = this._emptyStereoData();
+          await this.initialize3DScene();
+        } catch (e) {
+          // Nothing more can be done.
+        }
+      }
+    })();
+    this._displaying = display;
+    await display;
+  }
+
+  /**
+   * Stereo data rendering an empty scene.
+   */
+  _emptyStereoData() {
+    return {
+      leftEye: new ImageData(10, 10),
+      rightEye: new ImageData(10, 10),
+      phiLength: 0,
+      thetaStart: 0,
+      thetaLength: 0
+    };
   }
 
   setupLoadingIndicator() {
