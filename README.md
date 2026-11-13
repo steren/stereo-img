@@ -85,6 +85,8 @@ This component has been manually tested to load pictures taken with the followin
 
 ### Supported viewers and headsets
 
+Entering VR requires the page to be served over HTTPS (or from `localhost`): browsers do not expose WebXR to other pages. The component logs a warning in the console when that is the case.
+
 This component has been manually tested on the following hardware, OS and browsers:
 
 | Hardware    | OS          | Browser         | Status |

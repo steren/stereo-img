@@ -19,6 +19,7 @@ import { VRButton } from './lib/VRButton.js';
 import { OrbitControls } from './lib/OrbitControls.js';
 import { AnaglyphEffect } from './lib/AnaglyphEffect.js';
 import { flatModeButton } from './lib/flatModeButton.js';
+import { mixedContentHint } from './lib/https.js';
 
 
 class StereoImg extends HTMLElement {
@@ -567,7 +568,7 @@ class StereoImg extends HTMLElement {
           // Cancelled: a more recent load is in charge.
           return;
         }
-        console.error(`<stereo-img> could not display "${this.src}":`, error);
+        console.error(`<stereo-img> could not display "${this.src}".${mixedContentHint(this.src, location.href)}`, error);
         // Do not keep displaying the previous picture.
         stereoData = this._emptyStereoData();
       }
@@ -601,7 +602,7 @@ class StereoImg extends HTMLElement {
           // The more recent load replaces this scene.
           return;
         }
-        console.error(`<stereo-img> could not display "${this.src}":`, error);
+        console.error(`<stereo-img> could not display "${this.src}".${mixedContentHint(this.src, location.href)}`, error);
         try {
           this.stereoData = this._emptyStereoData();
           await this.initialize3DScene();
