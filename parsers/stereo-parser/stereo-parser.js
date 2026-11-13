@@ -14,6 +14,7 @@
 
 import exifr from './../../vendor/exifr/full.esm.js';
 import { findCamera, cameraType, fisheyeCircleEdges } from './cameras.js';
+import { pixelReader } from './../../lib/pixels.js';
 
 /**
  * fetch the image from URL
@@ -38,29 +39,22 @@ async function parseStereoPair(url, secondaryURL, options) {
   const image = await createImageFromURL(url, signal);
   //image.crossOrigin = "Anonymous";
   
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d', {willReadFrequently: true});
   const width = image.width;
   const height = image.height;
-  canvas.width = width;
-  canvas.height = height;
-  ctx.drawImage(image, 0, 0);
+  // Gives the pixels of a rectangle of the picture: its left, top, width and height.
+  // A picture too large for a canvas, on a phone, is read in parts.
+  const read = pixelReader(image);
 
   var secondaryImage = null;
-  var secondaryCanvas = null;
-  var secondaryCtx = null;
+  var readSecondary = null;
   var secondaryWidth = 0;
   var secondaryHeight = 0;
   if (secondaryURL) {
     secondaryImage = await createImageFromURL(secondaryURL, signal);
     //secondaryImage.crossOrigin = "Anonymous";
-    secondaryCanvas = document.createElement('canvas');
-    secondaryCtx = secondaryCanvas.getContext('2d', {willReadFrequently: true});
     secondaryWidth = secondaryImage.width;
     secondaryHeight = secondaryImage.height;
-    secondaryCanvas.width = secondaryWidth;
-    secondaryCanvas.height = secondaryHeight;
-    secondaryCtx.drawImage(secondaryImage, 0, 0);
+    readSecondary = pixelReader(secondaryImage);
   }
 
   function pixelIsBlack(pixel, threshold) {
@@ -99,11 +93,11 @@ async function parseStereoPair(url, secondaryURL, options) {
     ;
   } else {
     // Read pixels in each corner and middle to see if they are black. If black, assume fisheye image
-    const topLeft = ctx.getImageData(0, 0, 1, 1).data;
-    const topRight = ctx.getImageData(width - 1, 0, 1, 1).data;
-    const bottomLeft = ctx.getImageData(0, height - 1, 1, 1).data;
-    const bottomRight = ctx.getImageData(width - 1, height - 1, 1, 1).data;
-    const middle = ctx.getImageData(width / 2, height / 2, 1, 1).data;
+    const topLeft = read(0, 0, 1, 1).data;
+    const topRight = read(width - 1, 0, 1, 1).data;
+    const bottomLeft = read(0, height - 1, 1, 1).data;
+    const bottomRight = read(width - 1, height - 1, 1, 1).data;
+    const middle = read(width / 2, height / 2, 1, 1).data;
     if(pixelIsBlack(topLeft) && pixelIsBlack(topRight) && pixelIsBlack(bottomLeft) && pixelIsBlack(bottomRight) && pixelIsBlack(middle, 50)) {
         projection = 'fisheye';
         console.log("Detected fisheye image");
@@ -138,7 +132,7 @@ async function parseStereoPair(url, secondaryURL, options) {
 
       // top
       for(let y = 0; y < height / 2; y++) {
-        const pixel = ctx.getImageData(width / 4, y, 1, 1).data;
+        const pixel = read(width / 4, y, 1, 1).data;
         if(!pixelIsBlack(pixel)) {
           top = y;
           break;
@@ -147,7 +141,7 @@ async function parseStereoPair(url, secondaryURL, options) {
 
       // bottom
       for(let y = height - 1; y > height / 2; y--) {
-        const pixel = ctx.getImageData(width / 4, y, 1, 1).data;
+        const pixel = read(width / 4, y, 1, 1).data;
         if(!pixelIsBlack(pixel)) {
           bottom = y;
           break;
@@ -156,7 +150,7 @@ async function parseStereoPair(url, secondaryURL, options) {
 
       // left of the left fisheye
       for(let x = 0; x < width / 4; x++) {
-        const pixel = ctx.getImageData(x, height / 2, 1, 1).data;
+        const pixel = read(x, height / 2, 1, 1).data;
         if(!pixelIsBlack(pixel)) {
           leftLeft = x;
           break;
@@ -165,7 +159,7 @@ async function parseStereoPair(url, secondaryURL, options) {
 
       // right of the left fisheye
       for(let x = width / 2 - 1; x > width / 4; x--) {
-        const pixel = ctx.getImageData(x, height / 2, 1, 1).data;
+        const pixel = read(x, height / 2, 1, 1).data;
         if(!pixelIsBlack(pixel)) {
           leftRight = x;
           break;
@@ -174,7 +168,7 @@ async function parseStereoPair(url, secondaryURL, options) {
 
       // right of the right fisheye
       for(let x = width  - 1; x > 3 * width / 4; x--) {
-        const pixel = ctx.getImageData(x, height / 2, 1, 1).data;
+        const pixel = read(x, height / 2, 1, 1).data;
         if(!pixelIsBlack(pixel)) {
           rightRight = x;
           break;
@@ -183,7 +177,7 @@ async function parseStereoPair(url, secondaryURL, options) {
 
       // left of the right fisheye
       for(let x = width / 2; x < 3 * width / 4; x++) {
-        const pixel = ctx.getImageData(x, height / 2, 1, 1).data;
+        const pixel = read(x, height / 2, 1, 1).data;
         if(!pixelIsBlack(pixel)) {
           rightLeft = x;
           break;
@@ -197,30 +191,30 @@ async function parseStereoPair(url, secondaryURL, options) {
 
   switch(type) {
     case 'left-right':
-      leftEye =  ctx.getImageData(leftLeft, top, leftRight - leftLeft, bottom - top);
-      rightEye = ctx.getImageData(rightLeft, top, rightRight - rightLeft, bottom - top);
+      leftEye =  read(leftLeft, top, leftRight - leftLeft, bottom - top);
+      rightEye = read(rightLeft, top, rightRight - rightLeft, bottom - top);
       break;
     case 'right-left':
-      leftEye =  ctx.getImageData(rightLeft, top, rightRight - rightLeft, bottom - top);
-      rightEye = ctx.getImageData(leftLeft, top, leftRight - leftLeft, bottom - top);
+      leftEye =  read(rightLeft, top, rightRight - rightLeft, bottom - top);
+      rightEye = read(leftLeft, top, leftRight - leftLeft, bottom - top);
       break;
     case 'top-bottom':
-      leftEye = ctx.getImageData(0, 0, width, height / 2); 
-      rightEye = ctx.getImageData(0, height / 2, width, height / 2);
+      leftEye = read(0, 0, width, height / 2); 
+      rightEye = read(0, height / 2, width, height / 2);
       break;
     case 'bottom-top':
-      leftEye = ctx.getImageData(0, height / 2, width, height / 2);
-      rightEye = ctx.getImageData(0, 0, width, height / 2);
+      leftEye = read(0, height / 2, width, height / 2);
+      rightEye = read(0, 0, width, height / 2);
       break;
     case 'pair':
-      leftEye =  ctx.getImageData(0, 0, width, height);
-      rightEye = secondaryCtx.getImageData(0, 0, secondaryWidth, secondaryHeight);
+      leftEye =  read(0, 0, width, height);
+      rightEye = readSecondary(0, 0, secondaryWidth, secondaryHeight);
       break;
     case 'interlaced':
     case 'interlaced-reverse':
     case 'column-interlaced':
     case 'column-interlaced-reverse': {
-      const views = deinterlace(ctx.getImageData(0, 0, width, height), type.startsWith('column'));
+      const views = deinterlace(read(0, 0, width, height), type.startsWith('column'));
       [leftEye, rightEye] = type.endsWith('reverse') ? views.reverse() : views;
       break;
     }
