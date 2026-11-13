@@ -83,7 +83,29 @@ async function parseVR(data, options) {
   result.rightEye = "data:image/jpg;base64," + exif.GImage.Data;
   result.leftEye = data;
 
+  // Sound recorded with the picture
+  if (typeof exif.GAudio?.Data === 'string' && exif.GAudio.Data) {
+    result.audio = `data:${audioType(exif.GAudio)};base64,${exif.GAudio.Data}`;
+  }
+
   return result;
+}
+
+/**
+ * The media type to play the sound of a VR Photo with.
+ * @param {{Mime: string, Data: string}} audio - GAudio metadata: declared type and content in base 64
+ * @returns {string} the type a browser accepts for that content
+ */
+function audioType(audio) {
+  // Cameras declare "audio/mp4a-latm", which browsers refuse, for what is an MP4 file: go by the content.
+  try {
+    if (atob(audio.Data.slice(0, 16)).slice(4, 8) === 'ftyp') {
+      return 'audio/mp4';
+    }
+  } catch (e) {
+    // not base 64: keep the declared type
+  }
+  return audio.Mime || 'audio/mp4';
 }
 
 export {parseVR}
