@@ -150,6 +150,8 @@ Access-Control-Allow-Origin: *
 
 A GPU limits the size of a texture: often 4096 pixels on a phone, when the picture of one eye of a VR180 camera can be 8192 pixels wide. A picture larger than this limit is cut into tiles, each in its own texture: it keeps all of its details.
 
+Phones also limit the size of a canvas: Safari on iOS leaves a canvas of more than 4096 by 4096 pixels blank. A picture larger than that, such as the 45 million pixels of a camera with two fisheye lenses, is read in parts.
+
 ### Supported cameras
 
 This component has been manually tested to load pictures taken with the following cameras:
