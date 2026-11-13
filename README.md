@@ -39,6 +39,7 @@ npm install stereo-img
   - `top-bottom`: left eye on the top, right eye on the bottom, Exif angle of view is used if present.
   - `bottom-top`: left eye on the bottom, right eye on the top, Exif angle of view is used if present.
   - `pair`: separate files for left and right image. Left eye image read from `src` attribute, right eye image read from attribute `src-right`. Adding the `src-right` attribute will enable the `pair` type without the need to use the `type` attribute.
+  - `mpo`: [Multi-Picture Format](https://en.wikipedia.org/wiki/JPEG#JPEG_Multi-Picture_Format) file of a stereo camera, holding the left and right pictures. Files ending with `.mpo` are detected without the `type` attribute.
   - `anaglyph`: [Anaglyph 3D](https://en.wikipedia.org/wiki/Anaglyph_3D) - currently only supporting red / green
   - `depth`: Picture with depth map (e.g. portrait mode on Google Camera)
   - `mono`: A regular, non-stereo picture. The same image is displayed on both eyes.
@@ -81,6 +82,7 @@ This component has been manually tested to load pictures taken with the followin
 | ✔️     | CALF VR180                          | "vr180"             | `angle="180"`                         |  X           | X 
 | ✔️     | Kandao QooCam EGO 3D Camera         | left-right          | (none)                                |  X           | X 
 | ✔️     | Pixel phone                         | depth               | `type="depth"`                        |  X           | X 
+| ✔️     | Panasonic DMC-GX8 with H-FT012 lens | MPO                 | (none)                                |  ✓           | X 
 | ❌     | Vision Pro                          |                     |                                       |              | 
 
 ### Supported viewers and headsets

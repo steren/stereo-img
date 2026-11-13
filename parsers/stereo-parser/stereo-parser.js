@@ -30,7 +30,7 @@ async function parseStereo(url, options) {
  * return left and right eye images from either left / right, right / left, top / bottom, bottom / top, url / secondaryURL.
  * @Param {string} url - image url left, or combined left and right
  * @Param {string} secondaryURL - image url right, or null
- * @Param {Object} (options) - Parsing options: type: 'left-right' (default), 'right-left' or 'top-bottom', angle: '180' or '360', signal: AbortSignal to cancel the parsing
+ * @Param {Object} (options) - Parsing options: type: 'left-right' (default), 'right-left' or 'top-bottom', angle: '180' or '360', signal: AbortSignal to cancel the parsing, exif: metadata of the image, when already read
  * */
 async function parseStereoPair(url, secondaryURL, options) {
   const signal = options?.signal;
@@ -67,14 +67,18 @@ async function parseStereoPair(url, secondaryURL, options) {
     return pixel[0] < blackThreshold && pixel[1] < blackThreshold && pixel[2] < blackThreshold;
   }
 
-  let exif = {};
-  try {
-    exif = await exifr.parse(image, {
-      xmp: true,
-      multiSegment: true
-    })
-  } catch (e) {
-    // ignore
+  // The metadata can be given by a caller that has already read it.
+  let exif = options?.exif;
+  if (!exif) {
+    exif = {};
+    try {
+      exif = await exifr.parse(image, {
+        xmp: true,
+        multiSegment: true
+      })
+    } catch (e) {
+      // ignore
+    }
   }
   signal?.throwIfAborted();
 
