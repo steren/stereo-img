@@ -37,7 +37,7 @@
               "type": {
                 "text": "string | null"
               },
-              "description": "Type of stereo picture: \"vr\", \"left-right\", \"right-left\", \"top-bottom\", \"bottom-top\", \"interlaced\", \"interlaced-reverse\", \"column-interlaced\", \"column-interlaced-reverse\", \"pair\", \"mpo\", \"lif\", \"anaglyph\", \"depth\" or \"mono\". If unset, the type is inferred from heuristics.",
+              "description": "Type of stereo picture: \"vr\", \"left-right\", \"right-left\", \"top-bottom\", \"bottom-top\", \"interlaced\", \"interlaced-reverse\", \"column-interlaced\", \"column-interlaced-reverse\", \"pair\", \"mpo\", \"lif\", \"anaglyph\" (or \"anaglyph-red-cyan\", \"anaglyph-red-green\", \"anaglyph-red-blue\", \"anaglyph-green-magenta\", \"anaglyph-amber-blue\" to name its colours), \"depth\" or \"mono\". If unset, the type is inferred from heuristics.",
               "attribute": "type",
               "reflects": true
             },
@@ -125,7 +125,7 @@
               "type": {
                 "text": "string"
               },
-              "description": "Type of stereo picture: \"vr\", \"left-right\", \"right-left\", \"top-bottom\", \"bottom-top\", \"interlaced\", \"interlaced-reverse\", \"column-interlaced\", \"column-interlaced-reverse\", \"pair\", \"mpo\", \"lif\", \"anaglyph\", \"depth\" or \"mono\". If unset, the type is inferred from heuristics.",
+              "description": "Type of stereo picture: \"vr\", \"left-right\", \"right-left\", \"top-bottom\", \"bottom-top\", \"interlaced\", \"interlaced-reverse\", \"column-interlaced\", \"column-interlaced-reverse\", \"pair\", \"mpo\", \"lif\", \"anaglyph\" (or \"anaglyph-red-cyan\", \"anaglyph-red-green\", \"anaglyph-red-blue\", \"anaglyph-green-magenta\", \"anaglyph-amber-blue\" to name its colours), \"depth\" or \"mono\". If unset, the type is inferred from heuristics.",
               "fieldName": "type"
             },
             {

@@ -271,9 +271,10 @@ class StereoImg extends HTMLElement {
       return parseStereo(src, { type, angle, projection, signal });
     }
 
-    if (type === 'anaglyph') {
+    if (type === 'anaglyph' || type?.startsWith('anaglyph-')) {
       const { parseAnaglyph } = await import('./parsers/anaglyph-parser/anaglyph-parser.js');
-      return parseAnaglyph(src, { angle, projection, signal });
+      // "anaglyph-red-cyan" names the colours of the picture, "anaglyph" lets the parser find them
+      return parseAnaglyph(src, { colors: type.slice('anaglyph-'.length), angle, projection, signal });
     }
 
     if (type === 'depth') {
