@@ -4,7 +4,7 @@
   "modules": [
     {
       "kind": "javascript-module",
-      "path": "stereo-img/stereo-img.js",
+      "path": "stereo-img.js",
       "declarations": [
         {
           "kind": "class",
@@ -13,33 +13,169 @@
           "members": [
             {
               "kind": "field",
-              "name": "type"
+              "name": "src",
+              "type": {
+                "text": "string | null"
+              },
+              "description": "Source of the stereo picture (absolute or relative).",
+              "attribute": "src",
+              "reflects": true
             },
             {
               "kind": "field",
-              "name": "projection"
+              "name": "srcRight",
+              "type": {
+                "text": "string | null"
+              },
+              "description": "Source of the right eye picture for the \"pair\" type. The left eye picture is read from \"src\".",
+              "attribute": "src-right",
+              "reflects": true
             },
             {
               "kind": "field",
-              "name": "angle"
+              "name": "type",
+              "type": {
+                "text": "string | null"
+              },
+              "description": "Type of stereo picture: \"vr\", \"left-right\", \"right-left\", \"top-bottom\", \"bottom-top\", \"pair\", \"anaglyph\", \"depth\" or \"mono\". If unset, the type is inferred from heuristics.",
+              "attribute": "type",
+              "reflects": true
             },
             {
               "kind": "field",
-              "name": "src"
+              "name": "angle",
+              "type": {
+                "text": "string | null"
+              },
+              "description": "Hint at the angle of view, in degrees between 0 and 360. If unset, the Exif angle of view is used if present.",
+              "attribute": "angle",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "projection",
+              "type": {
+                "text": "string | null"
+              },
+              "description": "Hint at the projection: \"equirectangular\" or \"fisheye\". If unset, the projection is inferred from heuristics.",
+              "attribute": "projection",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "flat",
+              "type": {
+                "text": "string | null"
+              },
+              "description": "Display mode when viewing in 2D: \"left\" (default), \"right\", \"wiggle\" or \"anaglyph\".",
+              "attribute": "flat",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "controlslist",
+              "type": {
+                "text": "string | null"
+              },
+              "description": "Space-separated list of controls to display: \"vr\", \"left\", \"right\", \"wiggle\" and \"anaglyph\". All are displayed by default.",
+              "attribute": "controlslist",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "debug",
+              "type": {
+                "text": "string | null"
+              },
+              "description": "When set, logs diagnostic information to the console and displays the wireframe of the 3D geometry.",
+              "attribute": "debug",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "wiggle",
+              "type": {
+                "text": "string | null"
+              },
+              "description": "Alternate between the left and right images.",
+              "attribute": "wiggle",
+              "reflects": true,
+              "deprecated": "Use the \"flat\" attribute with a value of \"wiggle\" instead."
             }
           ],
           "attributes": [
             {
-              "name": "type"
+              "name": "src",
+              "type": {
+                "text": "string"
+              },
+              "description": "Source of the stereo picture (absolute or relative).",
+              "fieldName": "src"
             },
             {
-              "name": "projection"
+              "name": "src-right",
+              "type": {
+                "text": "string"
+              },
+              "description": "Source of the right eye picture for the \"pair\" type. The left eye picture is read from \"src\".",
+              "fieldName": "srcRight"
             },
             {
-              "name": "angle"
+              "name": "type",
+              "type": {
+                "text": "string"
+              },
+              "description": "Type of stereo picture: \"vr\", \"left-right\", \"right-left\", \"top-bottom\", \"bottom-top\", \"pair\", \"anaglyph\", \"depth\" or \"mono\". If unset, the type is inferred from heuristics.",
+              "fieldName": "type"
             },
             {
-              "name": "src"
+              "name": "angle",
+              "type": {
+                "text": "string"
+              },
+              "description": "Hint at the angle of view, in degrees between 0 and 360. If unset, the Exif angle of view is used if present.",
+              "fieldName": "angle"
+            },
+            {
+              "name": "projection",
+              "type": {
+                "text": "string"
+              },
+              "description": "Hint at the projection: \"equirectangular\" or \"fisheye\". If unset, the projection is inferred from heuristics.",
+              "fieldName": "projection"
+            },
+            {
+              "name": "flat",
+              "type": {
+                "text": "string"
+              },
+              "description": "Display mode when viewing in 2D: \"left\" (default), \"right\", \"wiggle\" or \"anaglyph\".",
+              "fieldName": "flat"
+            },
+            {
+              "name": "controlslist",
+              "type": {
+                "text": "string"
+              },
+              "description": "Space-separated list of controls to display: \"vr\", \"left\", \"right\", \"wiggle\" and \"anaglyph\". All are displayed by default.",
+              "fieldName": "controlslist"
+            },
+            {
+              "name": "debug",
+              "type": {
+                "text": "string"
+              },
+              "description": "When set, logs diagnostic information to the console and displays the wireframe of the 3D geometry.",
+              "fieldName": "debug"
+            },
+            {
+              "name": "wiggle",
+              "type": {
+                "text": "string"
+              },
+              "description": "Alternate between the left and right images.",
+              "fieldName": "wiggle",
+              "deprecated": "Use the \"flat\" attribute with a value of \"wiggle\" instead."
             }
           ],
           "superclass": {
@@ -51,19 +187,11 @@
       ],
       "exports": [
         {
-          "kind": "js",
-          "name": "StereoImg",
-          "declaration": {
-            "name": "StereoImg",
-            "module": "stereo-img/stereo-img.js"
-          }
-        },
-        {
           "kind": "custom-element-definition",
           "name": "stereo-img",
           "declaration": {
             "name": "StereoImg",
-            "module": "stereo-img/stereo-img.js"
+            "module": "stereo-img.js"
           }
         }
       ]
