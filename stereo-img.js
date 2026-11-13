@@ -718,7 +718,8 @@ class StereoImg extends HTMLElement {
     if (vrButton) vrButton.remove();
     if (flatButton) flatButton.remove();
 
-    const controlslist = this.getAttribute('controlslist') || 'vr wiggle left right anaglyph';
+    // Space-separated list of tokens, compared as whole words.
+    const controlslist = (this.getAttribute('controlslist') || 'vr wiggle left right anaglyph').toLowerCase().split(/\s+/);
     const availableFlatModes = ['left', 'right', 'wiggle', 'anaglyph'].filter(mode => controlslist.includes(mode));
 
     if (controlslist.includes('vr')) {
