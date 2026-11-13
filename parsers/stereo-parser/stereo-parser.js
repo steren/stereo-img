@@ -231,13 +231,18 @@ async function parseStereoPair(url, secondaryURL, options) {
       break;
   }
   
+  // The angles of view apply to what one eye sees, so they depend on the size
+  // of one eye's image, not of the whole picture.
+  const eyeWidth = leftEye ? leftEye.width : width / 2;
+  const eyeHeight = leftEye ? leftEye.height : height;
+
   let angleOfViewFocalLengthIn35mmFormat = function(focalLengthIn35mmFormat) {
     // https://en.wikipedia.org/wiki/Angle_of_view#Common_lens_angles_of_view
     // https://en.wikipedia.org/wiki/35_mm_equivalent_focal_length
     // angle of view on the diagonal (35mm is 24 mm (vertically) × 36 mm (horizontal), giving a diagonal of about 43.3 mm)
     const diagonalAngle = 2 * Math.atan(43.3 / (2 * focalLengthIn35mmFormat));
     // Pi / 4 for a square.
-    const halfAngle = Math.atan(height / (width / 2));
+    const halfAngle = Math.atan(eyeHeight / eyeWidth);
     const horizontalAngle = diagonalAngle * Math.cos(halfAngle);
     const verticalAngle = diagonalAngle * Math.sin(halfAngle);
 
@@ -266,7 +271,7 @@ async function parseStereoPair(url, secondaryURL, options) {
     // An angle set explicitly takes precedence over what is inferred from the image metadata.
     const angle = options?.angle * Math.PI/180.0;
     phiLength = angle;
-    thetaLength = angle * height/width;
+    thetaLength = angle * eyeHeight/eyeWidth;
 
   } else if(exif?.FocalLengthIn35mmFormat) {
     const angle = angleOfViewFocalLengthIn35mmFormat(exif.FocalLengthIn35mmFormat);
