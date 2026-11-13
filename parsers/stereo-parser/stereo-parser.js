@@ -18,7 +18,7 @@ import exifr from './../../vendor/exifr/full.esm.js';
  * fetch the image from URL
  * return left and right eye images from either left / right, right / left, top / bottom, bottom / top. 
  * @Param {string} url - image url
- * @Param {Object} (options) - Parsing options: type: 'left-right' (default), 'right-left' or 'top-bottom', angle: '180' or '360'
+ * @Param {Object} (options) - Parsing options: type: 'left-right' (default), 'right-left' or 'top-bottom', angle: '180' or '360', signal: AbortSignal to cancel the parsing
  * */
 async function parseStereo(url, options) {
   return parseStereoPair(url, null, options);
@@ -30,10 +30,11 @@ async function parseStereo(url, options) {
  * return left and right eye images from either left / right, right / left, top / bottom, bottom / top, url / secondaryURL.
  * @Param {string} url - image url left, or combined left and right
  * @Param {string} secondaryURL - image url right, or null
- * @Param {Object} (options) - Parsing options: type: 'left-right' (default), 'right-left' or 'top-bottom', angle: '180' or '360'
+ * @Param {Object} (options) - Parsing options: type: 'left-right' (default), 'right-left' or 'top-bottom', angle: '180' or '360', signal: AbortSignal to cancel the parsing
  * */
 async function parseStereoPair(url, secondaryURL, options) {
-  const image = await createImageFromURL(url);
+  const signal = options?.signal;
+  const image = await createImageFromURL(url, signal);
   //image.crossOrigin = "Anonymous";
   
   const canvas = document.createElement('canvas');
@@ -50,7 +51,7 @@ async function parseStereoPair(url, secondaryURL, options) {
   var secondaryWidth = 0;
   var secondaryHeight = 0;
   if (secondaryURL) {
-    secondaryImage = await createImageFromURL(secondaryURL);
+    secondaryImage = await createImageFromURL(secondaryURL, signal);
     //secondaryImage.crossOrigin = "Anonymous";
     secondaryCanvas = document.createElement('canvas');
     secondaryCtx = secondaryCanvas.getContext('2d', {willReadFrequently: true});
@@ -75,6 +76,7 @@ async function parseStereoPair(url, secondaryURL, options) {
   } catch (e) {
     // ignore
   }
+  signal?.throwIfAborted();
 
 
   // Images
@@ -297,15 +299,28 @@ async function parseStereoPair(url, secondaryURL, options) {
   return {leftEye, rightEye, phiLength, thetaStart, thetaLength, projection};
 }
 
-async function createImageFromURL(url) {
+async function createImageFromURL(url, signal) {
+  signal?.throwIfAborted();
   const image = new Image();
   image.src = url;
   return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      // Stop downloading the image.
+      image.onload = null;
+      image.onerror = null;
+      image.src = '';
+      reject(signal.reason);
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
     image.onload = () => {
+      signal?.removeEventListener('abort', onAbort);
       URL.revokeObjectURL(url);
       resolve(image);
     };
-    image.onerror = reject;
+    image.onerror = (error) => {
+      signal?.removeEventListener('abort', onAbort);
+      reject(error);
+    };
   });
 }
 
