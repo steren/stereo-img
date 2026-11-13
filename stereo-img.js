@@ -265,10 +265,9 @@ class StereoImg extends HTMLElement {
       } else if (this.type === 'pair' || (!this.type && this.srcRight)) {
         if (this.srcRight) {
           const righturl = this.srcRight;
-          this.type = 'pair';
           const { parseStereoPair } = await import('./parsers/stereo-parser/stereo-parser.js');
           this.stereoData = await parseStereoPair(this.src, righturl, {
-            type: this.type,
+            type: 'pair',
             angle: this.angle,
             projection: this.projection,
           });
@@ -312,7 +311,6 @@ class StereoImg extends HTMLElement {
                 projection: this.projection,
               });
             } else {
-              this.type = 'mono';
               console.info('<stereo-img> does not have a "type" attribute and image does not have XMP metadata of a VR picture. Image does not seem to be stereoscopic. Displaying as mono.');
               const { parseMono } = await import('./parsers/mono-parser/mono-parser.js');
               this.stereoData = await parseMono(this.src, {
