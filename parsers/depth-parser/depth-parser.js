@@ -33,6 +33,42 @@ function parseConcatenatedJFIF(imageData) {
 
 
 /**
+ * Find the depth map in the list of embedded images described by the
+ * "Container" XMP metadata of the picture.
+ * See https://developer.android.com/media/camera/camera2/Dynamic-depth-v1.0.pdf
+ *
+ * The first item is the primary image. The other ones are appended to the
+ * file, in the same order, and the metadata gives the length of each.
+ *
+ * @param {Uint8Array} jpeg - content of the file
+ * @param {Object} exif - metadata of the file, as parsed by exifr
+ * @returns {Uint8Array|undefined} the depth map image, if the metadata describes one
+ */
+function findDepthMapFromMetadata(jpeg, exif) {
+  const directory = exif?.Container?.Directory;
+  if (!directory) {
+    return;
+  }
+  const items = (Array.isArray(directory) ? directory : [directory]).map(entry => entry?.Item || entry);
+
+  const depthURI = exif?.Device?.Cameras?.value?.DepthMap?.DepthURI;
+  const depthIndex = items.findIndex(item => item?.Semantic === 'Depth' || (item?.DataURI && item.DataURI === depthURI));
+  if (depthIndex < 1) {
+    return;
+  }
+
+  // Appended images are located from the end of the file.
+  const lengthFrom = index => items.slice(index).reduce((total, item) => total + (Number(item?.Length) || 0), 0);
+  const start = jpeg.length - lengthFrom(depthIndex);
+  const end = jpeg.length - lengthFrom(depthIndex + 1);
+  if (start < 0 || end <= start) {
+    return;
+  }
+  return jpeg.slice(start, end);
+}
+
+
+/**
  * Fetch the image from the provided URL and parse a portrait mode JPEG that
  * contains concatenated left and right eye images plus an embedded depth map.
  *
@@ -43,27 +79,29 @@ function parseConcatenatedJFIF(imageData) {
 async function parseDepth(url, options) {
   const image = await createImageFromURL(url);
 
-  const exif = await exifr.parse(url, {
-    xmp: true,
-    multiSegment: true,
-    mergeOutput: false,
-    ihdr: true, //unclear why we need this, but if not enabled, some XMP Data are not parsed
-  });
-
-  // TODO: Check exif data for depth map
-  console.log(exif);  
-
-  // exif?.Device?.Cameras
-  // type == "http://ns.google.com/photos/dd/1.0/device/:Camera"
-  // value.DepthMap
-  // value.DepthMap.Near
-  // value.DepthMap.Far
-
-
   const imageData = await urlToUint8Array(url);
-  const parsedImages = parseConcatenatedJFIF(imageData);
 
-  const depthImageArray = parsedImages[4];
+  let exif;
+  try {
+    exif = await exifr.parse(imageData, {
+      xmp: true,
+      multiSegment: true,
+      mergeOutput: false,
+      ihdr: true, //unclear why we need this, but if not enabled, some XMP Data are not parsed
+    });
+  } catch (e) {
+    // no metadata, fall back to the position of the depth map in the file
+  }
+
+  // TODO: use the depth range of the depth map:
+  // exif?.Device?.Cameras?.value?.DepthMap.Near
+  // exif?.Device?.Cameras?.value?.DepthMap.Far
+
+  // Without metadata, assume the layout of Pixel portrait pictures, where the depth map is the fifth image.
+  const depthImageArray = findDepthMapFromMetadata(imageData, exif) || parseConcatenatedJFIF(imageData)[4];
+  if (!depthImageArray) {
+    throw new Error('No depth map found in image');
+  }
   const depth = await createImageFromURL(URL.createObjectURL(new Blob([depthImageArray], {type: 'image/jpeg'})))
   
   // TODO: use same method as for left-right stereo (share helper function)
