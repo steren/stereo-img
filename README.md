@@ -33,7 +33,7 @@ npm install stereo-img
 * `src-right`: (Optional) source of the right eye picture (absolute or relative) for the `pair` type. If used, the source for the left eye picture is read from the `src` attribute.
 * `type`: (Optional) type of stereo picture:
   - If unset, type is inferred from heuristics
-  - `vr` (or its alias `vr180`): [VR Photo](https://developers.google.com/vr/reference/cardboard-camera-vr-photo-format) - VR180, Google Camera panorama, Cardboard Camera, Photosphere images (Where right eye image and angle of view info are embedded in the image metadata) 
+  - `vr` (or its alias `vr180`): [VR Photo](https://developers.google.com/vr/reference/cardboard-camera-vr-photo-format) - VR180, Google Camera panorama, Cardboard Camera, Photosphere images (Where right eye image and angle of view info are embedded in the image metadata)  When the picture holds the sound recorded with it, a button plays it, and it plays in VR.
   - `left-right`: left eye on the left, right eye on the right, Exif angle of view is used if present.
   - `right-left`: left eye on the right, right eye on the left, Exif angle of view is used if present.
   - `top-bottom`: left eye on the top, right eye on the bottom, Exif angle of view is used if present.
@@ -73,6 +73,8 @@ npm install stereo-img
   - `right`: Allow the "right" flat mode.
   - `wiggle`: Allow the "wiggle" flat mode.
   - `anaglyph`: Allow the "anaglyph" flat mode.
+  - `sound`: Show the sound button, for pictures that have sound.
+* `muted`: (Optional) When set, the sound of the picture does not start by itself when entering VR. The sound button still plays it.
 * `debug`: (Optional) When set, logs diagnostic information to the console and displays the wireframe of the 3D geometry.
 
 ## Pictures from other sites
