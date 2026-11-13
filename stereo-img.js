@@ -485,6 +485,15 @@ class StereoImg extends HTMLElement {
   async initialize3DScene() {
     if (this.stereoImageGroup) {
       this.scene.remove(this.stereoImageGroup);
+      // Free the GPU memory used by the previous picture.
+      this.stereoImageGroup.traverse(object => {
+        object.geometry?.dispose();
+        if (object.material) {
+          object.material.map?.dispose();
+          object.material.displacementMap?.dispose();
+          object.material.dispose();
+        }
+      });
     }
     this.stereoImageGroup = new THREE.Group();
     this.scene.add(this.stereoImageGroup);
