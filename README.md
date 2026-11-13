@@ -77,6 +77,29 @@ npm install stereo-img
 * `muted`: (Optional) When set, the sound of the picture does not start by itself when entering VR. The sound button still plays it.
 * `debug`: (Optional) When set, logs diagnostic information to the console and displays the wireframe of the 3D geometry.
 
+## Events
+
+In VR, the viewer can ask for another picture without leaving VR. The element does not know which picture comes next: it tells the page, which changes `src`.
+
+* `next`: the trigger of the right controller, a pinch of the right hand, the button of a Cardboard viewer, or a thumbstick pushed to the right.
+* `previous`: the trigger of the left controller, a pinch of the left hand, or a thumbstick pushed to the left.
+
+The `detail` of the event tells what the viewer used: `input` is `"select"` or `"thumbstick"`, `handedness` is `"left"`, `"right"` or `"none"`. The events bubble.
+
+```js
+const pictures = ['first.jpg', 'second.jpg', 'third.jpg'];
+let index = 0;
+const stereoImg = document.querySelector('stereo-img');
+
+function show(newIndex) {
+  index = (newIndex + pictures.length) % pictures.length;
+  stereoImg.src = pictures[index];
+}
+
+stereoImg.addEventListener('next', () => show(index + 1));
+stereoImg.addEventListener('previous', () => show(index - 1));
+```
+
 ## Outside of VR
 
 The picture fills the element, like an image with `object-fit: cover`. To see more of it:
