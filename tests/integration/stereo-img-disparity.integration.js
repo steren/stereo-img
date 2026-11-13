@@ -92,17 +92,17 @@ describe('stereo-img disparity-adjustment', function () {
   it('should move the pictures closer together with a negative value', async () => {
     await display({ 'disparity-adjustment': '-20' });
 
-    // On a plane 20 units wide seen from 10.1 units with a vertical field of view of 70 degrees,
-    // 10% of the width of the picture is 42 pixels.
-    expect(barPosition(LEFT_EYE)).to.be.closeTo(42.4, 2);
-    expect(barPosition(RIGHT_EYE)).to.be.closeTo(-42.4, 2);
+    // On a plane 20 units wide seen from 10 units with a vertical field of view of 70 degrees,
+    // 10% of the width of the picture is 43 pixels.
+    expect(barPosition(LEFT_EYE)).to.be.closeTo(42.8, 2);
+    expect(barPosition(RIGHT_EYE)).to.be.closeTo(-42.8, 2);
   });
 
   it('should move the pictures apart with a positive value', async () => {
     await display({ 'disparity-adjustment': '10' });
 
-    expect(barPosition(LEFT_EYE)).to.be.closeTo(-21.2, 2);
-    expect(barPosition(RIGHT_EYE)).to.be.closeTo(21.2, 2);
+    expect(barPosition(LEFT_EYE)).to.be.closeTo(-21.4, 2);
+    expect(barPosition(RIGHT_EYE)).to.be.closeTo(21.4, 2);
   });
 
   it('should turn the pictures that are on a sphere', async () => {
@@ -119,11 +119,11 @@ describe('stereo-img disparity-adjustment', function () {
     const group = element.stereoImageGroup;
 
     element.setAttribute('disparity-adjustment', '-20');
-    expect(barPosition(LEFT_EYE)).to.be.closeTo(42.4, 2);
+    expect(barPosition(LEFT_EYE)).to.be.closeTo(42.8, 2);
 
     element.disparityAdjustment = 10;
     expect(element.getAttribute('disparity-adjustment')).to.equal('10');
-    expect(barPosition(LEFT_EYE)).to.be.closeTo(-21.2, 2);
+    expect(barPosition(LEFT_EYE)).to.be.closeTo(-21.4, 2);
 
     element.disparityAdjustment = 0;
     expect(barPosition(LEFT_EYE)).to.be.closeTo(0, 1);
@@ -143,8 +143,8 @@ describe('stereo-img disparity-adjustment', function () {
     element.setAttribute('src', await makePicture());
     await waitFor(() => element.stereoData !== previous && !element.loadingIndicator.visible, 'the second picture');
 
-    expect(barPosition(LEFT_EYE)).to.be.closeTo(42.4, 2);
-    expect(barPosition(RIGHT_EYE)).to.be.closeTo(-42.4, 2);
+    expect(barPosition(LEFT_EYE)).to.be.closeTo(42.8, 2);
+    expect(barPosition(RIGHT_EYE)).to.be.closeTo(-42.8, 2);
   });
 
   it('should ignore a value that is not a number', async () => {
