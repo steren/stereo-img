@@ -286,6 +286,11 @@ class StereoImg extends HTMLElement {
       return parseMono(src, { angle, projection, signal });
     }
 
+    if (type === 'lif') {
+      const { parseLIF } = await import('./parsers/lif-parser/lif-parser.js');
+      return parseLIF(src, { angle, projection, signal });
+    }
+
     // Multi-Picture Format: files of stereo cameras, ending with .mpo
     if (type === 'mpo' || (!type && !srcRight && /\.mpo$/i.test(src.split(/[?#]/)[0]))) {
       const { parseMPO } = await import('./parsers/mpo-parser/mpo-parser.js');
@@ -324,6 +329,17 @@ class StereoImg extends HTMLElement {
       // GImage XMP for left eye found, assume VR Photo
       const { parseVR } = await import('./parsers/vr-parser/vr-parser.js');
       return parseVR(src, { signal });
+    }
+
+    if (/leia/i.test(exif?.ifd0?.Make)) {
+      // Picture of a Leia device: it holds two views if it is in the Leia Image Format
+      const { parseLIF } = await import('./parsers/lif-parser/lif-parser.js');
+      try {
+        return await parseLIF(src, { angle, projection, signal });
+      } catch (error) {
+        signal?.throwIfAborted();
+        // not in that format: continue as for any other picture
+      }
     }
 
     // no left eye found, check if it is a stereo or mono image

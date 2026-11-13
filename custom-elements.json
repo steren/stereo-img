@@ -37,7 +37,7 @@
               "type": {
                 "text": "string | null"
               },
-              "description": "Type of stereo picture: \"vr\", \"left-right\", \"right-left\", \"top-bottom\", \"bottom-top\", \"pair\", \"mpo\", \"anaglyph\", \"depth\" or \"mono\". If unset, the type is inferred from heuristics.",
+              "description": "Type of stereo picture: \"vr\", \"left-right\", \"right-left\", \"top-bottom\", \"bottom-top\", \"pair\", \"mpo\", \"lif\", \"anaglyph\", \"depth\" or \"mono\". If unset, the type is inferred from heuristics.",
               "attribute": "type",
               "reflects": true
             },
@@ -125,7 +125,7 @@
               "type": {
                 "text": "string"
               },
-              "description": "Type of stereo picture: \"vr\", \"left-right\", \"right-left\", \"top-bottom\", \"bottom-top\", \"pair\", \"mpo\", \"anaglyph\", \"depth\" or \"mono\". If unset, the type is inferred from heuristics.",
+              "description": "Type of stereo picture: \"vr\", \"left-right\", \"right-left\", \"top-bottom\", \"bottom-top\", \"pair\", \"mpo\", \"lif\", \"anaglyph\", \"depth\" or \"mono\". If unset, the type is inferred from heuristics.",
               "fieldName": "type"
             },
             {
