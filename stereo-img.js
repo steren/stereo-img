@@ -500,6 +500,11 @@ class StereoImg extends HTMLElement {
   }
 
   updateflatMode() {
+    if (!this.isConnected) {
+      // Nothing to render while out of the document. connectedCallback calls this again.
+      return;
+    }
+
     const flatMode = this.getAttribute('flat');
 
     const animation = () => {
@@ -613,8 +618,6 @@ class StereoImg extends HTMLElement {
 
     this.updateButtons();
 
-    await this.parseImageAndInitialize3DScene();
-
     // Listen for component resize
     this._resizeObserver = new ResizeObserver(() => {
       this.renderer.setSize(this.clientWidth, this.clientHeight);
@@ -624,6 +627,8 @@ class StereoImg extends HTMLElement {
     });
 
     this._resizeObserver.observe(this);
+
+    await this.parseImageAndInitialize3DScene();
   }
 
   updateButtons() {
@@ -648,6 +653,12 @@ class StereoImg extends HTMLElement {
 
 
   connectedCallback() {
+    if (this._initialized) {
+      // Back in the document (for example after being moved): resume what disconnectedCallback paused.
+      this._resizeObserver.observe(this);
+      this.updateflatMode();
+      return;
+    }
     this.init();
   }
 
@@ -658,6 +669,10 @@ class StereoImg extends HTMLElement {
     if (this.wiggleIntervalID) {
       clearInterval(this.wiggleIntervalID);
       this.wiggleIntervalID = null;
+    }
+    if (this.renderer) {
+      // Stop rendering, so that a removed element does not keep drawing frames forever.
+      this.renderer.setAnimationLoop(null);
     }
   }
 
