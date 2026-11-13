@@ -53,13 +53,16 @@ export async function parseMono(src, { angle, projection, signal }) {
     
     // default to a plane geometry if no angle is specified
     const phiLength = angle ? parseFloat(angle) * Math.PI / 180 : Math.PI / 3;
+    // Vertically, the picture is centred and keeps its proportions: 180 and 360 degrees are a half and a full sphere.
+    const degrees = parseFloat(angle);
+    const thetaLength = degrees === 180 || degrees === 360 ? Math.PI : Math.min(Math.PI, phiLength * image.height / image.width);
 
     return {
         leftEye: imageData,
         rightEye: imageData,
         phiLength: phiLength,
-        thetaStart: 0,
-        thetaLength: 0,
+        thetaStart: Math.PI / 2 - thetaLength / 2,
+        thetaLength: thetaLength,
         projection: projection,
     };
   }
