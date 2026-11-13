@@ -18,6 +18,12 @@ Run the local web server with `npm start`.
 Run unit tests with `npm test`.
 Run integration tests with `npm run test:integration`. They run in a headless Chrome.
 
+## Adding a camera
+
+Some cameras and lenses need special handling, because their pictures do not say enough about themselves: the layout of the two eyes, the angle of view, the position of fisheye circles.
+
+What is known about them is in [`parsers/stereo-parser/cameras.js`](parsers/stereo-parser/cameras.js). To support a new one, add an entry to that list, a test in `tests/unit/cameras.test.js`, and a line in the table of supported cameras of the README.
+
 ## Publishing to npm
 
 To update the [npm package](https://www.npmjs.com/package/stereo-img)

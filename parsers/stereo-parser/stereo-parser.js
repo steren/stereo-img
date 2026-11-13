@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import exifr from './../../vendor/exifr/full.esm.js';
+import { findCamera, cameraType, fisheyeCircleEdges } from './cameras.js';
 
 /**
  * fetch the image from URL
@@ -83,18 +84,11 @@ async function parseStereoPair(url, secondaryURL, options) {
   signal?.throwIfAborted();
 
 
-  // Images
-  let type = options.type || 'left-right';
+  // What is known about the camera, for the ones listed in cameras.js
+  const camera = findCamera(exif, url);
 
-  // Heuristics for Canon RF5.2mm F2.8 L DUAL FISHEYE
-  // Unprocessed pictures are right-left. Pictures processed with EOS VR Utility software are left-right.
-  if(exif?.Make === 'Canon' && exif?.LensModel === 'RF5.2mm F2.8 L DUAL FISHEYE') {
-    if(exif?.Software?.includes('EOS VR Utility')) {
-      type = 'left-right';
-    } else {
-      type = 'right-left';
-    }
-  }
+  // Images
+  const type = cameraType(camera, exif) || options.type || 'left-right';
 
   // check if fisheye projection
   let projection;
@@ -129,22 +123,10 @@ async function parseStereoPair(url, secondaryURL, options) {
   // TODO: This assumes left-right or right-left. Make compatible with top-bottom and bottom-top.
   if(projection === 'fisheye') {
 
-    // Heuristics for Canon RF5.2mm F2.8 L DUAL FISHEYE
-    if(exif?.Make === 'Canon' && exif?.LensModel === 'RF5.2mm F2.8 L DUAL FISHEYE') {
+    if(camera?.fisheyeCircles) {
 
-      // Measured values on a reference image, see excmples/canon-eos-r5-dual-fisheye.jpg
-      const referenceImageWidth = 8192;
-      const referenceImageHeight = 5464;
-
-      const referenceEyeDiameter = 3750;
-      const referenceLeftEyeCenter = 1980;
-
-      top        = Math.round( (referenceImageHeight / 2 - referenceEyeDiameter / 2)                      * height / referenceImageHeight );
-      bottom     = Math.round( (referenceImageHeight / 2 + referenceEyeDiameter / 2)                      * height / referenceImageHeight );
-      leftLeft   = Math.round( (referenceLeftEyeCenter - referenceEyeDiameter / 2)                        * width / referenceImageWidth );
-      leftRight  = Math.round( (referenceLeftEyeCenter + referenceEyeDiameter / 2)                        * width / referenceImageWidth );
-      rightLeft  = Math.round( (referenceImageWidth - referenceLeftEyeCenter - referenceEyeDiameter / 2)  * width / referenceImageWidth );
-      rightRight = Math.round( (referenceImageWidth - referenceLeftEyeCenter + referenceEyeDiameter / 2)  * width / referenceImageWidth );
+      // The circles of this camera are always at the same place.
+      ({ top, bottom, leftLeft, leftRight, rightLeft, rightRight } = fisheyeCircleEdges(camera.fisheyeCircles, width, height));
 
     } else {
       // March from the edges and the middle to find hte actual edges of the fisheye image.
@@ -290,19 +272,9 @@ async function parseStereoPair(url, secondaryURL, options) {
     phiLength = angle.horizontalAngle;
     thetaLength = angle.verticalAngle;
 
-  } else if(exif?.Make === 'GoPro' || isGoProFilename(url)) {
-    // GoPro (https://gopro.com/help/articles/question_answer/hero7-field-of-view-fov-information?sf96748270=1)
-    phiLength = 2.1397737; // 122.6º
-    thetaLength = 1.647591;  // 94.4º
-
-  } else if(exif?.Make === 'Canon' && exif?.LensModel === 'RF5.2mm F2.8 L DUAL FISHEYE') {
-    // TODO: This lense has a 190º angle of view, but the viewer doesn't support any other angle than 180 for fisheye.
-    phiLength = Math.PI;
-    thetaLength = Math.PI;
-
-  } else if(exif?.Model === 'insta360 evo') {
-    phiLength = Math.PI;
-    thetaLength = Math.PI;
+  } else if(camera?.angle) {
+    phiLength = camera.angle.horizontal * Math.PI / 180;
+    thetaLength = camera.angle.vertical * Math.PI / 180;
 
   } else {
     const assumeFocalLengthIn35mmFormat = 27;
@@ -375,19 +347,6 @@ async function createImageFromURL(url, signal) {
       reject(error);
     };
   });
-}
-
-/**
- * GoPro cameras name their pictures "GOPR0001.JPG".
- * @param {string} url - image url, absolute or relative
- * @returns {boolean} true if the file name of the URL looks like a GoPro one
- */
-function isGoProFilename(url) {
-  if (url.startsWith('data:')) {
-    return false;
-  }
-  const filename = url.split(/[?#]/)[0].split('/').pop();
-  return /^gopr/i.test(filename);
 }
 
 export {parseStereo, parseStereoPair}
