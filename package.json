@@ -8,7 +8,7 @@
   },
   "scripts": {
     "test": "node --test",
-    "test:integration": "web-test-runner --puppeteer",
+    "test:integration": "web-test-runner",
     "start": "npx serve"
   },
   "repository": {
