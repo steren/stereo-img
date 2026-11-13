@@ -38,6 +38,20 @@ function readMetadata(bytes) {
 }
 
 /**
+ * Tell if the metadata of a picture describes a depth map embedded in it.
+ * @param {Object} exif - The metadata of the picture, as read by readMetadata.
+ * @returns {boolean} - True for the two formats of Google Camera: "GDepth" and "Dynamic Depth".
+ */
+function describesDepthMap(exif) {
+  if (exif?.GDepth?.Data) {
+    return true;
+  }
+  // Dynamic Depth lists the images appended to the file.
+  const items = [].concat(exif?.Container?.Directory || []).map(entry => entry?.Item || entry);
+  return items.some(item => item?.Semantic === 'Depth' || /depthmap/i.test(item?.DataURI));
+}
+
+/**
  * Quickly tell if a file may be in the Multi-Picture Format, by looking for the name of its index ("MPF")
  * at the start of the file.
  * @param {Uint8Array} bytes - The content of the file.
@@ -395,12 +409,6 @@ class StereoImg extends HTMLElement {
 
     // No type specified
 
-    // if url ends with `PORTRAIT.jpg` assume type = depth
-    if (src.toUpperCase().endsWith('PORTRAIT.JPG')) {
-      const { parseDepth } = await import('./parsers/depth-parser/depth-parser.js');
-      return parseDepth(url, { signal });
-    }
-
     const bytes = await picture.bytes();
 
     // Multi-Picture Format: files of stereo cameras, usually ending with .mpo
@@ -424,6 +432,12 @@ class StereoImg extends HTMLElement {
     // try to read XMP metadata to see if VR Photo, otherwise assume stereo-style (e.g. "left right")
     const exif = await readMetadata(bytes);
     signal?.throwIfAborted();
+
+    if (describesDepthMap(exif)) {
+      // Checked before VR Photos: a picture with a depth map can also hold a second image, the original picture.
+      const { parseDepth } = await import('./parsers/depth-parser/depth-parser.js');
+      return parseDepth(url, { signal, exif });
+    }
 
     if (exif?.GImage?.Data) {
       // GImage XMP for left eye found, assume VR Photo

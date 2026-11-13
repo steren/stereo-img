@@ -128,7 +128,7 @@ describe('stereo-img', function () {
       expect(geometryTypes(element)).to.deep.equal(['PlaneGeometry', 'PlaneGeometry']);
     }).timeout(30000);
 
-    it('should detect a portrait picture with a depth map from its file name', async () => {
+    it('should detect a portrait picture with a depth map', async () => {
       await create({ src: PORTRAIT });
 
       expect(element.stereoData.depth instanceof HTMLImageElement).to.be.true;
