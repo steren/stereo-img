@@ -102,6 +102,10 @@ Access-Control-Allow-Origin: *
 
 ## Compatibility
 
+### Large pictures
+
+A GPU limits the size of a texture: often 4096 pixels on a phone, when the picture of one eye of a VR180 camera can be 8192 pixels wide. A picture larger than this limit is cut into tiles, each in its own texture: it keeps all of its details.
+
 ### Supported cameras
 
 This component has been manually tested to load pictures taken with the following cameras:
