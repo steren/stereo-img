@@ -18,14 +18,30 @@
  * @param {object} options - The options for parsing.
  * @param {number} options.angle - The field of view angle.
  * @param {string} options.projection - The projection type.
+ * @param {AbortSignal} [options.signal] - Signal to cancel the parsing.
  * @returns {Promise<object>} - The stereo data.
  */
-export async function parseMono(src, { angle, projection }) {
+export async function parseMono(src, { angle, projection, signal }) {
+    signal?.throwIfAborted();
     const image = await new Promise((resolve, reject) => {
         const img = new Image();
+        const onAbort = () => {
+            // Stop downloading the image.
+            img.onload = null;
+            img.onerror = null;
+            img.src = '';
+            reject(signal.reason);
+        };
+        signal?.addEventListener('abort', onAbort, { once: true });
         img.crossOrigin = "Anonymous";
-        img.onload = () => resolve(img);
-        img.onerror = (err) => reject(err);
+        img.onload = () => {
+            signal?.removeEventListener('abort', onAbort);
+            resolve(img);
+        };
+        img.onerror = (err) => {
+            signal?.removeEventListener('abort', onAbort);
+            reject(err);
+        };
         img.src = src;
     });
     const canvas = document.createElement('canvas');
