@@ -39,6 +39,44 @@ function readMetadata(bytes) {
 }
 
 /**
+ * Tell if a ray hits the picture drawn by a mesh of the scene.
+ * @param {THREE.Mesh} mesh - The mesh of an eye: a plane, or a part of a sphere seen from inside.
+ * @param {THREE.Vector3} origin - Where the ray starts, in the scene.
+ * @param {THREE.Vector3} direction - Where the ray goes, in the scene.
+ * @returns {boolean} - True if the ray ends on the picture.
+ */
+function rayHitsPicture(mesh, origin, direction) {
+  // Work in the space of the mesh, where the picture is centred on the X axis.
+  const inverse = mesh.matrixWorld.clone().invert();
+  const from = origin.clone().applyMatrix4(inverse);
+  const along = direction.clone().transformDirection(inverse);
+  const parameters = mesh.geometry.parameters;
+  // a small tolerance, so that a view that exactly fits is accepted
+  const epsilon = 1e-6;
+
+  if (mesh.geometry.type === 'PlaneGeometry') {
+    // A plane facing the viewer, at a distance on the X axis
+    if (along.x <= 0) {
+      return false;
+    }
+    // With a depth map, parts of the picture are pushed away from the viewer, where they look smaller: count on the farthest.
+    const material = mesh.material;
+    const relief = material.displacementMap ? Math.max(Math.abs(material.displacementBias), Math.abs(material.displacementScale + material.displacementBias)) : 0;
+    const distance = (PICTURE_DISTANCE + relief - from.x) / along.x;
+    const y = from.y + distance * along.y;
+    const z = from.z + distance * along.z;
+    return Math.abs(y) <= parameters.height / 2 * (1 + epsilon) && Math.abs(z) <= parameters.width / 2 * (1 + epsilon);
+  }
+
+  // A part of a sphere around the viewer: angles around the vertical axis and from the top
+  const phi = Math.atan2(along.z, along.x);
+  const theta = Math.acos(Math.max(-1, Math.min(1, along.y)));
+  const insideHorizontally = parameters.phiLength >= 2 * Math.PI - epsilon || Math.abs(phi) <= parameters.phiLength / 2 + epsilon;
+  const insideVertically = theta >= parameters.thetaStart - epsilon && theta <= parameters.thetaStart + parameters.thetaLength + epsilon;
+  return insideHorizontally && insideVertically;
+}
+
+/**
  * Tell if the metadata of a picture describes a depth map embedded in it.
  * @param {Object} exif - The metadata of the picture, as read by readMetadata.
  * @returns {boolean} - True for the two formats of Google Camera: "GDepth" and "Dynamic Depth".
@@ -641,6 +679,83 @@ class StereoImg extends HTMLElement {
   }
 
   /**
+   * Tell if a view of the camera shows nothing but the picture: no margin around it.
+   * A view is given the way the controls move it: for a picture on a sphere, the direction of the camera,
+   * to the right and upwards in degrees. For a flat picture, the position of the camera, to the right and upwards.
+   * @param {number} first - Direction or position of the view, to the right.
+   * @param {number} second - Direction or position of the view, upwards.
+   * @param {number} fov - Vertical field of view, in degrees.
+   * @returns {boolean} - True if the picture fills the view, for both eyes.
+   * @private
+   */
+  _viewIsInsidePicture(first, second, fov) {
+    const meshes = this.stereoImageGroup?.children.filter(object => object.isMesh) || [];
+    const aspect = this.camera.aspect;
+    if (meshes.length === 0 || !(aspect > 0)) {
+      return true;
+    }
+    this.stereoImageGroup.updateMatrixWorld(true);
+
+    if (this._fitsGroup !== this.stereoImageGroup || this._fitsAspect !== aspect) {
+      // A picture that cannot fill even the narrowest view, in its middle, is left free: there is nothing to keep the view on.
+      this._fitsGroup = this.stereoImageGroup;
+      this._fitsAspect = aspect;
+      this._fits = true;
+      const center = this.controls.mode === 'pan' ? { lon: 0, lat: 0 } : this._pictureCenter();
+      this._fits = this._viewIsInsidePicture(center.lon, center.lat, this.controls.minFov);
+    }
+    if (!this._fits) {
+      return true;
+    }
+
+    const isPanning = this.controls.mode === 'pan';
+    const origin = new THREE.Vector3(isPanning ? first : 0, isPanning ? second : 0, 0);
+    const [lon, lat] = isPanning ? [0, 0] : [first, second];
+
+    const radians = Math.PI / 180;
+    const [sinLon, cosLon, sinLat, cosLat] = [Math.sin(lon * radians), Math.cos(lon * radians), Math.sin(lat * radians), Math.cos(lat * radians)];
+    // The camera looks at `forward`, with `right` and `up` on its sides.
+    const forward = [sinLon * cosLat, sinLat, -cosLon * cosLat];
+    const right = [cosLon, 0, sinLon];
+    const up = [-sinLon * sinLat, cosLat, cosLon * sinLat];
+    const tanV = Math.tan(fov * radians / 2);
+    const tanH = tanV * aspect;
+
+    // The corners of the view, and the middle of its sides
+    for (const [h, v] of [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, -1], [0, 1], [-1, 0], [1, 0]]) {
+      const direction = new THREE.Vector3(
+        forward[0] + h * tanH * right[0] + v * tanV * up[0],
+        forward[1] + h * tanH * right[1] + v * tanV * up[1],
+        forward[2] + h * tanH * right[2] + v * tanV * up[2]);
+      if (!meshes.every(mesh => rayHitsPicture(mesh, origin, direction))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * The direction of the middle of the picture, seen from the camera.
+   * @returns {{lon: number, lat: number}} - Angles to the right and upwards, in degrees.
+   * @private
+   */
+  _pictureCenter() {
+    const mesh = this.stereoImageGroup?.children.find(object => object.isMesh);
+    if (!mesh) {
+      return { lon: 0, lat: 0 };
+    }
+    this.stereoImageGroup.updateMatrixWorld(true);
+    // In the space of its mesh, a picture is centred on the X axis. On a sphere it can be above or below it.
+    const { thetaStart, thetaLength } = mesh.geometry.parameters;
+    const theta = thetaLength > 0 ? thetaStart + thetaLength / 2 : Math.PI / 2;
+    const center = new THREE.Vector3(Math.sin(theta), Math.cos(theta), 0).transformDirection(mesh.matrixWorld);
+    return {
+      lon: Math.atan2(center.x, -center.z) * 180 / Math.PI,
+      lat: Math.asin(Math.max(-1, Math.min(1, center.y))) * 180 / Math.PI,
+    };
+  }
+
+  /**
    * Move the pictures of the two eyes horizontally, in opposite directions.
    *
    * The "disparity-adjustment" attribute is the distance to add between the two pictures,
@@ -666,6 +781,9 @@ class StereoImg extends HTMLElement {
         object.rotation.y = Math.PI / 2 - shift * this.stereoData.phiLength;
       }
     }
+
+    // the pictures of both eyes must still fill the view
+    this.controls?.constrain();
   }
 
   async initialize3DScene() {
@@ -785,8 +903,12 @@ class StereoImg extends HTMLElement {
         this.stereoData = stereoData;
         await this.initialize3DScene();
         this.updateSound();
-        // start in front of the new picture
-        this.controls.reset(DEFAULT_FOV);
+        // A flat picture slides in front of the viewer. A picture on a sphere is looked around.
+        const isFlat = this.stereoImageGroup.children.some(object => object.geometry.type === 'PlaneGeometry');
+        this.controls.mode = isFlat ? 'pan' : 'look';
+        this.controls.distance = PICTURE_DISTANCE;
+        // start in front of the new picture, as wide as it allows
+        this.controls.reset(DEFAULT_FOV, this._pictureCenter());
       } catch (error) {
         if (signal.aborted) {
           // The more recent load replaces this scene.
@@ -896,6 +1018,8 @@ class StereoImg extends HTMLElement {
 
     // Look around by dragging the picture. In VR, the headset decides where the camera looks.
     this.controls = new LookControls(this.camera, this.renderer.domElement);
+    // Only look at the picture: no margin around it.
+    this.controls.isAllowed = (lon, lat, fov) => this._viewIsInsidePicture(lon, lat, fov);
     this.renderer.xr.addEventListener('sessionstart', () => {
       this.controls.enabled = false;
       this._fovBeforeVR = this.camera.fov;
@@ -912,7 +1036,7 @@ class StereoImg extends HTMLElement {
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(this.clientWidth, this.clientHeight);
       this.controls.enabled = true;
-      this.controls.update();
+      this.controls.constrain();
     });
 
     this.updateButtons();
@@ -923,6 +1047,8 @@ class StereoImg extends HTMLElement {
       this.camera.aspect = this.clientWidth / this.clientHeight;
       this.camera.updateProjectionMatrix();
       this.anaglyphEffect.setSize(this.clientWidth, this.clientHeight);
+      // the picture may not fill the new shape of the element with the same view
+      this.controls.constrain();
     });
 
     this._resizeObserver.observe(this);

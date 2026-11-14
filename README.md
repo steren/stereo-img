@@ -77,6 +77,15 @@ npm install stereo-img
 * `muted`: (Optional) When set, the sound of the picture does not start by itself when entering VR. The sound button still plays it.
 * `debug`: (Optional) When set, logs diagnostic information to the console and displays the wireframe of the 3D geometry.
 
+## Outside of VR
+
+The picture fills the element, like an image with `object-fit: cover`. To see more of it:
+
+* Drag the picture. A flat picture slides; a picture that surrounds the viewer, such as a VR180 photo or a panorama, turns around them.
+* Zoom with the wheel, or with a pinch on a touch screen.
+
+The view stops at the edges of the picture: no empty margin is shown around it.
+
 ## Pictures from other sites
 
 A picture can come from another site than the page, like with `<img>`. But unlike `<img>`, the component has to read the pixels of the picture, which browsers only allow when the server of the picture agrees. That server must send this header with the picture:

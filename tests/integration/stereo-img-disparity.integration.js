@@ -82,6 +82,14 @@ describe('stereo-img disparity-adjustment', function () {
     return (bright[0] + bright[bright.length - 1]) / 2 - (WIDTH - 1) / 2;
   }
 
+  // The view zooms in to keep both pictures filling the element, so pixels are counted from the field of view in use.
+  /** Distance from the middle of the element, in pixels, for one unit of distance at one unit from the viewer. */
+  const focal = () => HEIGHT / 2 / Math.tan(element.camera.fov * Math.PI / 360);
+  /** On screen, a fraction of the width of a flat picture: 20 units wide, seen from 10 units. */
+  const onPlane = fraction => fraction * 20 / 10 * focal();
+  /** On screen, where a direction turned by some degrees from straight ahead is. */
+  const onSphere = degrees => Math.tan(degrees * Math.PI / 180) * focal();
+
   it('should show both pictures at the same place by default', async () => {
     await display();
 
@@ -92,25 +100,24 @@ describe('stereo-img disparity-adjustment', function () {
   it('should move the pictures closer together with a negative value', async () => {
     await display({ 'disparity-adjustment': '-20' });
 
-    // On a plane 20 units wide seen from 10 units with a vertical field of view of 70 degrees,
-    // 10% of the width of the picture is 43 pixels.
-    expect(barPosition(LEFT_EYE)).to.be.closeTo(42.8, 2);
-    expect(barPosition(RIGHT_EYE)).to.be.closeTo(-42.8, 2);
+    // each picture moves by 10% of its width
+    expect(barPosition(LEFT_EYE)).to.be.closeTo(onPlane(0.1), 2);
+    expect(barPosition(RIGHT_EYE)).to.be.closeTo(-onPlane(0.1), 2);
   });
 
   it('should move the pictures apart with a positive value', async () => {
     await display({ 'disparity-adjustment': '10' });
 
-    expect(barPosition(LEFT_EYE)).to.be.closeTo(-21.4, 2);
-    expect(barPosition(RIGHT_EYE)).to.be.closeTo(21.4, 2);
+    expect(barPosition(LEFT_EYE)).to.be.closeTo(-onPlane(0.05), 2);
+    expect(barPosition(RIGHT_EYE)).to.be.closeTo(onPlane(0.05), 2);
   });
 
   it('should turn the pictures that are on a sphere', async () => {
     await display({ angle: '180', 'disparity-adjustment': '-20' });
 
-    // 10% of 180 degrees is 18 degrees, which is 70 pixels from the middle of the element.
-    expect(barPosition(LEFT_EYE)).to.be.closeTo(69.6, 3);
-    expect(barPosition(RIGHT_EYE)).to.be.closeTo(-69.6, 3);
+    // each picture turns by 10% of 180 degrees
+    expect(barPosition(LEFT_EYE)).to.be.closeTo(onSphere(18), 3);
+    expect(barPosition(RIGHT_EYE)).to.be.closeTo(-onSphere(18), 3);
   });
 
   it('should follow the attribute without loading the picture again', async () => {
@@ -119,11 +126,11 @@ describe('stereo-img disparity-adjustment', function () {
     const group = element.stereoImageGroup;
 
     element.setAttribute('disparity-adjustment', '-20');
-    expect(barPosition(LEFT_EYE)).to.be.closeTo(42.8, 2);
+    expect(barPosition(LEFT_EYE)).to.be.closeTo(onPlane(0.1), 2);
 
     element.disparityAdjustment = 10;
     expect(element.getAttribute('disparity-adjustment')).to.equal('10');
-    expect(barPosition(LEFT_EYE)).to.be.closeTo(-21.4, 2);
+    expect(barPosition(LEFT_EYE)).to.be.closeTo(-onPlane(0.05), 2);
 
     element.disparityAdjustment = 0;
     expect(barPosition(LEFT_EYE)).to.be.closeTo(0, 1);
@@ -143,8 +150,8 @@ describe('stereo-img disparity-adjustment', function () {
     element.setAttribute('src', await makePicture());
     await waitFor(() => element.stereoData !== previous && !element.loadingIndicator.visible, 'the second picture');
 
-    expect(barPosition(LEFT_EYE)).to.be.closeTo(42.8, 2);
-    expect(barPosition(RIGHT_EYE)).to.be.closeTo(-42.8, 2);
+    expect(barPosition(LEFT_EYE)).to.be.closeTo(onPlane(0.1), 2);
+    expect(barPosition(RIGHT_EYE)).to.be.closeTo(-onPlane(0.1), 2);
   });
 
   it('should ignore a value that is not a number', async () => {
