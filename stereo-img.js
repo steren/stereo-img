@@ -20,7 +20,38 @@ import { OrbitControls } from './lib/OrbitControls.js';
 import { AnaglyphEffect } from './lib/AnaglyphEffect.js';
 import { flatModeButton } from './lib/flatModeButton.js';
 import { mixedContentHint } from './lib/https.js';
+import { Picture } from './lib/picture.js';
 
+
+/**
+ * Read the metadata of a picture.
+ * @param {Uint8Array} bytes - The content of the file.
+ * @returns {Promise<Object>} - Its metadata, grouped by kind.
+ */
+function readMetadata(bytes) {
+  return exifr.parse(bytes, {
+    xmp: true,
+    multiSegment: true,
+    mergeOutput: false,
+    ihdr: true, //unclear why we need this, but if not enabled, some VR180 XMP Data are not parsed
+  });
+}
+
+/**
+ * Quickly tell if a file may be in the Multi-Picture Format, by looking for the name of its index ("MPF")
+ * at the start of the file.
+ * @param {Uint8Array} bytes - The content of the file.
+ * @returns {boolean} - False if it is certainly not in that format.
+ */
+function mayHaveMultiPictureIndex(bytes) {
+  const end = Math.min(bytes.length, 1 << 18) - 3;
+  for (let i = 0; i < end; i++) {
+    if (bytes[i] === 0x4d && bytes[i + 1] === 0x50 && bytes[i + 2] === 0x46 && bytes[i + 3] === 0) {
+      return true;
+    }
+  }
+  return false;
+}
 
 // Distance between the viewer and the picture, in the 3D scene.
 const PICTURE_DISTANCE = 10;
@@ -184,16 +215,14 @@ class StereoImg extends HTMLElement {
   }
 
   /**
-   * Checks if an image is stereoscopic
-   * @param {string} imageUrl - The URL of the image to check.
-   * @param {AbortSignal} [signal] - Aborted when the answer is not needed anymore.
-   * @returns {Promise<boolean>} - True if the image is likely stereoscopic, false otherwise.
+   * Load an image.
+   * @param {string} url - The URL of the image.
+   * @param {AbortSignal} [signal] - Aborted when the image is not needed anymore.
+   * @returns {Promise<HTMLImageElement>} - The loaded image.
    * @private
    */
-  async _isStereo(imageUrl, signal) {
-    // Compare the left and right halves.
-    // Renders the image to a small canvas and calculates the average pixel difference.
-    const image = await new Promise((resolve, reject) => {
+  _loadImage(url, signal) {
+    return new Promise((resolve, reject) => {
       const img = new Image();
       const onAbort = () => {
         // Stop downloading the image.
@@ -212,8 +241,21 @@ class StereoImg extends HTMLElement {
         signal?.removeEventListener('abort', onAbort);
         reject(err);
       };
-      img.src = imageUrl;
+      img.src = url;
     });
+  }
+
+  /**
+   * Checks if an image is stereoscopic
+   * @param {string} imageUrl - The URL of the image to check.
+   * @param {AbortSignal} [signal] - Aborted when the answer is not needed anymore.
+   * @returns {Promise<boolean>} - True if the image is likely stereoscopic, false otherwise.
+   * @private
+   */
+  async _isStereo(imageUrl, signal) {
+    // Compare the left and right halves.
+    // Renders the image to a small canvas and calculates the average pixel difference.
+    const image = await this._loadImage(imageUrl, signal);
 
     const canvas = document.createElement('canvas');
     const width = 20;
@@ -280,51 +322,75 @@ class StereoImg extends HTMLElement {
       return this._emptyStereoData();
     }
 
+    // Each file is downloaded once, however many times it is read.
+    const picture = new Picture(src, signal);
+    const pictureRight = srcRight ? new Picture(srcRight, signal) : null;
+    try {
+      return await this._parsePicture(picture, pictureRight, { type, angle, projection, signal });
+    } finally {
+      picture.release();
+      pictureRight?.release();
+    }
+  }
+
+  /**
+   * Parse a downloaded picture.
+   * @param {Picture} picture - The picture of the "src" attribute.
+   * @param {Picture} [pictureRight] - The picture of the "src-right" attribute, if any.
+   * @param {Object} options - type, angle and projection attributes, and the signal to abort the parsing.
+   * @returns {Promise<Object>} - The stereo data of the picture.
+   * @private
+   */
+  async _parsePicture(picture, pictureRight, { type, angle, projection, signal }) {
+    const src = picture.url;
+    // Parsers read the downloaded file through this URL. They also get the URL the picture
+    // comes from: its file name can tell which camera took it.
+    const url = await picture.objectURL();
+    const stereoOptions = { angle, projection, signal, originalUrl: src };
+
     if (type === 'vr180' || type === 'vr') {
-      const { parseVR } = await import('./parsers/vr-parser/vr-parser.js');
-      return parseVR(src, { signal });
+      return this._parseVR(picture, signal);
     }
 
     if (['left-right', 'right-left', 'bottom-top', 'top-bottom', 'interlaced', 'interlaced-reverse', 'column-interlaced', 'column-interlaced-reverse'].includes(type)) {
       const { parseStereo } = await import('./parsers/stereo-parser/stereo-parser.js');
-      return parseStereo(src, { type, angle, projection, signal });
+      return parseStereo(url, { ...stereoOptions, type });
     }
 
     if (type === 'anaglyph' || type?.startsWith('anaglyph-')) {
       const { parseAnaglyph } = await import('./parsers/anaglyph-parser/anaglyph-parser.js');
       // "anaglyph-red-cyan" names the colours of the picture, "anaglyph" lets the parser find them
-      return parseAnaglyph(src, { colors: type.slice('anaglyph-'.length), angle, projection, signal });
+      return parseAnaglyph(url, { colors: type.slice('anaglyph-'.length), angle, projection, signal });
     }
 
     if (type === 'depth') {
       const { parseDepth } = await import('./parsers/depth-parser/depth-parser.js');
-      return parseDepth(src, { signal });
+      return parseDepth(url, { signal });
     }
 
     if (type === 'mono') {
       const { parseMono } = await import('./parsers/mono-parser/mono-parser.js');
-      return parseMono(src, { angle, projection, signal });
+      return parseMono(url, { angle, projection, signal });
     }
 
     if (type === 'lif') {
       const { parseLIF } = await import('./parsers/lif-parser/lif-parser.js');
-      return parseLIF(src, { angle, projection, signal });
+      return parseLIF(url, { angle, projection, signal });
     }
 
-    // Multi-Picture Format: files of stereo cameras, ending with .mpo
-    if (type === 'mpo' || (!type && !srcRight && /\.mpo$/i.test(src.split(/[?#]/)[0]))) {
+    if (type === 'mpo') {
       const { parseMPO } = await import('./parsers/mpo-parser/mpo-parser.js');
-      return parseMPO(src, { angle, projection, signal });
+      return parseMPO(url, { angle, projection, signal });
     }
 
-    if (type === 'pair' || (!type && srcRight)) {
-      if (srcRight) {
+    if (type === 'pair' || (!type && pictureRight)) {
+      if (pictureRight) {
         const { parseStereoPair } = await import('./parsers/stereo-parser/stereo-parser.js');
-        return parseStereoPair(src, srcRight, { type: 'pair', angle, projection, signal });
+        return parseStereoPair(url, await pictureRight.objectURL(), { ...stereoOptions, type: 'pair' });
       }
       console.error('<stereo-img> type "pair" is missing the "src-right" attribute for the right eye image.');
       const { parseStereo } = await import('./parsers/stereo-parser/stereo-parser.js');
-      return parseStereo(src, { angle, projection, signal });
+      return parseStereo(url, stereoOptions);
     }
 
     // No type specified
@@ -332,48 +398,69 @@ class StereoImg extends HTMLElement {
     // if url ends with `PORTRAIT.jpg` assume type = depth
     if (src.toUpperCase().endsWith('PORTRAIT.JPG')) {
       const { parseDepth } = await import('./parsers/depth-parser/depth-parser.js');
-      return parseDepth(src, { signal });
+      return parseDepth(url, { signal });
+    }
+
+    const bytes = await picture.bytes();
+
+    // Multi-Picture Format: files of stereo cameras, usually ending with .mpo
+    const isNamedMpo = /\.mpo$/i.test(src.split(/[?#]/)[0]);
+    if (isNamedMpo || mayHaveMultiPictureIndex(bytes)) {
+      const { parseMPO, readStereoPair } = await import('./parsers/mpo-parser/mpo-parser.js');
+      // Regular pictures can use that format to hold previews: only use it for stereo pairs.
+      if (isNamedMpo || readStereoPair(bytes).length === 2) {
+        return parseMPO(url, { angle, projection, signal });
+      }
+    }
+
+    // Leia Image Format: the file ends with a marker
+    if (bytes[bytes.length - 2] === 0x1e && bytes[bytes.length - 1] === 0x1a) {
+      const { parseLIF, readStereoPair } = await import('./parsers/lif-parser/lif-parser.js');
+      if (readStereoPair(bytes)) {
+        return parseLIF(url, { angle, projection, signal });
+      }
     }
 
     // try to read XMP metadata to see if VR Photo, otherwise assume stereo-style (e.g. "left right")
-    // Read XMP metadata
-    const exif = await exifr.parse(src, {
-      xmp: true,
-      multiSegment: true,
-      mergeOutput: false,
-      ihdr: true, //unclear why we need this, but if not enabled, some VR180 XMP Data are not parsed
-    });
+    const exif = await readMetadata(bytes);
     signal?.throwIfAborted();
 
     if (exif?.GImage?.Data) {
       // GImage XMP for left eye found, assume VR Photo
-      const { parseVR } = await import('./parsers/vr-parser/vr-parser.js');
-      return parseVR(src, { signal });
-    }
-
-    if (/leia/i.test(exif?.ifd0?.Make)) {
-      // Picture of a Leia device: it holds two views if it is in the Leia Image Format
-      const { parseLIF } = await import('./parsers/lif-parser/lif-parser.js');
-      try {
-        return await parseLIF(src, { angle, projection, signal });
-      } catch (error) {
-        signal?.throwIfAborted();
-        // not in that format: continue as for any other picture
-      }
+      return this._parseVR(picture, signal, exif);
     }
 
     // no left eye found, check if it is a stereo or mono image
-    const isStereo = await this._isStereo(src, signal);
+    const isStereo = await this._isStereo(url, signal);
 
     if (isStereo) {
       console.info('<stereo-img> does not have a "type" attribute and image does not have XMP metadata of a VR picture. Use "type" attribute to specify the type of stereoscopic image. Image seems to be "left-right" stereo.');
       const { parseStereo } = await import('./parsers/stereo-parser/stereo-parser.js');
-      return parseStereo(src, { angle, projection, signal });
+      return parseStereo(url, stereoOptions);
     }
 
     console.info('<stereo-img> does not have a "type" attribute and image does not have XMP metadata of a VR picture. Image does not seem to be stereoscopic. Displaying as mono.');
     const { parseMono } = await import('./parsers/mono-parser/mono-parser.js');
-    return parseMono(src, { angle, projection, signal });
+    return parseMono(url, { angle, projection, signal });
+  }
+
+  /**
+   * Parse a VR Photo.
+   * @param {Picture} picture - The picture.
+   * @param {AbortSignal} [signal] - Aborted when the picture is not needed anymore.
+   * @param {Object} [exif] - The metadata of the picture, when already read.
+   * @returns {Promise<Object>} - The stereo data of the picture.
+   * @private
+   */
+  async _parseVR(picture, signal, exif) {
+    const { parseVR } = await import('./parsers/vr-parser/vr-parser.js');
+    const url = await picture.objectURL();
+    const stereoData = await parseVR(url, { signal, exif: exif || await readMetadata(await picture.bytes()) });
+    if (stereoData.leftEye === url) {
+      // The left eye is the picture itself: load it while the downloaded file is at hand.
+      stereoData.leftEye = await this._loadImage(url, signal);
+    }
+    return stereoData;
   }
 
   /**
