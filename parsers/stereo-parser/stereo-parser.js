@@ -193,7 +193,7 @@ async function parseStereoPair(url, secondaryURL, options) {
       }
 
       // left of the right fisheye
-      for(let x = width / 2 - 1; x > width / 4; x++) {
+      for(let x = width / 2; x < 3 * width / 4; x++) {
         const pixel = ctx.getImageData(x, height / 2, 1, 1).data;
         if(!pixelIsBlack(pixel)) {
           rightLeft = x;
