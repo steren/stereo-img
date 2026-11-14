@@ -19,6 +19,7 @@ import { VRButton } from './lib/VRButton.js';
 import { OrbitControls } from './lib/OrbitControls.js';
 import { AnaglyphEffect } from './lib/AnaglyphEffect.js';
 import { flatModeButton } from './lib/flatModeButton.js';
+import { soundButton } from './lib/soundButton.js';
 import { loadingHints } from './lib/https.js';
 import { Picture } from './lib/picture.js';
 
@@ -137,6 +138,17 @@ class StereoImg extends HTMLElement {
       this.setAttribute('flat', val);
     } else {
       this.removeAttribute('flat');
+    }
+  }
+
+  get muted() {
+    return this.hasAttribute('muted');
+  }
+  set muted(val) {
+    if (val) {
+      this.setAttribute('muted', '');
+    } else {
+      this.removeAttribute('muted');
     }
   }
 
@@ -770,6 +782,7 @@ class StereoImg extends HTMLElement {
       try {
         this.stereoData = stereoData;
         await this.initialize3DScene();
+        this.updateSound();
       } catch (error) {
         if (signal.aborted) {
           // The more recent load replaces this scene.
@@ -779,6 +792,7 @@ class StereoImg extends HTMLElement {
         try {
           this.stereoData = this._emptyStereoData();
           await this.initialize3DScene();
+          this.updateSound();
         } catch (e) {
           // Nothing more can be done.
         }
@@ -844,6 +858,16 @@ class StereoImg extends HTMLElement {
     this.renderer = new THREE.WebGLRenderer();
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.xr.enabled = true;
+    // The sound of the picture plays in VR, unless the element is muted. It goes back to how it was when leaving VR.
+    this.renderer.xr.addEventListener('sessionstart', () => {
+      this._soundBeforeVR = this.soundOn;
+      if (!this.muted) {
+        this.setSound(true);
+      }
+    });
+    this.renderer.xr.addEventListener('sessionend', () => {
+      this.setSound(!!this._soundBeforeVR);
+    });
     this.renderer.setSize(this.clientWidth, this.clientHeight);
     this.shadowRoot.appendChild(this.renderer.domElement);
 
@@ -893,7 +917,7 @@ class StereoImg extends HTMLElement {
     if (flatButton) flatButton.remove();
 
     // Space-separated list of tokens, compared as whole words.
-    const controlslist = (this.getAttribute('controlslist') || 'vr wiggle left right anaglyph').toLowerCase().split(/\s+/);
+    const controlslist = (this.getAttribute('controlslist') || 'vr wiggle left right anaglyph sound').toLowerCase().split(/\s+/);
     const availableFlatModes = ['left', 'right', 'wiggle', 'anaglyph'].filter(mode => controlslist.includes(mode));
 
     if (controlslist.includes('vr')) {
@@ -904,6 +928,64 @@ class StereoImg extends HTMLElement {
     if (availableFlatModes.length > 1) {
       this.shadowRoot.appendChild(flatModeButton.createButton(this));
     }
+
+    this.updateSoundButton();
+  }
+
+  /**
+   * Show the sound button when the picture has sound, unless "controlslist" leaves it out.
+   */
+  updateSoundButton() {
+    this.shadowRoot.querySelector('#soundButton')?.remove();
+    const controlslist = (this.getAttribute('controlslist') || 'sound').toLowerCase().split(/\s+/);
+    if (this.audio && controlslist.includes('sound')) {
+      this.shadowRoot.appendChild(soundButton.createButton(this));
+    }
+  }
+
+  /**
+   * Get ready to play the sound of the picture being displayed, if it has one.
+   * The sound keeps playing from one picture to the next when it was on.
+   */
+  updateSound() {
+    const wasOn = this.soundOn;
+    this.audio?.pause();
+    this.audio = null;
+    this.soundOn = false;
+    if (this.stereoData?.audio) {
+      this.audio = new Audio(this.stereoData.audio);
+      this.audio.loop = true;
+      if (wasOn) {
+        this.setSound(true);
+      }
+    }
+    this.updateSoundButton();
+  }
+
+  /**
+   * Turn the sound of the picture on or off.
+   * Browsers only let a page play sound once the user has interacted with it: until then, the sound stays off.
+   * @param {boolean} on - true to play the sound
+   */
+  setSound(on) {
+    this.soundOn = !!on && !!this.audio;
+    if (this.soundOn) {
+      const audio = this.audio;
+      Promise.resolve(audio.play()).catch(() => {
+        // not allowed to play, or the sound cannot be read
+        if (this.audio === audio) {
+          this.soundOn = false;
+          this.shadowRoot.querySelector('#soundButton')?.update();
+        }
+      });
+    } else {
+      this.audio?.pause();
+    }
+    this.shadowRoot.querySelector('#soundButton')?.update();
+  }
+
+  toggleSound() {
+    this.setSound(!this.soundOn);
   }
 
 
@@ -928,6 +1010,10 @@ class StereoImg extends HTMLElement {
     if (this.renderer) {
       // Stop rendering, so that a removed element does not keep drawing frames forever.
       this.renderer.setAnimationLoop(null);
+    }
+    // A removed element must not keep playing.
+    if (this.soundOn) {
+      this.setSound(false);
     }
   }
 

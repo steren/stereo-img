@@ -87,7 +87,7 @@
               "type": {
                 "text": "string | null"
               },
-              "description": "Space-separated list of controls to display: \"vr\", \"left\", \"right\", \"wiggle\" and \"anaglyph\". All are displayed by default.",
+              "description": "Space-separated list of controls to display: \"vr\", \"left\", \"right\", \"wiggle\", \"anaglyph\" and \"sound\". All are displayed by default.",
               "attribute": "controlslist",
               "reflects": true
             },
@@ -111,6 +111,16 @@
               "attribute": "wiggle",
               "reflects": true,
               "deprecated": "Use the \"flat\" attribute with a value of \"wiggle\" instead."
+            },
+            {
+              "kind": "field",
+              "name": "muted",
+              "type": {
+                "text": "boolean"
+              },
+              "description": "When set, the sound of the picture does not start by itself when entering VR.",
+              "attribute": "muted",
+              "reflects": true
             }
           ],
           "attributes": [
@@ -175,7 +185,7 @@
               "type": {
                 "text": "string"
               },
-              "description": "Space-separated list of controls to display: \"vr\", \"left\", \"right\", \"wiggle\" and \"anaglyph\". All are displayed by default.",
+              "description": "Space-separated list of controls to display: \"vr\", \"left\", \"right\", \"wiggle\", \"anaglyph\" and \"sound\". All are displayed by default.",
               "fieldName": "controlslist"
             },
             {
@@ -194,6 +204,14 @@
               "description": "Alternate between the left and right images.",
               "fieldName": "wiggle",
               "deprecated": "Use the \"flat\" attribute with a value of \"wiggle\" instead."
+            },
+            {
+              "name": "muted",
+              "type": {
+                "text": "boolean"
+              },
+              "description": "When set, the sound of the picture does not start by itself when entering VR.",
+              "fieldName": "muted"
             }
           ],
           "superclass": {
