@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { pixelReader } from './../../lib/pixels.js';
+
 const RED = 0;
 const GREEN = 1;
 const BLUE = 2;
@@ -115,16 +117,11 @@ async function parseAnaglyph(url, options) {
   const image = await createImageBitmap(blob);
   signal?.throwIfAborted();
   //image.crossOrigin = "Anonymous";
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
   const width = image.width;
   const height = image.height;
-  canvas.width = width;
-  canvas.height = height;
-  ctx.drawImage(image, 0, 0);
-  
 
-  const imageData = ctx.getImageData(0, 0, width, height);
+  // A picture too large for a canvas, on a phone, is read in parts.
+  const imageData = pixelReader(image)(0, 0, width, height);
   const { data } = imageData;
   const colors = COLORS[options?.colors] ? options.colors : detectColors(data, width, height);
   const { left, right } = COLORS[colors];
