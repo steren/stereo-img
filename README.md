@@ -111,6 +111,8 @@ The view stops at the edges of the picture: no empty margin is shown around it.
 
 ## In VR
 
+A stereo picture is what two eyes saw from one place: the viewer is kept in the middle of it. Turning the head looks around; moving the head does not move the viewer in the picture, which has no other side to show. A picture with a depth map is the exception: it has relief, stays where it is in the room, and moving the head shows it from another angle.
+
 A picture does not always surround the viewer: a flat picture floats in front of them, a VR180 photo leaves what is behind them empty. What is around the picture takes the colours of its edges, dimmed: the colour of its top above it, the colour of its bottom below it, and a gradient from one to the other beside it.
 
 ## Pictures from other sites
