@@ -25,7 +25,7 @@ async function pixels(src) {
 
 /**
  * Build an interlaced picture, as a lossless PNG.
- * @returns {Promise<string>} its URL. The parser releases it once loaded, so each parsing needs its own.
+ * @returns {Promise<string>} its URL
  */
 async function interlace(first, second, byColumns) {
   const interlaced = new Uint32Array(WIDTH * HEIGHT);

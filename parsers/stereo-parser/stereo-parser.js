@@ -31,7 +31,7 @@ async function parseStereo(url, options) {
  * return left and right eye images from either left / right, right / left, top / bottom, bottom / top, url / secondaryURL.
  * @Param {string} url - image url left, or combined left and right
  * @Param {string} secondaryURL - image url right, or null
- * @Param {Object} (options) - Parsing options: type: 'left-right' (default), 'right-left' or 'top-bottom', angle: '180' or '360', signal: AbortSignal to cancel the parsing, exif: metadata of the image, when already read
+ * @Param {Object} (options) - Parsing options: type: 'left-right' (default), 'right-left' or 'top-bottom', angle: '180' or '360', signal: AbortSignal to cancel the parsing, exif: metadata of the image, when already read, originalUrl: where the picture comes from, when url is a temporary copy of it
  * */
 async function parseStereoPair(url, secondaryURL, options) {
   const signal = options?.signal;
@@ -85,7 +85,8 @@ async function parseStereoPair(url, secondaryURL, options) {
 
 
   // What is known about the camera, for the ones listed in cameras.js
-  const camera = findCamera(exif, url);
+  // The picture may be read from a temporary URL: the one it comes from tells its file name.
+  const camera = findCamera(exif, options?.originalUrl || url);
 
   // Images
   const type = cameraType(camera, exif) || options.type || 'left-right';
@@ -339,7 +340,6 @@ async function createImageFromURL(url, signal) {
     signal?.addEventListener('abort', onAbort, { once: true });
     image.onload = () => {
       signal?.removeEventListener('abort', onAbort);
-      URL.revokeObjectURL(url);
       resolve(image);
     };
     image.onerror = (error) => {
