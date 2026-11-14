@@ -10,6 +10,7 @@ class FakeLayer {
     this.framebuffer = null;
     this.framebufferWidth = gl.drawingBufferWidth;
     this.framebufferHeight = gl.drawingBufferHeight;
+    session.showFullScreen(gl.canvas);
   }
 
   getViewport(view) {
@@ -30,6 +31,17 @@ class FakeSession extends EventTarget {
 
   updateRenderState(state) {
     Object.assign(this.renderState, state);
+  }
+
+  /**
+   * Take the canvas out of the page to show it over everything, as the runtimes that draw VR on the screen
+   * of a phone do. When the session ends they leave it there, or drop it: they do not know where it was.
+   */
+  showFullScreen(canvas) {
+    this.screen = document.createElement('div');
+    this.screen.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;z-index:1000';
+    this.screen.appendChild(canvas);
+    document.body.appendChild(this.screen);
   }
 
   async requestReferenceSpace() {
@@ -55,6 +67,7 @@ class FakeSession extends EventTarget {
     }
     this.ended = true;
     this.headset.session = null;
+    this.screen?.remove();
     const event = new Event('end');
     event.session = this;
     this.dispatchEvent(event);
