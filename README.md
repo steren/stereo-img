@@ -46,7 +46,7 @@ npm install stereo-img
   - `mpo`: [Multi-Picture Format](https://en.wikipedia.org/wiki/JPEG#JPEG_Multi-Picture_Format) file of a stereo camera, holding the left and right pictures. Files ending with `.mpo` are detected without the `type` attribute.
   - `lif`: Leia Image Format, the pictures of the Lume Pad tablets. They are detected without the `type` attribute.
   - `anaglyph`: [Anaglyph 3D](https://en.wikipedia.org/wiki/Anaglyph_3D). The colours of the picture are detected. To name them instead, use `anaglyph-red-cyan`, `anaglyph-red-green`, `anaglyph-red-blue`, `anaglyph-green-magenta` or `anaglyph-amber-blue`: the first colour is the one of the left eye.
-  - `depth`: Picture with depth map (e.g. portrait mode on Google Camera)
+  - `depth`: Picture with depth map (e.g. portrait or lens blur mode on Google Camera). Detected from the metadata of the picture.
   - `mono`: A regular, non-stereo picture. The same image is displayed on both eyes.
 * `angle`: (Optional) hint at angle of view for `left-right`, `top-bottom`, `interlaced`, `pair` or `anaglyph` types
   - If unset, Exif angle of view is used if present.
@@ -100,7 +100,7 @@ This component has been manually tested to load pictures taken with the followin
 | ✔️     | CALF VR180                          | left-right          | (none)                                |  X           | X 
 | ✔️     | CALF VR180                          | "vr180"             | `angle="180"`                         |  X           | X 
 | ✔️     | Kandao QooCam EGO 3D Camera         | left-right          | (none)                                |  X           | X 
-| ✔️     | Pixel phone                         | depth               | `type="depth"`                        |  X           | X 
+| ✔️     | Pixel phone                         | depth               | (none)                                |  X           | X 
 | ✔️     | Panasonic DMC-GX8 with H-FT012 lens | MPO                 | (none)                                |  ✓           | X 
 | ✔️     | Leia Lume Pad 2                     | Leia Image Format   | (none)                                |  ✓           | X 
 | ✔️     | Leia Lume Pad 2                     | left-right          | (none)                                |  X           | X 
