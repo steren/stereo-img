@@ -69,11 +69,34 @@ function findDepthMapFromMetadata(jpeg, exif) {
 
 
 /**
- * Fetch the image from the provided URL and parse a portrait mode JPEG that
- * contains concatenated left and right eye images plus an embedded depth map.
+ * Find the depth map stored in the "GDepth" XMP metadata of a picture.
+ * This is the format of the "Lens Blur" mode of older versions of Google Camera.
+ * See https://developers.google.com/depthmap-metadata/reference
+ *
+ * @param {Object} exif - metadata of the file, as parsed by exifr
+ * @returns {{depth: string, image: string|undefined}|undefined} URLs of the depth map and of the
+ *   picture it applies to, when the metadata holds one. Undefined if there is no such depth map.
+ */
+function findGDepth(exif) {
+  const data = exif?.GDepth?.Data;
+  if (typeof data !== 'string' || !data) {
+    return;
+  }
+  const dataUrl = (mime, base64) => `data:${mime};base64,${base64}`;
+  return {
+    depth: dataUrl(exif.GDepth.Mime || 'image/png', data),
+    // The file itself shows the picture once blurred. The metadata holds the original, sharp everywhere.
+    image: typeof exif.GImage?.Data === 'string' && exif.GImage.Data ? dataUrl(exif.GImage.Mime || 'image/jpeg', exif.GImage.Data) : undefined,
+  };
+}
+
+
+/**
+ * Fetch the image from the provided URL and parse a JPEG that contains an embedded depth map,
+ * such as the portrait mode pictures of Google Camera.
  *
  * @param {string} url - image url
- * @param {Object} [options] - Parsing options: signal: AbortSignal to cancel the parsing
+ * @param {Object} [options] - Parsing options: signal: AbortSignal to cancel the parsing, exif: metadata of the image, when already read (with the options used below)
  * @returns {Promise<{depth: HTMLImageElement, leftEye: HTMLImageElement, rightEye: HTMLImageElement, phiLength: number, thetaStart: number, thetaLength: number}>} A promise that resolves with an object containing the parsed data.
  */
 async function parseDepth(url, options) {
@@ -84,16 +107,18 @@ async function parseDepth(url, options) {
 
   const imageData = await urlToUint8Array(url, signal);
 
-  let exif;
-  try {
-    exif = await exifr.parse(imageData, {
-      xmp: true,
-      multiSegment: true,
-      mergeOutput: false,
-      ihdr: true, //unclear why we need this, but if not enabled, some XMP Data are not parsed
-    });
-  } catch (e) {
-    // no metadata, fall back to the position of the depth map in the file
+  let exif = options?.exif;
+  if (!exif) {
+    try {
+      exif = await exifr.parse(imageData, {
+        xmp: true,
+        multiSegment: true,
+        mergeOutput: false,
+        ihdr: true, //unclear why we need this, but if not enabled, some XMP Data are not parsed
+      });
+    } catch (e) {
+      // no metadata, fall back to the position of the depth map in the file
+    }
   }
   signal?.throwIfAborted();
 
@@ -101,18 +126,28 @@ async function parseDepth(url, options) {
   // exif?.Device?.Cameras?.value?.DepthMap.Near
   // exif?.Device?.Cameras?.value?.DepthMap.Far
 
-  // Without metadata, assume the layout of Pixel portrait pictures, where the depth map is the fifth image.
-  const depthImageArray = findDepthMapFromMetadata(imageData, exif) || parseConcatenatedJFIF(imageData)[4];
-  if (!depthImageArray) {
-    throw new Error('No depth map found in image');
-  }
-  const depthUrl = URL.createObjectURL(new Blob([depthImageArray], {type: 'image/jpeg'}));
   let depth;
-  try {
-    depth = await createImageFromURL(depthUrl);
-  } finally {
-    URL.revokeObjectURL(depthUrl);
+  let picture = image;
+  const gdepth = findGDepth(exif);
+  if (gdepth) {
+    depth = await createImageFromURL(gdepth.depth);
+    if (gdepth.image) {
+      picture = await createImageFromURL(gdepth.image);
+    }
+  } else {
+    // Without metadata, assume the layout of Pixel portrait pictures, where the depth map is the fifth image.
+    const depthImageArray = findDepthMapFromMetadata(imageData, exif) || parseConcatenatedJFIF(imageData)[4];
+    if (!depthImageArray) {
+      throw new Error('No depth map found in image');
+    }
+    const depthUrl = URL.createObjectURL(new Blob([depthImageArray], {type: 'image/jpeg'}));
+    try {
+      depth = await createImageFromURL(depthUrl);
+    } finally {
+      URL.revokeObjectURL(depthUrl);
+    }
   }
+  signal?.throwIfAborted();
   
   // TODO: use same method as for left-right stereo (share helper function)
   const phiLength = 1.02278;
@@ -121,7 +156,7 @@ async function parseDepth(url, options) {
   const thetaStart = Math.PI / 2 - thetaLength / 2;
 
   // return same image in both left and right eyes. Also add depth map. 
-  const leftEye = image;
+  const leftEye = picture;
   const rightEye = leftEye;
 
   return {depth, leftEye, rightEye, phiLength, thetaStart, thetaLength};
