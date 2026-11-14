@@ -68,6 +68,11 @@ describe('stereo-img fills the element with the picture', function () {
     const { width, height } = canvas;
     const background = element.scene.background;
     element.scene.background = background.clone().setRGB(1, 0, 1);
+    // what surrounds the picture is not the picture
+    const surroundings = element.surroundings;
+    if (surroundings) {
+      surroundings.visible = false;
+    }
     const gl = element.renderer.getContext();
     let margin = 0;
     const countMagenta = (x, y, w, h) => {
@@ -91,6 +96,9 @@ describe('stereo-img fills the element with the picture', function () {
     } finally {
       element.scene.background = background;
       element.camera.layers.set(1);
+      if (surroundings) {
+        surroundings.visible = true;
+      }
     }
     return margin;
   }

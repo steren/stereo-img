@@ -86,6 +86,10 @@ The picture fills the element, like an image with `object-fit: cover`. To see mo
 
 The view stops at the edges of the picture: no empty margin is shown around it.
 
+## In VR
+
+A picture does not always surround the viewer: a flat picture floats in front of them, a VR180 photo leaves what is behind them empty. What is around the picture takes the colours of its edges, dimmed: the colour of its top above it, the colour of its bottom below it, and a gradient from one to the other beside it.
+
 ## Pictures from other sites
 
 A picture can come from another site than the page, like with `<img>`. But unlike `<img>`, the component has to read the pixels of the picture, which browsers only allow when the server of the picture agrees. That server must send this header with the picture:
