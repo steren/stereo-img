@@ -16,7 +16,7 @@ import exifr from './vendor/exifr/full.esm.js';
 
 import * as THREE from './vendor/three/three.module.min.js';
 import { VRButton } from './lib/VRButton.js';
-import { OrbitControls } from './lib/OrbitControls.js';
+import { LookControls } from './lib/LookControls.js';
 import { AnaglyphEffect } from './lib/AnaglyphEffect.js';
 import { flatModeButton } from './lib/flatModeButton.js';
 import { soundButton } from './lib/soundButton.js';
@@ -70,6 +70,8 @@ function mayHaveMultiPictureIndex(bytes) {
 
 // Distance between the viewer and the picture, in the 3D scene.
 const PICTURE_DISTANCE = 10;
+// Vertical field of view of the camera outside of VR, in degrees.
+const DEFAULT_FOV = 70;
 // Layers on which the pictures of each eye are drawn.
 const LEFT_EYE_LAYER = 1;
 
@@ -783,6 +785,8 @@ class StereoImg extends HTMLElement {
         this.stereoData = stereoData;
         await this.initialize3DScene();
         this.updateSound();
+        // start in front of the new picture
+        this.controls.reset(DEFAULT_FOV);
       } catch (error) {
         if (signal.aborted) {
           // The more recent load replaces this scene.
@@ -887,12 +891,29 @@ class StereoImg extends HTMLElement {
     }
 
     // TODO: Should we use component size instead?
-    this.camera = new THREE.PerspectiveCamera(70, this.clientWidth / this.clientHeight, 1, 2000);
+    this.camera = new THREE.PerspectiveCamera(DEFAULT_FOV, this.clientWidth / this.clientHeight, 1, 2000);
     this.camera.layers.enable(1);
 
-    const controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.camera.position.set(0, 0, 0.1);
-    controls.update();
+    // Look around by dragging the picture. In VR, the headset decides where the camera looks.
+    this.controls = new LookControls(this.camera, this.renderer.domElement);
+    this.renderer.xr.addEventListener('sessionstart', () => {
+      this.controls.enabled = false;
+      this._fovBeforeVR = this.camera.fov;
+    });
+    this.renderer.xr.addEventListener('sessionend', () => {
+      // Some WebXR runtimes move the canvas to show it full screen, and cannot put it back in the element.
+      const canvas = this.renderer.domElement;
+      if (canvas.parentNode !== this.shadowRoot) {
+        this.shadowRoot.insertBefore(canvas, this.shadowRoot.querySelector('style').nextSibling);
+      }
+      // The headset changed the camera: go back to the view of the element.
+      this.camera.fov = this._fovBeforeVR;
+      this.camera.aspect = this.clientWidth / this.clientHeight;
+      this.camera.updateProjectionMatrix();
+      this.renderer.setSize(this.clientWidth, this.clientHeight);
+      this.controls.enabled = true;
+      this.controls.update();
+    });
 
     this.updateButtons();
 
