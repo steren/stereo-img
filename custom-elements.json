@@ -214,6 +214,22 @@
               "fieldName": "muted"
             }
           ],
+          "events": [
+            {
+              "name": "next",
+              "type": {
+                "text": "CustomEvent<{input: 'select' | 'thumbstick', handedness: 'left' | 'right' | 'none'}>"
+              },
+              "description": "In VR, the viewer asks for the next picture: with the trigger of the right controller, a pinch of the right hand, the button of a Cardboard viewer, or a thumbstick pushed to the right."
+            },
+            {
+              "name": "previous",
+              "type": {
+                "text": "CustomEvent<{input: 'select' | 'thumbstick', handedness: 'left' | 'right' | 'none'}>"
+              },
+              "description": "In VR, the viewer asks for the previous picture: with the trigger of the left controller, a pinch of the left hand, or a thumbstick pushed to the left."
+            }
+          ],
           "superclass": {
             "name": "HTMLElement"
           },

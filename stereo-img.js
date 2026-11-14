@@ -24,6 +24,7 @@ import { loadingHints } from './lib/https.js';
 import { Picture } from './lib/picture.js';
 import { edgeColors } from './lib/edgeColors.js';
 import { tilePadding, planTiles, pickTriangles, tileUvs, cropPixels } from './lib/tiles.js';
+import { directionOfSelect, directionOfThumbstick } from './lib/xrInput.js';
 
 
 /**
@@ -717,6 +718,38 @@ class StereoImg extends HTMLElement {
   }
 
   /**
+   * In VR, look at the thumbsticks of the controllers: pushed to a side, they ask for the previous or the next picture.
+   * @private
+   */
+  _readThumbsticks() {
+    const session = this.renderer.xr.getSession();
+    if (!session || !this._pushedThumbsticks) {
+      return;
+    }
+    for (const inputSource of session.inputSources) {
+      const direction = directionOfThumbstick(this._pushedThumbsticks, inputSource);
+      if (direction) {
+        this._askForPicture(direction, 'thumbstick', inputSource);
+      }
+    }
+  }
+
+  /**
+   * Tell the page that the viewer asks for another picture.
+   * @param {string} direction - "previous" or "next": the name of the event.
+   * @param {string} input - What the viewer used: "select" or "thumbstick".
+   * @param {XRInputSource} [inputSource] - The controller.
+   * @private
+   */
+  _askForPicture(direction, input, inputSource) {
+    this.dispatchEvent(new CustomEvent(direction, {
+      detail: { input, handedness: inputSource?.handedness || 'none' },
+      bubbles: true,
+      composed: true,
+    }));
+  }
+
+  /**
    * The largest width and height of a texture, in pixels: a limit of the GPU.
    * @returns {number}
    * @private
@@ -942,6 +975,10 @@ class StereoImg extends HTMLElement {
       if (this.loadingIndicator && this.loadingIndicator.visible) {
         this.loadingIndicator.rotation.y += 0.01;
         this.loadingIndicator.rotation.x += 0.01;
+      }
+
+      if (this.renderer.xr.isPresenting) {
+        this._readThumbsticks();
       }
 
       if (flatMode === 'wiggle') {
@@ -1226,6 +1263,14 @@ class StereoImg extends HTMLElement {
     });
     this.renderer.xr.addEventListener('sessionend', () => {
       this.setSound(!!this._soundBeforeVR);
+    });
+    // In VR, the controllers ask for the previous or the next picture: the page decides which pictures these are.
+    this.renderer.xr.addEventListener('sessionstart', () => {
+      this._pushedThumbsticks = new WeakSet();
+      // the trigger of a controller, a pinch of the fingers, the button of a Cardboard viewer
+      this.renderer.xr.getSession().addEventListener('select', event => {
+        this._askForPicture(directionOfSelect(event.inputSource?.handedness), 'select', event.inputSource);
+      });
     });
     this.renderer.setSize(this.clientWidth, this.clientHeight);
     this.shadowRoot.appendChild(this.renderer.domElement);
