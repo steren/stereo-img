@@ -1,10 +1,9 @@
 import { expect } from '@esm-bundle/chai';
-import { XRDevice, metaQuest3 } from 'iwer';
+import { installFakeHeadset } from './helpers/fake-headset.js';
 import '../../stereo-img.js';
 
-// There is no VR headset here: emulate one.
-const xrDevice = new XRDevice(metaQuest3);
-xrDevice.installRuntime({ forceInstall: true });
+// There is no VR headset here: imitate one.
+installFakeHeadset();
 
 const WIDTH = 400;
 const HEIGHT = 300;
@@ -263,7 +262,8 @@ describe('stereo-img controls outside of VR', function () {
     // same zoom, same shape, and the picture is still in the element at its size
     expect(element.camera.fov).to.equal(60);
     expect(element.camera.aspect).to.be.closeTo(WIDTH / HEIGHT, 1e-6);
-    expect(canvas.parentNode).to.equal(element.shadowRoot);
+    // a boolean: reporting a failure must not print the whole page
+    expect(canvas.parentNode === element.shadowRoot, 'the canvas is back in the element').to.equal(true);
     expect(canvas.getBoundingClientRect().width).to.equal(WIDTH);
     expect(canvas.getBoundingClientRect().height).to.equal(HEIGHT);
   });

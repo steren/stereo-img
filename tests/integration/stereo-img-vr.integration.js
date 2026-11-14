@@ -1,10 +1,9 @@
 import { expect } from '@esm-bundle/chai';
-import { XRDevice, metaQuest3 } from 'iwer';
+import { installFakeHeadset } from './helpers/fake-headset.js';
 import '../../stereo-img.js';
 
-// There is no VR headset here: emulate one.
-const xrDevice = new XRDevice(metaQuest3);
-xrDevice.installRuntime({ forceInstall: true });
+// There is no VR headset here: imitate one.
+installFakeHeadset();
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
