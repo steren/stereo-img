@@ -1,10 +1,9 @@
 import { expect } from '@esm-bundle/chai';
-import { XRDevice, metaQuest3 } from 'iwer';
+import { installFakeHeadset } from './helpers/fake-headset.js';
 import '../../stereo-img.js';
 
-// There is no VR headset here: emulate one.
-const xrDevice = new XRDevice(metaQuest3);
-xrDevice.installRuntime({ forceInstall: true });
+// There is no VR headset here: imitate one.
+const headset = installFakeHeadset();
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -59,7 +58,7 @@ describe('stereo-img keeps the viewer in the middle of the picture in VR', funct
 
   /** Put the head of the viewer somewhere in the room, in metres: to their right, above the floor, behind where they started. */
   async function moveHead(x, y, z) {
-    xrDevice.position.set(x, y, z);
+    headset.position.set(x, y, z);
     await frames();
   }
 
@@ -82,8 +81,8 @@ describe('stereo-img keeps the viewer in the middle of the picture in VR', funct
   }
 
   beforeEach(() => {
-    xrDevice.position.set(0, 1.6, 0);
-    xrDevice.quaternion.set(0, 0, 0, 1);
+    headset.position.set(0, 1.6, 0);
+    headset.quaternion.set(0, 0, 0, 1);
   });
 
   afterEach(async () => {
@@ -139,7 +138,7 @@ describe('stereo-img keeps the viewer in the middle of the picture in VR', funct
     const before = element.stereoImageGroup.getWorldQuaternion(element.camera.quaternion.clone());
 
     // look to the left, 90 degrees
-    xrDevice.quaternion.set(0, Math.SQRT1_2, 0, Math.SQRT1_2);
+    headset.quaternion.set(0, Math.SQRT1_2, 0, Math.SQRT1_2);
     await frames();
 
     const after = element.stereoImageGroup.getWorldQuaternion(element.camera.quaternion.clone());
