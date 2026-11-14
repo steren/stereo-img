@@ -42,7 +42,7 @@ npm install stereo-img
   - `anaglyph`: [Anaglyph 3D](https://en.wikipedia.org/wiki/Anaglyph_3D) - currently only supporting red / green
   - `depth`: Picture with depth map (e.g. portrait mode on Google Camera)
   - `mono`: A regular, non-stereo picture. The same image is displayed on both eyes.
-* `angle`: (Optional) hint at angle of view for `left-right`, `top-bottom`, or `pair` types
+* `angle`: (Optional) hint at angle of view for `left-right`, `top-bottom`, `pair` or `anaglyph` types
   - If unset, Exif angle of view is used if present.
   - `DEGREE`: any degree number between 0 and 360
   - `180`: Half sphere (VR180)

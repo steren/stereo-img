@@ -12,8 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/** fetch the image from URL, read its pixels and return left and right eye images  */
-async function parseAnaglyph(url) {
+/**
+ * fetch the image from URL, read its pixels and return left and right eye images
+ * @Param {string} url - image url
+ * @Param {Object} (options) - Parsing options: angle: horizontal angle of view in degrees, projection: 'equirectangular' or 'fisheye'
+ */
+async function parseAnaglyph(url, options) {
   const response = await fetch(url);
   const blob = await response.blob();
   const image = await createImageBitmap(blob);
@@ -29,32 +33,46 @@ async function parseAnaglyph(url) {
 
   const imageData = ctx.getImageData(0, 0, width, height);
   const { data } = imageData;
-  const leftEyePixels = [];
-  const rightEyePixels = [];
+  // Allocate both eyes up front: growing regular arrays one channel at a time
+  // is slow and uses several gigabytes of memory on large pictures.
+  const leftEyePixels = new Uint8ClampedArray(data.length);
+  const rightEyePixels = new Uint8ClampedArray(data.length);
   for (let i = 0; i < data.length; i += 4) {
     const r = data[i];
     const g = data[i + 1];
     const a = data[i + 3];
-    leftEyePixels.push(r);
-    leftEyePixels.push(r);
-    leftEyePixels.push(r);
-    leftEyePixels.push(a);
-    rightEyePixels.push(g);
-    rightEyePixels.push(g);
-    rightEyePixels.push(g);
-    rightEyePixels.push(a);
+    leftEyePixels[i] = r;
+    leftEyePixels[i + 1] = r;
+    leftEyePixels[i + 2] = r;
+    leftEyePixels[i + 3] = a;
+    rightEyePixels[i] = g;
+    rightEyePixels[i + 1] = g;
+    rightEyePixels[i + 2] = g;
+    rightEyePixels[i + 3] = a;
   }
 
-  const leftEye = new ImageData(new Uint8ClampedArray(leftEyePixels), width, height);
-  const rightEye = new ImageData(new Uint8ClampedArray(rightEyePixels), width, height);
+  const leftEye = new ImageData(leftEyePixels, width, height);
+  const rightEye = new ImageData(rightEyePixels, width, height);
 
   // TODO: use same method as for left-right stereo (share helper function)
-  const phiLength = 1.02278;
-  const thetaLength =  0.8838;
+  let phiLength = 1.02278;
+  let thetaLength =  0.8838;
+
+  const angle = Number(options?.angle);
+  if (angle === 180) {
+    phiLength = Math.PI;
+    thetaLength = Math.PI;
+  } else if (angle === 360) {
+    phiLength = Math.PI * 2;
+    thetaLength = Math.PI;
+  } else if (angle > 0 && angle < 360) {
+    phiLength = angle * Math.PI / 180;
+    thetaLength = phiLength * height / width;
+  }
 
   const thetaStart = Math.PI / 2 - thetaLength / 2;
 
-  return {leftEye, rightEye, phiLength, thetaStart, thetaLength};
+  return {leftEye, rightEye, phiLength, thetaStart, thetaLength, projection: options?.projection};
 }
 
 async function createImageBitmap(blob) {
