@@ -286,6 +286,12 @@ class StereoImg extends HTMLElement {
       return parseMono(src, { angle, projection, signal });
     }
 
+    // Multi-Picture Format: files of stereo cameras, ending with .mpo
+    if (type === 'mpo' || (!type && !srcRight && /\.mpo$/i.test(src.split(/[?#]/)[0]))) {
+      const { parseMPO } = await import('./parsers/mpo-parser/mpo-parser.js');
+      return parseMPO(src, { angle, projection, signal });
+    }
+
     if (type === 'pair' || (!type && srcRight)) {
       if (srcRight) {
         const { parseStereoPair } = await import('./parsers/stereo-parser/stereo-parser.js');
