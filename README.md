@@ -56,7 +56,6 @@ npm install stereo-img
   - `right`: Show the right eye image.
   - `wiggle`: Alternate between left and right images to help the user see the 3D effect.
   - `anaglyph`: Show a red-cyan anaglyph image.
-* `wiggle`: (Deprecated) Use the `flat="wiggle"` attribute instead.
 * `controlslist`: (Optional) A space-separated list of controls to display.
   - `vr`: Show the "Enter VR" button.
   - `left`: Allow the "left" flat mode.
