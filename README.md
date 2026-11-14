@@ -75,6 +75,7 @@ npm install stereo-img
   - `anaglyph`: Allow the "anaglyph" flat mode.
   - `sound`: Show the sound button, for pictures that have sound.
 * `muted`: (Optional) When set, the sound of the picture does not start by itself when entering VR. The sound button still plays it.
+* `start`: (Optional) Set it to `interaction` on pages with many pictures. See [Pages with many pictures](#pages-with-many-pictures).
 * `debug`: (Optional) When set, logs diagnostic information to the console and displays the wireframe of the 3D geometry.
 
 ## Events
@@ -114,6 +115,24 @@ The view stops at the edges of the picture: no empty margin is shown around it.
 A stereo picture is what two eyes saw from one place: the viewer is kept in the middle of it. Turning the head looks around; moving the head does not move the viewer in the picture, which has no other side to show. A picture with a depth map is the exception: it has relief, stays where it is in the room, and moving the head shows it from another angle.
 
 A picture does not always surround the viewer: a flat picture floats in front of them, a VR180 photo leaves what is behind them empty. What is around the picture takes the colours of its edges, dimmed: the colour of its top above it, the colour of its bottom below it, and a gradient from one to the other beside it.
+
+## Pages with many pictures
+
+Each element draws with WebGL, and browsers limit the WebGL contexts of a page: 16 in Chrome on a computer, 8 on a phone. Beyond the limit, the oldest elements go blank.
+
+With `start="interaction"`, an element shows a still of its picture, drawn without a WebGL context of its own, and starts 3D when the viewer points at it, presses on it or touches it:
+
+```html
+<stereo-img src="first.jpg" start="interaction"></stereo-img>
+<stereo-img src="second.jpg" start="interaction"></stereo-img>
+```
+
+* The still shows what the element would show: the same view, the eye or the anaglyph of the `flat` attribute. With `flat="wiggle"`, it wiggles.
+* The buttons appear when 3D starts.
+* At most four of these elements are started at the same time. Starting a fifth one stops the one used the longest ago, which shows a still again.
+* The picture is loaded once for the still, and once more when 3D starts.
+
+The attribute is read when the element is added to the page.
 
 ## Pictures from other sites
 
