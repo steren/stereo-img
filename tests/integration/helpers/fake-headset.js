@@ -1,4 +1,5 @@
-// A VR headset for the tests: just enough of WebXR for the component, and for three.js, to start a session and draw frames.
+// A VR headset for the tests: just enough of WebXR for the component, and for three.js, to start a session, draw frames
+// and hear about controllers and hands.
 // There is no headset where the tests run, and the browser refuses VR sessions without one.
 
 import * as THREE from '../../../vendor/three/three.module.min.js';
@@ -19,14 +20,70 @@ class FakeLayer {
   }
 }
 
+/** What a hand holds or does: a controller with a trigger and a thumbstick, or the hand itself, which pinches. */
+class FakeInput {
+  constructor(headset, handedness, isHand) {
+    this.headset = headset;
+    this.pressed = false;
+    /** What a session tells about it: an XRInputSource. */
+    this.inputSource = { handedness, targetRayMode: 'tracked-pointer' };
+    if (isHand) {
+      this.inputSource.profiles = ['generic-hand'];
+      this.inputSource.hand = new Map();
+    } else {
+      this.inputSource.profiles = ['generic-trigger-squeeze-thumbstick'];
+      // the standard layout: a touchpad on the first two axes, a thumbstick on the next two
+      this.inputSource.gamepad = { mapping: 'xr-standard', axes: [0, 0, 0, 0], buttons: [{ pressed: false, touched: false, value: 0 }] };
+    }
+  }
+
+  /** Press the trigger of the controller, or pinch the fingers of the hand. */
+  press() {
+    if (!this.pressed) {
+      this.pressed = true;
+      this._tell('selectstart');
+    }
+  }
+
+  /** Release it: that is when a session says that something was selected. */
+  release() {
+    if (this.pressed) {
+      this.pressed = false;
+      this._tell('select');
+      this._tell('selectend');
+    }
+  }
+
+  /** Put the thumbstick of the controller at a position: from -1 on the left or at the top to 1 on the right or at the bottom. */
+  moveThumbstick(x, y = 0) {
+    this.inputSource.gamepad.axes[2] = x;
+    this.inputSource.gamepad.axes[3] = y;
+  }
+
+  _tell(type) {
+    const session = this.headset.session;
+    // out of VR, nobody listens to the controllers
+    if (session && session.inputSources.includes(this.inputSource)) {
+      const event = new Event(type);
+      event.inputSource = this.inputSource;
+      session.dispatchEvent(event);
+    }
+  }
+}
+
 class FakeSession extends EventTarget {
   constructor(headset) {
     super();
     this.headset = headset;
     this.renderState = {};
-    this.inputSources = [];
     this.environmentBlendMode = 'opaque';
     this.ended = false;
+  }
+
+  /** What the viewer has in their hands, or their hands. */
+  get inputSources() {
+    const { left, right } = this.headset.input === 'hands' ? this.headset.hands : this.headset.controllers;
+    return [left.inputSource, right.inputSource];
   }
 
   updateRenderState(state) {
@@ -83,6 +140,10 @@ class FakeHeadset extends EventTarget {
     this.position = new THREE.Vector3(0, 1.6, 0);
     /** Which way the head is turned. */
     this.quaternion = new THREE.Quaternion();
+    /** What the headset follows: the 'controllers' that the viewer holds, or their bare 'hands'. */
+    this.input = 'controllers';
+    this.controllers = { left: new FakeInput(this, 'left', false), right: new FakeInput(this, 'right', false) };
+    this.hands = { left: new FakeInput(this, 'left', true), right: new FakeInput(this, 'right', true) };
   }
 
   // What the page sees: navigator.xr
