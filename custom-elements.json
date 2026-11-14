@@ -121,6 +121,16 @@
               "description": "When set, the sound of the picture does not start by itself when entering VR.",
               "attribute": "muted",
               "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "start",
+              "type": {
+                "text": "'interaction' | null"
+              },
+              "description": "When 3D starts. With \"interaction\", the element shows a still of the picture and starts WebGL when the viewer points at it or touches it. Read when the element is added to the page.",
+              "attribute": "start",
+              "reflects": true
             }
           ],
           "attributes": [
@@ -212,6 +222,14 @@
               },
               "description": "When set, the sound of the picture does not start by itself when entering VR.",
               "fieldName": "muted"
+            },
+            {
+              "name": "start",
+              "type": {
+                "text": "'interaction'"
+              },
+              "description": "When 3D starts. With \"interaction\", the element shows a still of the picture and starts WebGL when the viewer points at it or touches it. Read when the element is added to the page.",
+              "fieldName": "start"
             }
           ],
           "events": [

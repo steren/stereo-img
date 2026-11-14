@@ -111,6 +111,34 @@ function mayHaveMultiPictureIndex(bytes) {
 
 // Distance between the viewer and the picture, in the 3D scene.
 const PICTURE_DISTANCE = 10;
+// How many elements that start on interaction can be started at the same time on a page: the others show a still.
+// Browsers limit the WebGL contexts of a page, to 16 in Chrome on a computer and 8 on a phone.
+const MOST_STARTED = 4;
+// What a viewer does to start an element that starts on interaction: point at it, press on it, touch it.
+const START_EVENTS = ['pointerenter', 'pointerdown', 'touchstart'];
+// The styles of the element, started or not.
+const HOST_STYLE = `
+      <style>
+        :host {
+          display: block;
+          contain: content;
+        }
+        #flatModeButton:hover {
+          opacity: 1.0 !important;
+        }
+        .still {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          pointer-events: none;
+        }
+      </style>
+      `;
+// The attributes that change what a still shows.
+const STILL_ATTRIBUTES = ['src', 'src-right', 'type', 'angle', 'projection', 'flat', 'disparity-adjustment'];
 // How far in front of the viewer the sign that a picture is loading is.
 const LOADING_INDICATOR_DISTANCE = 1;
 // What surrounds the picture is drawn on a sphere this far from the viewer.
@@ -123,6 +151,111 @@ const SURROUNDINGS_DARKEST = 16;
 const DEFAULT_FOV = 70;
 // Layers on which the pictures of each eye are drawn.
 const LEFT_EYE_LAYER = 1;
+
+/** The elements that started on interaction and are started, the most recently used last. */
+const startedOnInteraction = [];
+
+/** A hidden element that draws the stills of the elements that are not started: one WebGL context for all of them. */
+let stillDrawer = null;
+
+/** The stills are drawn one at a time. */
+let stillQueue = Promise.resolve();
+
+/**
+ * The hidden element that draws stills. Made when the first still is needed, and again if the browser took its GPU away.
+ * @returns {StereoImg}
+ */
+function getStillDrawer() {
+  if (stillDrawer && !stillDrawer.renderer?.getContext().isContextLost()) {
+    return stillDrawer;
+  }
+  if (stillDrawer) {
+    const host = stillDrawer.getRootNode().host;
+    stillDrawer._teardown();
+    host?.remove();
+  }
+  // Out of the page: not seen, and in a shadow tree, where the styles and the scripts of the page do not find it.
+  const host = document.createElement('div');
+  host.setAttribute('aria-hidden', 'true');
+  host.style.cssText = 'position:fixed;left:-100000px;top:0;width:0;height:0;overflow:hidden;visibility:hidden;pointer-events:none;';
+  stillDrawer = document.createElement('stereo-img');
+  stillDrawer._drawsOnDemand = true;
+  stillDrawer.setAttribute('controlslist', 'none');
+  stillDrawer.style.cssText = 'position:absolute;left:0;top:0;';
+  host.attachShadow({ mode: 'open' }).appendChild(stillDrawer);
+  return stillDrawer;
+}
+
+/**
+ * Draw the stills of an element that is not started: what it would show if it was.
+ * @param {StereoImg} element - The element.
+ * @param {number} job - Which of the requests of the element this is: only its latest counts.
+ * @returns {Promise<Array<HTMLCanvasElement>|null>} - One still, or one per eye for an element that wiggles. Null if they are not needed anymore.
+ */
+function drawStills(element, job) {
+  const drawing = stillQueue.then(async () => {
+    const isNeeded = () => element.isConnected && element._preview?.job === job;
+    const width = element.clientWidth;
+    const height = element.clientHeight;
+    if (!isNeeded() || width === 0 || height === 0) {
+      return null;
+    }
+
+    const drawer = getStillDrawer();
+    drawer.style.width = `${width}px`;
+    drawer.style.height = `${height}px`;
+    for (const name of STILL_ATTRIBUTES) {
+      if (element.hasAttribute(name)) {
+        drawer.setAttribute(name, element.getAttribute(name));
+      } else {
+        drawer.removeAttribute(name);
+      }
+    }
+
+    const host = drawer.getRootNode().host;
+    if (!host.isConnected) {
+      // its first picture: the element starts, and loads it
+      document.body.appendChild(host);
+      await drawer._started;
+    } else {
+      drawer._resize();
+      await drawer.parseImageAndInitialize3DScene();
+    }
+
+    try {
+      return isNeeded() ? drawer._captureFrames() : null;
+    } finally {
+      // keep nothing of the picture until the next still
+      await drawer._display(drawer._emptyStereoData(), new AbortController().signal);
+    }
+  });
+  stillQueue = drawing.catch(() => {});
+  return drawing;
+}
+
+/**
+ * Note that an element that starts on interaction is being used, and stop the ones used the longest ago if too many are started.
+ * @param {StereoImg} element - The element.
+ */
+function noteUse(element) {
+  const index = startedOnInteraction.indexOf(element);
+  if (index >= 0) {
+    startedOnInteraction.splice(index, 1);
+  }
+  startedOnInteraction.push(element);
+
+  let extra = startedOnInteraction.length - MOST_STARTED;
+  for (const candidate of [...startedOnInteraction]) {
+    if (extra <= 0) {
+      break;
+    }
+    // not the one being used, and not one that someone is in, in VR
+    if (candidate !== element && !candidate.renderer?.xr.isPresenting) {
+      candidate._stopAndShowPreview(true);
+      extra--;
+    }
+  }
+}
 
 class StereoImg extends HTMLElement {
 
@@ -167,6 +300,21 @@ class StereoImg extends HTMLElement {
       this.setAttribute('projection', val);
     } else {
       this.removeAttribute('projection');
+    }
+  }
+
+  /**
+   * When 3D starts: "interaction" to show a still until the viewer points at the element or touches it.
+   * Read when the element is added to the page.
+   */
+  get start() {
+    return this.getAttribute('start');
+  }
+  set start(val) {
+    if (val) {
+      this.setAttribute('start', val);
+    } else {
+      this.removeAttribute('start');
     }
   }
 
@@ -266,7 +414,21 @@ class StereoImg extends HTMLElement {
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
-    if (oldValue === newValue || !this.renderer) {
+    if (oldValue === newValue) {
+      return;
+    }
+    if (this._preview) {
+      // not started: draw the stills again, once for all the attributes changed together
+      if (STILL_ATTRIBUTES.includes(name) && !this._previewUpdate) {
+        this._previewUpdate = Promise.resolve().then(() => {
+          this._previewUpdate = null;
+          this._drawPreview();
+        });
+      }
+      return;
+    }
+    // The element that draws stills loads when it is told to.
+    if (!this.renderer || this._drawsOnDemand) {
       return;
     }
 
@@ -1027,18 +1189,15 @@ class StereoImg extends HTMLElement {
         this._followViewer(frame);
       }
 
-      if (flatMode === 'wiggle') {
-        this.renderer.render(this.scene, this.camera);
-      } else if (flatMode === 'right') {
-        this.camera.layers.set(2);
-        this.renderer.render(this.scene, this.camera);
-      } else if (flatMode === 'anaglyph') {
-        this.anaglyphEffect.render(this.scene, this.camera);
-      } else { // 'left' is the default
-        this.camera.layers.set(1);
-        this.renderer.render(this.scene, this.camera);
-      }
+      this._renderFrame();
     };
+
+    if (this._drawsOnDemand) {
+      // draws when asked: nothing to animate
+      this.toggleWiggle(false);
+      this.renderer.setAnimationLoop(null);
+      return;
+    }
 
     if (flatMode === 'wiggle') {
       this.toggleWiggle(true);
@@ -1279,23 +1438,13 @@ class StereoImg extends HTMLElement {
       this.debug = true;
     }
 
-    this.shadowRoot.innerHTML = `
-      <style>
-        :host {
-          display: block;
-          contain: content;
-        }
-        #flatModeButton:hover {
-          opacity: 1.0 !important;
-        }
-      </style>
-      `;
-
-    // TODO: should we also read width and height attributes and resize element accordingly?
-    if (this.clientHeight === 0) {
-      const aspectRatio = 4 / 3;
-      this.style.height = this.clientWidth / aspectRatio + "px";
+    this.shadowRoot.innerHTML = HOST_STYLE;
+    if (this._still) {
+      // Started on interaction: the still stays over the picture until the picture is displayed.
+      this.shadowRoot.appendChild(this._still);
     }
+
+    this._giveHeight();
 
     this.renderer = new THREE.WebGLRenderer();
     this.renderer.setPixelRatio(window.devicePixelRatio);
@@ -1376,18 +1525,292 @@ class StereoImg extends HTMLElement {
     this.updateButtons();
 
     // Listen for component resize
-    this._resizeObserver = new ResizeObserver(() => {
-      this.renderer.setSize(this.clientWidth, this.clientHeight);
-      this.camera.aspect = this.clientWidth / this.clientHeight;
-      this.camera.updateProjectionMatrix();
-      this.anaglyphEffect.setSize(this.clientWidth, this.clientHeight);
-      // the picture may not fill the new shape of the element with the same view
-      this.controls.constrain();
-    });
+    this._resizeObserver = new ResizeObserver(() => this._resize());
 
     this._resizeObserver.observe(this);
 
     await this.parseImageAndInitialize3DScene();
+  }
+
+  /**
+   * Give a height to an element that has none: three quarters of its width.
+   * @private
+   */
+  _giveHeight() {
+    // TODO: should we also read width and height attributes and resize element accordingly?
+    if (this.clientHeight === 0) {
+      const aspectRatio = 4 / 3;
+      this.style.height = this.clientWidth / aspectRatio + "px";
+    }
+  }
+
+  /**
+   * Draw at the size of the element.
+   * @private
+   */
+  _resize() {
+    if (!this.renderer) {
+      return;
+    }
+    this.renderer.setSize(this.clientWidth, this.clientHeight);
+    this.camera.aspect = this.clientWidth / this.clientHeight;
+    this.camera.updateProjectionMatrix();
+    this.anaglyphEffect.setSize(this.clientWidth, this.clientHeight);
+    // the picture may not fill the new shape of the element with the same view
+    this.controls.constrain();
+  }
+
+  /**
+   * Draw the picture once, the way the "flat" attribute says.
+   * @param {number} [eye] - Draw what this eye sees instead: 1 for the left eye, 2 for the right eye.
+   * @private
+   */
+  _renderFrame(eye) {
+    const flatMode = this.getAttribute('flat');
+    if (eye) {
+      this.camera.layers.set(eye);
+      this.renderer.render(this.scene, this.camera);
+    } else if (flatMode === 'wiggle') {
+      this.renderer.render(this.scene, this.camera);
+    } else if (flatMode === 'right') {
+      this.camera.layers.set(2);
+      this.renderer.render(this.scene, this.camera);
+    } else if (flatMode === 'anaglyph') {
+      this.anaglyphEffect.render(this.scene, this.camera);
+    } else { // 'left' is the default
+      this.camera.layers.set(1);
+      this.renderer.render(this.scene, this.camera);
+    }
+  }
+
+  /**
+   * Copy what the element shows: a still. An element that wiggles gets one still per eye.
+   * @returns {Array<HTMLCanvasElement>}
+   * @private
+   */
+  _captureFrames() {
+    const canvas = this.renderer.domElement;
+    const eyes = this.getAttribute('flat') === 'wiggle' ? [1, 2] : [0];
+    return eyes.map(eye => {
+      this._renderFrame(eye);
+      const still = document.createElement('canvas');
+      still.width = canvas.width;
+      still.height = canvas.height;
+      still.getContext('2d').drawImage(canvas, 0, 0);
+      return still;
+    });
+  }
+
+  /**
+   * Show stills of the picture instead of starting 3D: for an element that starts on interaction.
+   * Nothing of WebGL is made, so a page can have many of these.
+   * @param {Array<HTMLCanvasElement>} [stills] - What to show. When missing, the stills are drawn from the picture.
+   * @private
+   */
+  _showPreview(stills) {
+    this.shadowRoot.innerHTML = HOST_STYLE;
+    this._giveHeight();
+    this._preview = { job: 0, stills: [], timer: null, aspect: 0 };
+
+    for (const type of START_EVENTS) {
+      this.addEventListener(type, this._startOnInteraction, { passive: true });
+    }
+    // an element that changes shape needs another still, and one that had no size gets its first
+    this._previewResizeObserver = new ResizeObserver(() => {
+      const aspect = this.clientWidth / this.clientHeight;
+      const drawnFor = this._preview?.aspect;
+      if (this._preview && aspect > 0 && (!(drawnFor > 0) || Math.abs(aspect / drawnFor - 1) > 0.01)) {
+        this._drawPreview();
+      }
+    });
+
+    if (stills?.length > 0) {
+      this._setStills(stills);
+    } else {
+      this._drawPreview();
+    }
+    this._previewResizeObserver.observe(this);
+  }
+
+  /**
+   * Draw the stills of an element that is not started, from its picture.
+   * @private
+   */
+  async _drawPreview() {
+    const preview = this._preview;
+    if (!preview) {
+      return;
+    }
+    const job = ++preview.job;
+    preview.aspect = this.clientWidth / this.clientHeight;
+    const stills = await drawStills(this, job);
+    if (this._preview !== preview || preview.job !== job) {
+      // started meanwhile, or asked again
+      return;
+    }
+    if (stills) {
+      this._setStills(stills);
+    } else {
+      // Not drawn: the element had no size, or was out of the page. To be drawn when it has a size.
+      preview.aspect = 0;
+      if (this.isConnected && this.clientWidth > 0 && this.clientHeight > 0) {
+        this._drawPreview();
+      }
+    }
+  }
+
+  /**
+   * Show stills in an element that is not started. With one per eye, they alternate: the picture wiggles.
+   * @param {Array<HTMLCanvasElement>} stills - What to show.
+   * @private
+   */
+  _setStills(stills) {
+    const preview = this._preview;
+    clearInterval(preview.timer);
+    preview.stills.forEach(still => still.remove());
+    preview.stills = stills;
+    preview.aspect = stills[0].width / stills[0].height;
+    stills.forEach((still, index) => {
+      still.className = 'still';
+      still.style.visibility = index === 0 ? 'visible' : 'hidden';
+      this.shadowRoot.appendChild(still);
+    });
+    this._wigglePreview();
+  }
+
+  /**
+   * Alternate the stills of the two eyes, at the pace of toggleWiggle.
+   * @private
+   */
+  _wigglePreview() {
+    const preview = this._preview;
+    clearInterval(preview.timer);
+    preview.timer = null;
+    if (preview.stills.length > 1 && this.isConnected) {
+      let shown = 0;
+      preview.timer = setInterval(() => {
+        shown = (shown + 1) % preview.stills.length;
+        preview.stills.forEach((still, index) => {
+          still.style.visibility = index === shown ? 'visible' : 'hidden';
+        });
+      }, 1000 / 10);
+    }
+  }
+
+  /**
+   * Start 3D in an element that showed stills.
+   * @private
+   */
+  _start() {
+    const preview = this._preview;
+    if (!preview) {
+      return;
+    }
+    clearInterval(preview.timer);
+    this._previewResizeObserver.disconnect();
+    for (const type of START_EVENTS) {
+      this.removeEventListener(type, this._startOnInteraction);
+    }
+    this._preview = null;
+
+    // One still stays over the picture until the picture is displayed, and is kept in case the browser takes the GPU away.
+    this._still = preview.stills.find(still => still.style.visibility === 'visible') || preview.stills[0] || null;
+    preview.stills.forEach(still => still.style.visibility = 'visible');
+
+    this._started = this.init();
+    this._started.finally(() => {
+      if (this.renderer && this._still?.isConnected) {
+        // the picture, not the sign that it was loading
+        if (!this.renderer.xr.isPresenting) {
+          this._renderFrame();
+        }
+        this._still.remove();
+      }
+    }).catch(() => {
+      // reported by the browser, as for an element that starts by itself
+    });
+    if (!this.renderer) {
+      // WebGL is not available
+      return;
+    }
+
+    this.renderer.domElement.addEventListener('webglcontextlost', this._stopOnContextLoss);
+    for (const type of ['pointerenter', 'pointerdown']) {
+      this.addEventListener(type, this._noteUse, { passive: true });
+    }
+    noteUse(this);
+  }
+
+  /**
+   * Stop 3D in an element that starts on interaction, and show stills again. The next interaction starts it again.
+   * @param {boolean} capture - True to show what the element was showing. False to show the still from before it started.
+   * @private
+   */
+  _stopAndShowPreview(capture) {
+    if (!this.renderer) {
+      return;
+    }
+    let stills = this._still ? [this._still] : [];
+    if (capture && !this.renderer.getContext().isContextLost() && this.stereoData && !this.loadingIndicator.visible) {
+      stills = this._captureFrames();
+    }
+    this.renderer.domElement.removeEventListener('webglcontextlost', this._stopOnContextLoss);
+    for (const type of ['pointerenter', 'pointerdown']) {
+      this.removeEventListener(type, this._noteUse);
+    }
+    const index = startedOnInteraction.indexOf(this);
+    if (index >= 0) {
+      startedOnInteraction.splice(index, 1);
+    }
+    this._teardown();
+    this._still = null;
+    this._showPreview(stills);
+  }
+
+  /**
+   * Stop 3D and give back everything it uses: the GPU first.
+   * @private
+   */
+  _teardown() {
+    this._loadController?.abort();
+    this._loadController = null;
+    this.toggleWiggle(false);
+    this._resizeObserver?.disconnect();
+    if (this.soundOn) {
+      this.setSound(false);
+    }
+    this.audio = null;
+    if (this.renderer) {
+      this.renderer.setAnimationLoop(null);
+      this.controls.dispose();
+      this.scene.traverse(object => {
+        object.geometry?.dispose();
+        if (object.material) {
+          object.material.map?.dispose();
+          object.material.displacementMap?.dispose();
+          object.material.dispose();
+        }
+      });
+      this.anaglyphEffect.dispose();
+      const gl = this.renderer.getContext();
+      this.renderer.dispose();
+      // tell the browser now, instead of when it notices that nothing uses the context
+      if (!gl.isContextLost()) {
+        gl.getExtension('WEBGL_lose_context')?.loseContext();
+      }
+    }
+    this.renderer = null;
+    this.scene = null;
+    this.camera = null;
+    this.controls = null;
+    this.anaglyphEffect = null;
+    this.loadingIndicator = null;
+    this.surroundings = null;
+    this.stereoImageGroup = null;
+    this.stereoData = null;
+    this._leftPicture = null;
+    this._displaying = null;
+    this._initialized = false;
   }
 
   updateButtons() {
@@ -1477,10 +1900,27 @@ class StereoImg extends HTMLElement {
       this.updateflatMode();
       return;
     }
-    this.init();
+    if (this._preview) {
+      // Back in the document without having started: the stills are still there.
+      this._wigglePreview();
+      if (this._preview.stills.length === 0) {
+        this._drawPreview();
+      }
+      return;
+    }
+    if (this.getAttribute('start') === 'interaction') {
+      // Show stills, and start 3D when the viewer shows interest.
+      this._showPreview();
+      return;
+    }
+    this._started = this.init();
   }
 
   disconnectedCallback() {
+    if (this._preview) {
+      clearInterval(this._preview.timer);
+      this._preview.timer = null;
+    }
     if (this._resizeObserver) {
       this._resizeObserver.disconnect();
     }
@@ -1505,6 +1945,11 @@ class StereoImg extends HTMLElement {
     this.stereoImageGroup = null;
     this._initialized = false;
     this.attachShadow({ mode: 'open' });
+
+    // For an element that starts on interaction
+    this._startOnInteraction = () => this._start();
+    this._noteUse = () => noteUse(this);
+    this._stopOnContextLoss = () => this._stopAndShowPreview(false);
   }
 
 }
