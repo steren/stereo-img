@@ -33,7 +33,7 @@ npm install stereo-img
 * `src-right`: (Optional) source of the right eye picture (absolute or relative) for the `pair` type. If used, the source for the left eye picture is read from the `src` attribute.
 * `type`: (Optional) type of stereo picture:
   - If unset, type is inferred from heuristics
-  - `vr`: [VR Photo](https://developers.google.com/vr/reference/cardboard-camera-vr-photo-format) - VR180, Google Camera panorama, Cardboard Camera, Photosphere images (Where right eye image and angle of view info are embedded in the image metadata) 
+  - `vr` (or its alias `vr180`): [VR Photo](https://developers.google.com/vr/reference/cardboard-camera-vr-photo-format) - VR180, Google Camera panorama, Cardboard Camera, Photosphere images (Where right eye image and angle of view info are embedded in the image metadata) 
   - `left-right`: left eye on the left, right eye on the right, Exif angle of view is used if present.
   - `right-left`: left eye on the right, right eye on the left, Exif angle of view is used if present.
   - `top-bottom`: left eye on the top, right eye on the bottom, Exif angle of view is used if present.
@@ -63,6 +63,7 @@ npm install stereo-img
   - `right`: Allow the "right" flat mode.
   - `wiggle`: Allow the "wiggle" flat mode.
   - `anaglyph`: Allow the "anaglyph" flat mode.
+* `debug`: (Optional) When set, logs diagnostic information to the console and displays the wireframe of the 3D geometry.
 
 ## Compatibility
 
@@ -107,28 +108,24 @@ Instead of a CDN, you can install the module locally using [npm](https://www.npm
 npm install stereo-img
 ```
 
-Then, use a JavaScript builder or [import-maps](https://github.com/WICG/import-maps) to load the module and its dependencies:
+The package has no dependency to install or to map: its copies of [three.js](https://threejs.org/) and [exifr](https://github.com/MikeKovarik/exifr) are included in its `vendor` folder and imported with relative paths.
 
-If using import-maps:
+Load the module from where it is installed:
 
 ```html
-<!-- Shim for importmap -->
-<script async src="https://unpkg.com/es-module-shims@1.3.0/dist/es-module-shims.js"></script>
+<script type="module" src="./node_modules/stereo-img/stereo-img.js"></script>
+```
+
+Or, to import it by name, use a JavaScript bundler or an [import map](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script/type/importmap):
+
+```html
 <script type="importmap">
   {
     "imports": {
-      "stereo-img": "./node_modules/stereo-img/stereo-img.js",
-      "exifr": "./node_modules/exifr/dist/full.esm.js",
-      "three": "./node_modules/three/build/three.module.js",
-      "three/": "./node_modules/three/"
+      "stereo-img": "./node_modules/stereo-img/stereo-img.js"
     }
   }
 </script>
-```
-
-Then load the `stereo-img` module:
-
-```html
 <script type="module">import "stereo-img";</script>
 ```
 
