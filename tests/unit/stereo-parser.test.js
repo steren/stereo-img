@@ -132,7 +132,8 @@ test('Angle calculation with fisheye projection', async () => {
 test('Angle calculation with custom angle', async () => {
     const result = await parseStereo(url, { angle: 90 });
     assert.equal(result.phiLength, Math.PI / 2);
-    assert.equal(result.thetaLength, (Math.PI / 2) * 2/2); // height/width
+    // each eye is 1 pixel wide and 2 pixels high
+    assert.equal(result.thetaLength, (Math.PI / 2) * 2/1);
 });
 
 test('Default angle calculation', async () => {
