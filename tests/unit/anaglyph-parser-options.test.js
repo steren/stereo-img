@@ -49,7 +49,7 @@ test.afterEach(() => {
 const close = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} is not close to ${expected}`);
 
 test('parseAnaglyph splits every pixel of the picture', async () => {
-  const result = await parseAnaglyph('anaglyph.jpg');
+  const result = await parseAnaglyph('anaglyph.jpg', { colors: 'red-green' });
 
   assert.ok(result.leftEye.data instanceof Uint8ClampedArray);
   assert.ok(result.rightEye.data instanceof Uint8ClampedArray);

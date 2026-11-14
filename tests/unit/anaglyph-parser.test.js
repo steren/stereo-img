@@ -40,7 +40,7 @@ test('parseAnaglyph splits color channels', async () => {
   };
 
   try {
-    const result = await parseAnaglyph('data:image/jpeg;base64,AA');
+    const result = await parseAnaglyph('data:image/jpeg;base64,AA', { colors: 'red-green' });
     assert.deepStrictEqual(Array.from(result.leftEye.data), [10,10,10,40]);
     assert.deepStrictEqual(Array.from(result.rightEye.data), [20,20,20,40]);
     assert.equal(result.phiLength, 1.02278);
