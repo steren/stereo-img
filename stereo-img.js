@@ -22,6 +22,7 @@ import { flatModeButton } from './lib/flatModeButton.js';
 import { soundButton } from './lib/soundButton.js';
 import { loadingHints } from './lib/https.js';
 import { Picture } from './lib/picture.js';
+import { edgeColors } from './lib/edgeColors.js';
 
 
 /**
@@ -108,6 +109,12 @@ function mayHaveMultiPictureIndex(bytes) {
 
 // Distance between the viewer and the picture, in the 3D scene.
 const PICTURE_DISTANCE = 10;
+// What surrounds the picture is drawn on a sphere this far from the viewer.
+const SURROUNDINGS_RADIUS = 1000;
+// What surrounds the picture takes the colours of its edges, dimmed to leave the picture in front.
+const SURROUNDINGS_BRIGHTNESS = 0.5;
+// The colour of the surroundings is never darker than this, on a scale of 255.
+const SURROUNDINGS_DARKEST = 16;
 // Vertical field of view of the camera outside of VR, in degrees.
 const DEFAULT_FOV = 70;
 // Layers on which the pictures of each eye are drawn.
@@ -902,6 +909,7 @@ class StereoImg extends HTMLElement {
       try {
         this.stereoData = stereoData;
         await this.initialize3DScene();
+        this.updateSurroundings();
         this.updateSound();
         // A flat picture slides in front of the viewer. A picture on a sphere is looked around.
         const isFlat = this.stereoImageGroup.children.some(object => object.geometry.type === 'PlaneGeometry');
@@ -918,6 +926,7 @@ class StereoImg extends HTMLElement {
         try {
           this.stereoData = this._emptyStereoData();
           await this.initialize3DScene();
+          this.updateSurroundings();
           this.updateSound();
         } catch (e) {
           // Nothing more can be done.
@@ -939,6 +948,92 @@ class StereoImg extends HTMLElement {
       thetaStart: 0,
       thetaLength: 0
     };
+  }
+
+  /**
+   * What is seen around the picture, where it does not fill the view: mostly in VR.
+   * A very large sphere around the viewer, coloured from the bottom to the top.
+   */
+  setupSurroundings() {
+    const geometry = new THREE.SphereGeometry(SURROUNDINGS_RADIUS, 32, 64);
+    geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(geometry.attributes.position.count * 3), 3));
+    const material = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, depthWrite: false, fog: false });
+    this.surroundings = new THREE.Mesh(geometry, material);
+    // behind everything, for both eyes
+    this.surroundings.renderOrder = -1;
+    this.surroundings.layers.enable(1);
+    this.surroundings.layers.enable(2);
+    this.scene.add(this.surroundings);
+    this.setSurroundingsColors([0, 0, 0], [0, 0, 0]);
+  }
+
+  /**
+   * Colour the surroundings of the picture: one colour above it, another below it, and from one to the other beside it.
+   * @param {Array<number>} top - Red, green and blue above the picture, from 0 to 255.
+   * @param {Array<number>} bottom - Red, green and blue below the picture, from 0 to 255.
+   * @param {number} [topLatitude] - How high the top of the picture is, in radians above the horizon.
+   * @param {number} [bottomLatitude] - How high the bottom of the picture is, in radians above the horizon.
+   */
+  setSurroundingsColors(top, bottom, topLatitude = Math.PI / 2, bottomLatitude = -Math.PI / 2) {
+    // dimmed, to leave the picture in front, but never darker than the surroundings of an element without a picture
+    const dim = color => color.map(value => Math.round(Math.max(SURROUNDINGS_DARKEST, value * SURROUNDINGS_BRIGHTNESS)));
+    const topColor = new THREE.Color().setRGB(...dim(top).map(value => value / 255), THREE.SRGBColorSpace);
+    const bottomColor = new THREE.Color().setRGB(...dim(bottom).map(value => value / 255), THREE.SRGBColorSpace);
+
+    const { position, color } = this.surroundings.geometry.attributes;
+    const mixed = new THREE.Color();
+    for (let i = 0; i < position.count; i++) {
+      const latitude = Math.asin(THREE.MathUtils.clamp(position.getY(i) / SURROUNDINGS_RADIUS, -1, 1));
+      // from 0 at the height of the bottom of the picture to 1 at the height of its top
+      const height = THREE.MathUtils.clamp((latitude - bottomLatitude) / (topLatitude - bottomLatitude), 0, 1);
+      mixed.lerpColors(bottomColor, topColor, height);
+      color.setXYZ(i, mixed.r, mixed.g, mixed.b);
+    }
+    color.needsUpdate = true;
+
+    /** The colours of the surroundings of the picture: red, green and blue from 0 to 255, above and below the picture. */
+    this.surroundingsColors = { top: dim(top), bottom: dim(bottom) };
+  }
+
+  /**
+   * Give the surroundings the colours of the top and bottom edges of the picture being displayed.
+   */
+  updateSurroundings() {
+    let colors = { top: [0, 0, 0], bottom: [0, 0, 0] };
+    let topLatitude = Math.PI / 2;
+    let bottomLatitude = -Math.PI / 2;
+
+    try {
+      const mesh = this.stereoImageGroup?.children.find(object => object.isMesh && object.material.map);
+      if (mesh) {
+        let pixels = mesh.material.map.image;
+        if (!(pixels instanceof ImageData)) {
+          // a small copy of the picture is enough to know the colours of its edges
+          const canvas = document.createElement('canvas');
+          canvas.width = 64;
+          canvas.height = 64;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          ctx.drawImage(pixels, 0, 0, canvas.width, canvas.height);
+          pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        }
+        colors = edgeColors(pixels, { circle: this.stereoData.projection === 'fisheye' });
+
+        // how high and how low the picture goes, seen from the middle of the scene
+        const { type, parameters } = mesh.geometry;
+        if (type === 'PlaneGeometry') {
+          topLatitude = Math.atan2(parameters.height / 2, PICTURE_DISTANCE);
+          bottomLatitude = -topLatitude;
+        } else {
+          topLatitude = Math.PI / 2 - parameters.thetaStart;
+          bottomLatitude = topLatitude - parameters.thetaLength;
+        }
+      }
+    } catch (error) {
+      // The colours are a decoration: a picture whose pixels cannot be read keeps dark surroundings.
+      colors = { top: [0, 0, 0], bottom: [0, 0, 0] };
+    }
+
+    this.setSurroundingsColors(colors.top, colors.bottom, topLatitude, bottomLatitude);
   }
 
   setupLoadingIndicator() {
@@ -999,6 +1094,7 @@ class StereoImg extends HTMLElement {
 
     this.scene = new THREE.Scene();
     this.setupLoadingIndicator();
+    this.setupSurroundings();
 
     const light = new THREE.AmbientLight(0xffffff, 3);
     light.layers.enable(1);
