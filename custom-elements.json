@@ -63,6 +63,16 @@
             },
             {
               "kind": "field",
+              "name": "disparityAdjustment",
+              "type": {
+                "text": "string | null"
+              },
+              "description": "Distance to add between the pictures of the two eyes, in percent of the width of one of them. A negative value moves them closer together.",
+              "attribute": "disparity-adjustment",
+              "reflects": true
+            },
+            {
+              "kind": "field",
               "name": "flat",
               "type": {
                 "text": "string | null"
@@ -143,6 +153,14 @@
               },
               "description": "Hint at the projection: \"equirectangular\" or \"fisheye\". If unset, the projection is inferred from heuristics.",
               "fieldName": "projection"
+            },
+            {
+              "name": "disparity-adjustment",
+              "type": {
+                "text": "string"
+              },
+              "description": "Distance to add between the pictures of the two eyes, in percent of the width of one of them. A negative value moves them closer together.",
+              "fieldName": "disparityAdjustment"
             },
             {
               "name": "flat",
