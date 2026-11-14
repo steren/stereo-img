@@ -33,7 +33,7 @@ test.beforeEach(() => {
   };
 });
 
-const GOPRO_PHI_LENGTH = 2.1397737;
+const GOPRO_PHI_LENGTH = 122.6 * Math.PI / 180;
 
 for (const url of [
   'GOPR0123.JPG',
