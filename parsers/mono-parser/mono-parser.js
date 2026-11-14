@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { pixelReader } from './../../lib/pixels.js';
+
 /**
  * Parses a monoscopic image and returns stereo data with the same image for both eyes.
  * @param {string} src - The URL of the image to parse.
@@ -44,12 +46,8 @@ export async function parseMono(src, { angle, projection, signal }) {
         };
         img.src = src;
     });
-    const canvas = document.createElement('canvas');
-    canvas.width = image.width;
-    canvas.height = image.height;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(image, 0, 0);
-    const imageData = ctx.getImageData(0, 0, image.width, image.height);
+    // A picture too large for a canvas, on a phone, is read in parts.
+    const imageData = pixelReader(image)(0, 0, image.width, image.height);
     
     // default to a plane geometry if no angle is specified
     const phiLength = angle ? parseFloat(angle) * Math.PI / 180 : Math.PI / 3;
