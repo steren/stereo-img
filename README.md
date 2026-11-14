@@ -57,6 +57,10 @@ npm install stereo-img
   - If unset, projection is inferred from heuristics.
   - `equirectangular`: Equirectangular projection
   - `fisheye`: Fisheye projection
+* `disparity-adjustment`: (Optional) Distance to add between the pictures of the two eyes, in percent of the width of one of them. Useful when the two lenses of the camera were further apart, or closer, than human eyes.
+  - A negative value moves the pictures closer together: the left one to the right and the right one to the left.
+  - A positive value moves them apart.
+  - Each picture moves by half of the value. The picture is not loaded again when the value changes.
 * `flat`: (Optional) When viewing in 2D, set the display mode.
   - `left`: (Default) Show the left eye image.
   - `right`: Show the right eye image.

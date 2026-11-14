@@ -22,6 +22,11 @@ import { flatModeButton } from './lib/flatModeButton.js';
 import { mixedContentHint } from './lib/https.js';
 
 
+// Distance between the viewer and the picture, in the 3D scene.
+const PICTURE_DISTANCE = 10;
+// Layers on which the pictures of each eye are drawn.
+const LEFT_EYE_LAYER = 1;
+
 class StereoImg extends HTMLElement {
 
   get type() {
@@ -90,6 +95,17 @@ class StereoImg extends HTMLElement {
     }
   }
 
+  get disparityAdjustment() {
+    return this.getAttribute('disparity-adjustment');
+  }
+  set disparityAdjustment(val) {
+    if (val || val === 0) {
+      this.setAttribute('disparity-adjustment', val);
+    } else {
+      this.removeAttribute('disparity-adjustment');
+    }
+  }
+
   get wiggle() {
     console.warn('<stereo-img>: The "wiggle" attribute is deprecated. Use the "flat" attribute with a value of "wiggle" instead.');
     return this.getAttribute('wiggle');
@@ -126,7 +142,7 @@ class StereoImg extends HTMLElement {
   }
 
   static get observedAttributes() {
-    return ['type', 'angle', 'debug', 'projection', 'controlslist', 'flat', 'wiggle', 'src', 'src-right'];
+    return ['type', 'angle', 'debug', 'projection', 'controlslist', 'flat', 'wiggle', 'src', 'src-right', 'disparity-adjustment'];
   }
 
   _scheduleRenderUpdate() {
@@ -160,6 +176,9 @@ class StereoImg extends HTMLElement {
         break;
       case 'controlslist':
         this.updateButtons();
+        break;
+      case 'disparity-adjustment':
+        this.updateDisparityAdjustment();
         break;
     }
   }
@@ -386,7 +405,7 @@ class StereoImg extends HTMLElement {
    * @param {String} eye: "left" or "right"
    */
   async createEye(eye, debug) {
-    const radius = 10; // 500
+    const radius = PICTURE_DISTANCE;
     const depth = radius / 5;
     const planeSegments = this.stereoData.depth ? 256 : 1;
     const sphereWidthSegments = 60;
@@ -506,6 +525,34 @@ class StereoImg extends HTMLElement {
     }
   }
 
+  /**
+   * Move the pictures of the two eyes horizontally, in opposite directions.
+   *
+   * The "disparity-adjustment" attribute is the distance to add between the two pictures,
+   * in percent of the width of one of them. A negative value moves them closer together:
+   * the left picture to the right and the right picture to the left. Each moves by half of the value.
+   */
+  updateDisparityAdjustment() {
+    if (!this.stereoImageGroup || !this.stereoData) {
+      return;
+    }
+    const adjustment = (parseFloat(this.getAttribute('disparity-adjustment')) || 0) / 100;
+    // same rule as in createEye
+    const isPlane = this.stereoData.phiLength < Math.PI / 2;
+
+    for (const object of this.stereoImageGroup.children) {
+      const isLeftEye = object.layers.isEnabled(LEFT_EYE_LAYER);
+      // how far the picture of this eye moves to the right, as a fraction of its width
+      const shift = (isLeftEye ? -1 : 1) * adjustment / 2;
+      if (isPlane) {
+        object.position.x = shift * PICTURE_DISTANCE * 2;
+      } else {
+        // a picture on a sphere moves by turning around the viewer
+        object.rotation.y = Math.PI / 2 - shift * this.stereoData.phiLength;
+      }
+    }
+  }
+
   async initialize3DScene() {
     if (this.stereoImageGroup) {
       this.scene.remove(this.stereoImageGroup);
@@ -526,6 +573,8 @@ class StereoImg extends HTMLElement {
 
     await this.createEye("left");
     await this.createEye("right");
+
+    this.updateDisparityAdjustment();
 
     this.updateflatMode();
   }
