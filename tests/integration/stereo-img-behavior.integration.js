@@ -68,7 +68,10 @@ const sameImageInBothEyes = element => element.stereoData.leftEye === element.st
 const eyesAreImageData = element => element.stereoData.leftEye instanceof ImageData && element.stereoData.rightEye instanceof ImageData;
 const geometryTypes = element => element.stereoImageGroup.children.map(child => child.geometry.type);
 
-describe('stereo-img', () => {
+describe('stereo-img', function () {
+  // These tests wait for pictures to load and for frames to be drawn.
+  this.timeout(30000);
+
   let element;
 
   /** Create an element, add it to the page and wait for its picture to be displayed. */

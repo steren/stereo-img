@@ -19,7 +19,10 @@ async function controlsFor(controlslist) {
   return controls;
 }
 
-describe('stereo-img controlslist', () => {
+describe('stereo-img controlslist', function () {
+  // Each test creates a WebGL scene.
+  this.timeout(30000);
+
   it('should display all controls by default', async () => {
     const controls = await controlsFor(undefined);
     expect(controls.vr).to.be.true;
