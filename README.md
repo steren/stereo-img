@@ -75,6 +75,16 @@ npm install stereo-img
   - `anaglyph`: Allow the "anaglyph" flat mode.
 * `debug`: (Optional) When set, logs diagnostic information to the console and displays the wireframe of the 3D geometry.
 
+## Pictures from other sites
+
+A picture can come from another site than the page, like with `<img>`. But unlike `<img>`, the component has to read the pixels of the picture, which browsers only allow when the server of the picture agrees. That server must send this header with the picture:
+
+```
+Access-Control-Allow-Origin: *
+```
+
+(or the origin of your page instead of `*`). Without it, nothing is displayed and the reason is logged in the console.
+
 ## Compatibility
 
 ### Supported cameras
