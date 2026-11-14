@@ -266,7 +266,7 @@ class StereoImg extends HTMLElement {
       return parseVR(src, { signal });
     }
 
-    if (type === 'left-right' || type === 'right-left' || type === 'bottom-top' || type === 'top-bottom') {
+    if (['left-right', 'right-left', 'bottom-top', 'top-bottom', 'interlaced', 'interlaced-reverse', 'column-interlaced', 'column-interlaced-reverse'].includes(type)) {
       const { parseStereo } = await import('./parsers/stereo-parser/stereo-parser.js');
       return parseStereo(src, { type, angle, projection, signal });
     }

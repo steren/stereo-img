@@ -38,13 +38,17 @@ npm install stereo-img
   - `right-left`: left eye on the right, right eye on the left, Exif angle of view is used if present.
   - `top-bottom`: left eye on the top, right eye on the bottom, Exif angle of view is used if present.
   - `bottom-top`: left eye on the bottom, right eye on the top, Exif angle of view is used if present.
+  - `interlaced`: rows alternate between the eyes, the first row being for the left eye.
+  - `interlaced-reverse`: rows alternate between the eyes, the first row being for the right eye.
+  - `column-interlaced`: columns alternate between the eyes, the first column being for the left eye.
+  - `column-interlaced-reverse`: columns alternate between the eyes, the first column being for the right eye.
   - `pair`: separate files for left and right image. Left eye image read from `src` attribute, right eye image read from attribute `src-right`. Adding the `src-right` attribute will enable the `pair` type without the need to use the `type` attribute.
   - `mpo`: [Multi-Picture Format](https://en.wikipedia.org/wiki/JPEG#JPEG_Multi-Picture_Format) file of a stereo camera, holding the left and right pictures. Files ending with `.mpo` are detected without the `type` attribute.
   - `lif`: Leia Image Format, the pictures of the Lume Pad tablets. They are detected without the `type` attribute.
   - `anaglyph`: [Anaglyph 3D](https://en.wikipedia.org/wiki/Anaglyph_3D) - currently only supporting red / green
   - `depth`: Picture with depth map (e.g. portrait mode on Google Camera)
   - `mono`: A regular, non-stereo picture. The same image is displayed on both eyes.
-* `angle`: (Optional) hint at angle of view for `left-right`, `top-bottom`, `pair` or `anaglyph` types
+* `angle`: (Optional) hint at angle of view for `left-right`, `top-bottom`, `interlaced`, `pair` or `anaglyph` types
   - If unset, Exif angle of view is used if present.
   - `DEGREE`: any degree number between 0 and 360
   - `180`: Half sphere (VR180)
