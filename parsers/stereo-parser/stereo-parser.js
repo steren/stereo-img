@@ -16,9 +16,9 @@ import exifr from './../../vendor/exifr/full.esm.js';
 
 /**
  * fetch the image from URL
- * return left and right eye images from either left / right, right / left, top / bottom, bottom / top. 
+ * return left and right eye images from either left / right, right / left, top / bottom, bottom / top, or interlaced.
  * @Param {string} url - image url
- * @Param {Object} (options) - Parsing options: type: 'left-right' (default), 'right-left' or 'top-bottom', angle: '180' or '360', signal: AbortSignal to cancel the parsing
+ * @Param {Object} (options) - Parsing options: type: 'left-right' (default), 'right-left', 'top-bottom', 'bottom-top', 'interlaced', 'interlaced-reverse', 'column-interlaced' or 'column-interlaced-reverse', angle: '180' or '360', signal: AbortSignal to cancel the parsing
  * */
 async function parseStereo(url, options) {
   return parseStereoPair(url, null, options);
@@ -233,6 +233,14 @@ async function parseStereoPair(url, secondaryURL, options) {
       leftEye =  ctx.getImageData(0, 0, width, height);
       rightEye = secondaryCtx.getImageData(0, 0, secondaryWidth, secondaryHeight);
       break;
+    case 'interlaced':
+    case 'interlaced-reverse':
+    case 'column-interlaced':
+    case 'column-interlaced-reverse': {
+      const views = deinterlace(ctx.getImageData(0, 0, width, height), type.startsWith('column'));
+      [leftEye, rightEye] = type.endsWith('reverse') ? views.reverse() : views;
+      break;
+    }
   }
   
   // The angles of view apply to what one eye sees, so they depend on the size
@@ -307,6 +315,41 @@ async function parseStereoPair(url, secondaryURL, options) {
 
 
   return {leftEye, rightEye, phiLength, thetaStart, thetaLength, projection};
+}
+
+/**
+ * Separate the two pictures of an interlaced one, where the lines of both pictures alternate.
+ * Each picture keeps the size of the interlaced one: its lines are doubled.
+ * @param {ImageData} imageData - the interlaced picture
+ * @param {boolean} byColumns - true if columns alternate, false if rows alternate
+ * @returns {Array<ImageData>} the picture made of the first, third, fifth... lines, then the one made of the others
+ */
+function deinterlace(imageData, byColumns) {
+  const { width, height } = imageData;
+  const source = new Uint32Array(imageData.data.buffer, imageData.data.byteOffset, width * height);
+  const count = byColumns ? width : height;
+
+  return [0, 1].map(parity => {
+    const pixels = new Uint32Array(width * height);
+    for (let line = 0; line < count; line++) {
+      // the closest line of this picture: itself, or the neighbour it is doubled from
+      let from = line - (line % 2) + parity;
+      if (from >= count) {
+        from -= 2;
+      }
+      if (from < 0) {
+        from = line;
+      }
+      if (byColumns) {
+        for (let y = 0; y < height; y++) {
+          pixels[y * width + line] = source[y * width + from];
+        }
+      } else {
+        pixels.set(source.subarray(from * width, (from + 1) * width), line * width);
+      }
+    }
+    return new ImageData(new Uint8ClampedArray(pixels.buffer), width, height);
+  });
 }
 
 async function createImageFromURL(url, signal) {
