@@ -1,10 +1,9 @@
 import { expect } from '@esm-bundle/chai';
-import { XRDevice, metaQuest3 } from 'iwer';
+import { installFakeHeadset } from './helpers/fake-headset.js';
 import '../../stereo-img.js';
 
-// There is no VR headset here: emulate one, with its two controllers.
-const xrDevice = new XRDevice(metaQuest3);
-xrDevice.installRuntime({ forceInstall: true });
+// There is no VR headset here: imitate one, with its two controllers.
+const headset = installFakeHeadset();
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -46,8 +45,6 @@ describe('stereo-img with the controllers of a headset', function () {
   async function enterVR() {
     vrButton(element).click();
     await waitFor(() => isPresenting(element), 'the VR session');
-    // the headset tells about its controllers on its first frames
-    await waitFor(() => element.renderer.xr.getSession().inputSources.length === 2, 'the controllers');
   }
 
   async function exitVR() {
@@ -64,22 +61,22 @@ describe('stereo-img with the controllers of a headset', function () {
 
   /** Press and release the trigger of a controller. */
   async function pullTrigger(hand) {
-    xrDevice.controllers[hand].updateButtonValue('trigger', 1);
+    headset.controllers[hand].press();
     await frames();
-    xrDevice.controllers[hand].updateButtonValue('trigger', 0);
+    headset.controllers[hand].release();
     await frames();
   }
 
   /** Put the thumbstick of a controller at a position. */
   async function moveThumbstick(hand, x, y = 0) {
-    xrDevice.controllers[hand].updateAxes('thumbstick', x, y);
+    headset.controllers[hand].moveThumbstick(x, y);
     await frames();
   }
 
   afterEach(async () => {
     for (const hand of ['left', 'right']) {
-      xrDevice.controllers[hand].updateAxes('thumbstick', 0, 0);
-      xrDevice.controllers[hand].updateButtonValue('trigger', 0);
+      headset.controllers[hand].moveThumbstick(0, 0);
+      headset.controllers[hand].release();
     }
     if (element) {
       if (isPresenting(element)) {
@@ -112,18 +109,18 @@ describe('stereo-img with the controllers of a headset', function () {
 
   it('asks with a pinch of the fingers, when the headset follows the hands', async () => {
     await createElement();
-    xrDevice.primaryInputMode = 'hand';
+    headset.input = 'hands';
     try {
       await enterVR();
 
       for (const hand of ['right', 'left']) {
-        xrDevice.hands[hand].updatePinchValue(1);
+        headset.hands[hand].press();
         await frames();
-        xrDevice.hands[hand].updatePinchValue(0);
+        headset.hands[hand].release();
         await frames();
       }
     } finally {
-      xrDevice.primaryInputMode = 'controller';
+      headset.input = 'controllers';
     }
 
     expect(events).to.deep.equal([['next', 'select', 'right'], ['previous', 'select', 'left']]);
@@ -203,11 +200,11 @@ describe('stereo-img with the controllers of a headset', function () {
   it('asks for nothing outside of VR', async () => {
     await createElement();
 
-    xrDevice.controllers.right.updateAxes('thumbstick', 1, 0);
-    xrDevice.controllers.right.updateButtonValue('trigger', 1);
+    headset.controllers.right.moveThumbstick(1, 0);
+    headset.controllers.right.press();
     await wait(100);
-    xrDevice.controllers.right.updateButtonValue('trigger', 0);
-    xrDevice.controllers.right.updateAxes('thumbstick', 0, 0);
+    headset.controllers.right.release();
+    headset.controllers.right.moveThumbstick(0, 0);
     await wait(100);
 
     expect(events).to.deep.equal([]);

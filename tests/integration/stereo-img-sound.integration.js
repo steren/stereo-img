@@ -1,11 +1,10 @@
 import { expect } from '@esm-bundle/chai';
-import { XRDevice, metaQuest3 } from 'iwer';
+import { installFakeHeadset } from './helpers/fake-headset.js';
 import { parseVR } from '../../parsers/vr-parser/vr-parser.js';
 import '../../stereo-img.js';
 
-// There is no VR headset here: emulate one.
-const xrDevice = new XRDevice(metaQuest3);
-xrDevice.installRuntime({ forceInstall: true });
+// There is no VR headset here: imitate one.
+installFakeHeadset();
 
 // A panorama taken with Google Camera, with the sound recorded while taking it.
 const WITH_SOUND = '/examples/pixel3xl.PANO.jpg';
