@@ -111,6 +111,8 @@ function mayHaveMultiPictureIndex(bytes) {
 
 // Distance between the viewer and the picture, in the 3D scene.
 const PICTURE_DISTANCE = 10;
+// How far in front of the viewer the sign that a picture is loading is.
+const LOADING_INDICATOR_DISTANCE = 1;
 // What surrounds the picture is drawn on a sphere this far from the viewer.
 const SURROUNDINGS_RADIUS = 1000;
 // What surrounds the picture takes the colours of its edges, dimmed to leave the picture in front.
@@ -718,6 +720,49 @@ class StereoImg extends HTMLElement {
   }
 
   /**
+   * In VR, keep the viewer in the middle of the picture, wherever their head is in the room.
+   *
+   * A stereo picture is what two eyes saw from one place. Seen from anywhere else it is distorted: the middle of what it is
+   * drawn on has to be where the head is, and to stay there when the head moves. Only turning the head changes the view.
+   *
+   * A picture with a depth map is different: it has relief, and moving the head shows its sides. It is placed once,
+   * in front of where the viewer is, and stays there.
+   * @param {XRFrame} frame - The frame being drawn.
+   * @private
+   */
+  _followViewer(frame) {
+    const referenceSpace = this.renderer.xr.getReferenceSpace();
+    const pose = referenceSpace && frame?.getViewerPose(referenceSpace);
+    if (!pose) {
+      // the headset does not know where it is, for now
+      return;
+    }
+    const head = pose.transform.position;
+
+    this.loadingIndicator.position.set(head.x, head.y, head.z - LOADING_INDICATOR_DISTANCE);
+
+    const group = this.stereoImageGroup;
+    if (!group) {
+      return;
+    }
+    const hasRelief = !!this.stereoData?.depth;
+    if (!hasRelief || this._placedGroup !== group) {
+      group.position.set(head.x, head.y, head.z);
+      this._placedGroup = group;
+    }
+  }
+
+  /**
+   * Out of VR, the picture is around the middle of the scene, where the camera of the element is.
+   * @private
+   */
+  _stopFollowingViewer() {
+    this._placedGroup = null;
+    this.stereoImageGroup?.position.set(0, 0, 0);
+    this.loadingIndicator.position.set(0, 0, -LOADING_INDICATOR_DISTANCE);
+  }
+
+  /**
    * In VR, look at the thumbsticks of the controllers: pushed to a side, they ask for the previous or the next picture.
    * @private
    */
@@ -971,7 +1016,7 @@ class StereoImg extends HTMLElement {
 
     const flatMode = this.getAttribute('flat');
 
-    const animation = () => {
+    const animation = (time, frame) => {
       if (this.loadingIndicator && this.loadingIndicator.visible) {
         this.loadingIndicator.rotation.y += 0.01;
         this.loadingIndicator.rotation.x += 0.01;
@@ -979,6 +1024,7 @@ class StereoImg extends HTMLElement {
 
       if (this.renderer.xr.isPresenting) {
         this._readThumbsticks();
+        this._followViewer(frame);
       }
 
       if (flatMode === 'wiggle') {
@@ -1215,7 +1261,7 @@ class StereoImg extends HTMLElement {
     const loaderGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
     const loaderMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true });
     this.loadingIndicator = new THREE.Mesh(loaderGeometry, loaderMaterial);
-    this.loadingIndicator.position.set(0, 0, -1);
+    this.loadingIndicator.position.set(0, 0, -LOADING_INDICATOR_DISTANCE);
     this.loadingIndicator.visible = false;
     this.loadingIndicator.layers.enable(1);
     this.loadingIndicator.layers.enable(2);
@@ -1316,6 +1362,8 @@ class StereoImg extends HTMLElement {
       if (canvas.parentNode !== this.shadowRoot) {
         this.shadowRoot.insertBefore(canvas, this.shadowRoot.querySelector('style').nextSibling);
       }
+      // The picture followed the viewer in the room: put it back.
+      this._stopFollowingViewer();
       // The headset changed the camera: go back to the view of the element.
       this.camera.fov = this._fovBeforeVR;
       this.camera.aspect = this.clientWidth / this.clientHeight;
