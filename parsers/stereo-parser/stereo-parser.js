@@ -28,8 +28,21 @@ const LARGEST_HORIZONTAL_OFFSET = 0.04;
  * fetch the image from URL
  * return left and right eye images from either left / right, right / left, top / bottom, bottom / top, or interlaced.
  * @Param {string} url - image url
- * @Param {Object} (options) - Parsing options: type: 'left-right' (default), 'right-left', 'top-bottom', 'bottom-top', 'interlaced', 'interlaced-reverse', 'column-interlaced' or 'column-interlaced-reverse', angle: '180' or '360', signal: AbortSignal to cancel the parsing
+ * @Param {Object} (options) - Parsing options: type: 'left-right' (default), 'right-left', 'top-bottom', 'bottom-top', 'interlaced', 'interlaced-reverse', 'column-interlaced' or 'column-interlaced-reverse', or 'half-left-right', 'half-right-left', 'half-top-bottom' or 'half-bottom-top' when the views are squeezed to half of their width, or height, angle: '180' or '360', signal: AbortSignal to cancel the parsing
  * */
+const HALF = 'half-';
+
+/**
+ * Tell the type of the views of a picture, and if they are squeezed to half of their size.
+ * @param {string} [type] - e.g. 'left-right' or 'half-left-right'
+ * @returns {{type: string|undefined, half: boolean}} e.g. 'left-right' and true for 'half-left-right'
+ */
+function halfType(type) {
+  const half = typeof type === 'string' && type.startsWith(HALF)
+    && ['left-right', 'right-left', 'top-bottom', 'bottom-top'].includes(type.slice(HALF.length));
+  return { type: half ? type.slice(HALF.length) : type, half };
+}
+
 async function parseStereo(url, options) {
   return parseStereoPair(url, null, options);
 }
@@ -40,7 +53,7 @@ async function parseStereo(url, options) {
  * return left and right eye images from either left / right, right / left, top / bottom, bottom / top, url / secondaryURL.
  * @Param {string} url - image url left, or combined left and right
  * @Param {string} secondaryURL - image url right, or null
- * @Param {Object} (options) - Parsing options: type: 'left-right' (default), 'right-left' or 'top-bottom', angle: '180' or '360', signal: AbortSignal to cancel the parsing, exif: metadata of the image, when already read, originalUrl: where the picture comes from, when url is a temporary copy of it
+ * @Param {Object} (options) - Parsing options: type: 'left-right' (default), 'right-left', 'top-bottom', or one of them prefixed by 'half-', angle: '180' or '360', signal: AbortSignal to cancel the parsing, exif: metadata of the image, when already read, originalUrl: where the picture comes from, when url is a temporary copy of it
  * */
 async function parseStereoPair(url, secondaryURL, options) {
   const signal = options?.signal;
@@ -91,7 +104,11 @@ async function parseStereoPair(url, secondaryURL, options) {
   const camera = findCamera(exif, options?.originalUrl || url);
 
   // Images
-  const type = cameraType(camera, exif) || options.type || 'left-right';
+  // A "half-" type is the one of a picture whose views are squeezed to half of their size.
+  const requested = halfType(options?.type);
+  const cameraKnownType = cameraType(camera, exif);
+  const type = cameraKnownType || requested.type || 'left-right';
+  const half = !cameraKnownType && requested.half;
 
   // check if fisheye projection
   let projection;
@@ -254,11 +271,30 @@ async function parseStereoPair(url, secondaryURL, options) {
     }
   }
   
+  if (half && leftEye) {
+    // Each view was squeezed to half of its width, or of its height, to fit with the other in the picture.
+    const horizontally = type === 'left-right' || type === 'right-left';
+    leftEye = unsqueeze(leftEye, horizontally);
+    rightEye = unsqueeze(rightEye, horizontally);
+  }
+
   // The angles of view apply to what one eye sees, so they depend on the size
   // of one eye's image, not of the whole picture.
   const eyeWidth = leftEye ? leftEye.width : width / 2;
   const eyeHeight = leftEye ? leftEye.height : height;
+  const angles = anglesOfView(eyeWidth, eyeHeight, { angle: options?.angle, projection, exif, camera });
 
+  return {leftEye, rightEye, ...angles, projection};
+}
+
+/**
+ * The angles of view of the picture of one eye, for the sphere or plane it is drawn on.
+ * @param {number} eyeWidth - width of the picture of one eye, in pixels
+ * @param {number} eyeHeight - height of the picture of one eye, in pixels
+ * @param {Object} [options] - angle: the "angle" attribute, projection: 'fisheye' when the picture is, exif: metadata of the picture, camera: what cameras.js knows about the camera
+ * @returns {{phiLength: number, thetaStart: number, thetaLength: number}} horizontal angle, and where the vertical one starts and its length, in radians
+ */
+function anglesOfView(eyeWidth, eyeHeight, { angle, projection, exif, camera } = {}) {
   let angleOfViewFocalLengthIn35mmFormat = function(focalLengthIn35mmFormat) {
     // https://en.wikipedia.org/wiki/Angle_of_view#Common_lens_angles_of_view
     // https://en.wikipedia.org/wiki/35_mm_equivalent_focal_length
@@ -277,11 +313,11 @@ async function parseStereoPair(url, secondaryURL, options) {
   let phiLength;
   let thetaLength;
 
-  if(options?.angle === "180" || options?.angle === 180) {
+  if(angle === "180" || angle === 180) {
     phiLength = Math.PI;
     thetaLength = Math.PI;
 
-  } else if(options?.angle === "360" || options?.angle === 360) {
+  } else if(angle === "360" || angle === 360) {
     phiLength = Math.PI * 2;
     thetaLength = Math.PI;
 
@@ -290,16 +326,16 @@ async function parseStereoPair(url, secondaryURL, options) {
     phiLength = Math.PI;
     thetaLength = Math.PI;
 
-  } else if(options?.angle > 0 && options?.angle <= 360) {
+  } else if(angle > 0 && angle <= 360) {
     // An angle set explicitly takes precedence over what is inferred from the image metadata.
-    const angle = options?.angle * Math.PI/180.0;
-    phiLength = angle;
-    thetaLength = angle * eyeHeight/eyeWidth;
+    const radians = angle * Math.PI/180.0;
+    phiLength = radians;
+    thetaLength = radians * eyeHeight/eyeWidth;
 
   } else if(exif?.FocalLengthIn35mmFormat) {
-    const angle = angleOfViewFocalLengthIn35mmFormat(exif.FocalLengthIn35mmFormat);
-    phiLength = angle.horizontalAngle;
-    thetaLength = angle.verticalAngle;
+    const angles = angleOfViewFocalLengthIn35mmFormat(exif.FocalLengthIn35mmFormat);
+    phiLength = angles.horizontalAngle;
+    thetaLength = angles.verticalAngle;
 
   } else if(camera?.angle) {
     phiLength = camera.angle.horizontal * Math.PI / 180;
@@ -307,15 +343,43 @@ async function parseStereoPair(url, secondaryURL, options) {
 
   } else {
     const assumeFocalLengthIn35mmFormat = 27;
-    const angle = angleOfViewFocalLengthIn35mmFormat(assumeFocalLengthIn35mmFormat);
-    phiLength = angle.horizontalAngle;
-    thetaLength = angle.verticalAngle;
+    const angles = angleOfViewFocalLengthIn35mmFormat(assumeFocalLengthIn35mmFormat);
+    phiLength = angles.horizontalAngle;
+    thetaLength = angles.verticalAngle;
   }
 
   const thetaStart = Math.PI / 2 - thetaLength / 2;
 
+  return {phiLength, thetaStart, thetaLength};
+}
 
-  return {leftEye, rightEye, phiLength, thetaStart, thetaLength, projection};
+/**
+ * Give its proportions back to the picture of one eye of a "half" side by side, or top and bottom, picture:
+ * each of its columns, or rows, is doubled.
+ * @param {ImageData} imageData - the squeezed picture
+ * @param {boolean} horizontally - true to double its width, false to double its height
+ * @returns {ImageData} the picture, twice as wide or twice as high
+ */
+function unsqueeze(imageData, horizontally) {
+  const { width, height } = imageData;
+  const source = new Uint32Array(imageData.data.buffer, imageData.data.byteOffset, width * height);
+  const newWidth = horizontally ? width * 2 : width;
+  const newHeight = horizontally ? height : height * 2;
+  const pixels = new Uint32Array(newWidth * newHeight);
+  for (let y = 0; y < height; y++) {
+    const row = source.subarray(y * width, (y + 1) * width);
+    if (horizontally) {
+      const start = y * newWidth;
+      for (let x = 0; x < width; x++) {
+        pixels[start + 2 * x] = row[x];
+        pixels[start + 2 * x + 1] = row[x];
+      }
+    } else {
+      pixels.set(row, 2 * y * width);
+      pixels.set(row, (2 * y + 1) * width);
+    }
+  }
+  return new ImageData(new Uint8ClampedArray(pixels.buffer), newWidth, newHeight);
 }
 
 /**
@@ -377,4 +441,4 @@ async function createImageFromURL(url, signal) {
   });
 }
 
-export {parseStereo, parseStereoPair}
+export {parseStereo, parseStereoPair, anglesOfView, halfType}

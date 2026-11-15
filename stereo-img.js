@@ -109,6 +109,42 @@ function mayHaveMultiPictureIndex(bytes) {
   return false;
 }
 
+/**
+ * Quickly tell if a file is in the HEIF format (as HEIC pictures), from the type of its first box.
+ * @param {Uint8Array} bytes - The content of the file.
+ * @returns {boolean}
+ */
+function isHeif(bytes) {
+  return bytes.length >= 12 && String.fromCharCode(bytes[4], bytes[5], bytes[6], bytes[7]) === 'ftyp';
+}
+
+/**
+ * Tell from the name of a file if it is a side by side, or top and bottom, picture whose views are squeezed
+ * to half of their size: "HSBS" or "half-SBS", "HOU", "HTAB" or "half-OU" in the name.
+ * @param {string} src - The URL of the picture.
+ * @returns {string|undefined} - 'half-left-right', 'half-top-bottom' or undefined.
+ */
+function halfTypeOfName(src) {
+  let name = src.split(/[?#]/)[0].split('/').pop() || '';
+  try {
+    name = decodeURIComponent(name);
+  } catch (e) {
+    // keep it encoded
+  }
+  // the words of the name, split on anything but letters and digits, with "half" joined to the next one
+  const words = name.toLowerCase().replace(/half[^a-z0-9]*/g, 'h').split(/[^a-z0-9]+/);
+  if (words.includes('hsbs')) {
+    return 'half-left-right';
+  }
+  if (words.some(word => ['hou', 'htab', 'htb'].includes(word))) {
+    return 'half-top-bottom';
+  }
+}
+
+// Types of the pictures read by the stereo parser.
+const STEREO_TYPES = ['left-right', 'right-left', 'bottom-top', 'top-bottom', 'interlaced', 'interlaced-reverse', 'column-interlaced', 'column-interlaced-reverse',
+  'half-left-right', 'half-right-left', 'half-top-bottom', 'half-bottom-top'];
+
 // Distance between the viewer and the picture, in the 3D scene.
 const PICTURE_DISTANCE = 10;
 // How many elements that start on interaction can be started at the same time on a page: the others show a still.
@@ -639,7 +675,7 @@ class StereoImg extends HTMLElement {
       return this._parseVR(picture, signal);
     }
 
-    if (['left-right', 'right-left', 'bottom-top', 'top-bottom', 'interlaced', 'interlaced-reverse', 'column-interlaced', 'column-interlaced-reverse'].includes(type)) {
+    if (STEREO_TYPES.includes(type)) {
       const { parseStereo } = await import('./parsers/stereo-parser/stereo-parser.js');
       return parseStereo(url, { ...stereoOptions, type });
     }
@@ -663,6 +699,11 @@ class StereoImg extends HTMLElement {
     if (type === 'lif') {
       const { parseLIF } = await import('./parsers/lif-parser/lif-parser.js');
       return parseLIF(url, { angle, projection, signal });
+    }
+
+    if (type === 'heic') {
+      const { parseHEIC } = await import('./parsers/heic-parser/heic-parser.js');
+      return parseHEIC(url, { angle, projection, signal });
     }
 
     if (type === 'mpo') {
@@ -702,6 +743,14 @@ class StereoImg extends HTMLElement {
       }
     }
 
+    // HEIC: Apple Vision Pro and iPhone spatial photos. Most browsers cannot display them by themselves.
+    if (isHeif(bytes)) {
+      const { parseHEIC, readHeic } = await import('./parsers/heic-parser/heic-parser.js');
+      if (readHeic(bytes)) {
+        return parseHEIC(url, { angle, projection, signal });
+      }
+    }
+
     // try to read XMP metadata to see if VR Photo, otherwise assume stereo-style (e.g. "left right")
     const exif = await readMetadata(bytes);
     signal?.throwIfAborted();
@@ -715,6 +764,15 @@ class StereoImg extends HTMLElement {
     if (exif?.GImage?.Data) {
       // GImage XMP for left eye found, assume VR Photo
       return this._parseVR(picture, signal, exif);
+    }
+
+    // Side by side, or top and bottom, pictures whose views are squeezed to half of their size cannot be told apart
+    // from the others. Their file name usually says it, as "_HSBS" in the ones of Spatialify.
+    const squeezed = halfTypeOfName(src);
+    if (squeezed) {
+      console.info(`<stereo-img> does not have a "type" attribute. From its file name, the picture seems to be "${squeezed}".`);
+      const { parseStereo } = await import('./parsers/stereo-parser/stereo-parser.js');
+      return parseStereo(url, { ...stereoOptions, type: squeezed });
     }
 
     // no left eye found, check if it is a stereo or mono image

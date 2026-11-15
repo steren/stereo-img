@@ -47,7 +47,8 @@ This component has been manually tested to load pictures taken with the followin
 | ✔️     | Panasonic DMC-GX8 with H-FT012 lens | MPO                 | (none)                                |  ✓           | X 
 | ✔️     | Leia Lume Pad 2                     | Leia Image Format   | (none)                                |  ✓           | X 
 | ✔️     | Leia Lume Pad 2                     | left-right          | (none)                                |  X           | X 
-| ❌     | Vision Pro                          |                     |                                       |              | 
+| ✔️     | Apple Vision Pro                    | HEIC                | (none)                                |  ✓           | X 
+| ✔️     | Spatialify (half side by side)      | half-left-right     | (none) if the file name has `HSBS`, otherwise `type="half-left-right"` |  X           | X 
 
 ### Supported viewers and headsets
 
@@ -83,8 +84,10 @@ This component has been manually tested on the following hardware, OS and browse
   - `interlaced-reverse`: rows alternate between the eyes, the first row being for the right eye.
   - `column-interlaced`: columns alternate between the eyes, the first column being for the left eye.
   - `column-interlaced-reverse`: columns alternate between the eyes, the first column being for the right eye.
+  - `half-left-right`, `half-right-left`, `half-top-bottom`, `half-bottom-top`: like `left-right`, `right-left`, `top-bottom` and `bottom-top`, for pictures whose two views were squeezed to half of their width (or height) to fit in the size of one, like the "Half SBS" pictures of Spatialify. Nothing in such a picture tells it apart from a regular one: without the `type` attribute, it is only detected when its file name has `HSBS` or `half-SBS` (side by side), or `HOU`, `HTAB` or `half-OU` (top and bottom).
   - `pair`: separate files for left and right image. Left eye image read from `src` attribute, right eye image read from attribute `src-right`. Adding the `src-right` attribute will enable the `pair` type without the need to use the `type` attribute.
   - `mpo`: [Multi-Picture Format](https://en.wikipedia.org/wiki/JPEG#JPEG_Multi-Picture_Format) file of a stereo camera, holding the left and right pictures. Files ending with `.mpo` are detected without the `type` attribute.
+  - `heic`: HEIC picture, like the spatial photos of the Apple Vision Pro and of iPhones, holding the left and right pictures. They are detected without the `type` attribute, and displayed in browsers that cannot display HEIC pictures: the decoder ([libheif](https://github.com/strukturag/libheif), about 1.4 MB) is only downloaded for them. A HEIC picture that is not stereoscopic is displayed as `mono`.
   - `lif`: Leia Image Format, the pictures of the Lume Pad tablets. They are detected without the `type` attribute.
   - `anaglyph`: [Anaglyph 3D](https://en.wikipedia.org/wiki/Anaglyph_3D). The colours of the picture are detected. To name them instead, use `anaglyph-red-cyan`, `anaglyph-red-green`, `anaglyph-red-blue`, `anaglyph-green-magenta` or `anaglyph-amber-blue`: the first colour is the one of the left eye.
   - `depth`: Picture with depth map (e.g. portrait or lens blur mode on Google Camera). Detected from the metadata of the picture.
