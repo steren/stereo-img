@@ -187,7 +187,7 @@ This component has been manually tested on the following hardware, OS and browse
 | Quest 1     |             | Default         | ✔️
 | Quest 2     |             | Default         | ✔️️
 | Quest 3     |             | Default         | ✔️️
-| Vision Pro  |             | Safari          | ❌ [#34](https://github.com/steren/stereo-img/issues/34)
+| Vision Pro  |             | Safari          | ✔️️ [to be confirmed](https://github.com/steren/stereo-img/issues/34)
 
 ## Installing using npm
 
