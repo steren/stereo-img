@@ -13,8 +13,16 @@
 // limitations under the License.
 
 import exifr from './../../vendor/exifr/full.esm.js';
-import { findCamera, cameraType, fisheyeCircleEdges } from './cameras.js';
+import { findCamera, cameraType, fisheyeCircleSquares } from './cameras.js';
 import { pixelReader } from './../../lib/pixels.js';
+import { verticalOffset } from './../../lib/verticalOffset.js';
+
+// What is compared of the two circles of a fisheye lens to tell how much lower one is, as shares of the diameter of a circle:
+// the middle of each circle, where things are at the same height for both eyes however close they are.
+const COMPARED_SHARE = 0.3;
+// The largest offsets that are looked for: vertically, between the circles, and horizontally, between what the two eyes see.
+const LARGEST_VERTICAL_OFFSET = 0.03;
+const LARGEST_HORIZONTAL_OFFSET = 0.04;
 
 /**
  * fetch the image from URL
@@ -107,12 +115,10 @@ async function parseStereoPair(url, secondaryURL, options) {
   let leftEye;
   let rightEye;
 
-  let top = 0;
-  let leftLeft = 0;
-  let leftRight = width / 2;
-  let bottom = height;
-  let rightRight = width;
-  let rightLeft = width / 2;
+  // Where the two views are, when they are side by side: the one on the left of the picture and the one on its right.
+  let leftPart = { x: 0, y: 0, width: width / 2, height };
+  let rightPart = { x: width / 2, y: 0, width: width / 2, height };
+  const readPart = part => read(part.x, part.y, part.width, part.height);
 
   // fisheye image might have black around image data, measure the actual top, left, bottom, right position of the fisheye circle
   // TODO: This assumes left-right or right-left. Make compatible with top-bottom and bottom-top.
@@ -120,10 +126,34 @@ async function parseStereoPair(url, secondaryURL, options) {
 
     if(camera?.fisheyeCircles) {
 
-      // The circles of this camera are always at the same place.
-      ({ top, bottom, leftLeft, leftRight, rightLeft, rightRight } = fisheyeCircleEdges(camera.fisheyeCircles, width, height));
+      // The circles of this camera are about at the same place in every picture.
+      const circles = camera.fisheyeCircles;
+      const expected = fisheyeCircleSquares(circles, width, height);
+
+      // One circle is a bit lower than the other, differently for each copy of a lens: enough to see double in a headset.
+      // What the two circles show tells by how much.
+      const middle = ({ x, y, size }) => {
+        const side = Math.round(size * COMPARED_SHARE);
+        const margin = Math.round((size - side) / 2);
+        return read(x + margin, y + margin, side, side);
+      };
+      const offset = verticalOffset(middle(expected.left), middle(expected.right), {
+        maxVertical: expected.left.size * LARGEST_VERTICAL_OFFSET,
+        maxHorizontal: expected.left.size * LARGEST_HORIZONTAL_OFFSET,
+      });
+
+      const squares = fisheyeCircleSquares(circles, width, height, offset);
+      leftPart = { x: squares.left.x, y: squares.left.y, width: squares.left.size, height: squares.left.size };
+      rightPart = { x: squares.right.x, y: squares.right.y, width: squares.right.size, height: squares.right.size };
 
     } else {
+      let top = 0;
+      let leftLeft = 0;
+      let leftRight = width / 2;
+      let bottom = height;
+      let rightRight = width;
+      let rightLeft = width / 2;
+
       // March from the edges and the middle to find hte actual edges of the fisheye image.
       // TODO: This is not a robust approach at all:
       // 1. centers are not necesserarlly at width / 4, top find the top, we should look for lines.
@@ -183,20 +213,23 @@ async function parseStereoPair(url, secondaryURL, options) {
           break;
         }
       }
+
+      leftPart = { x: leftLeft, y: top, width: leftRight - leftLeft, height: bottom - top };
+      rightPart = { x: rightLeft, y: top, width: rightRight - rightLeft, height: bottom - top };
     }
 
-    console.log({top, bottom, leftLeft, leftRight, rightLeft, rightRight});
+    console.log({ leftPart, rightPart });
   }
   
 
   switch(type) {
     case 'left-right':
-      leftEye =  read(leftLeft, top, leftRight - leftLeft, bottom - top);
-      rightEye = read(rightLeft, top, rightRight - rightLeft, bottom - top);
+      leftEye =  readPart(leftPart);
+      rightEye = readPart(rightPart);
       break;
     case 'right-left':
-      leftEye =  read(rightLeft, top, rightRight - rightLeft, bottom - top);
-      rightEye = read(leftLeft, top, leftRight - leftLeft, bottom - top);
+      leftEye =  readPart(rightPart);
+      rightEye = readPart(leftPart);
       break;
     case 'top-bottom':
       leftEye = read(0, 0, width, height / 2); 

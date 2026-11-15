@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CAMERAS, findCamera, cameraType, fisheyeCircleEdges } from '../../parsers/stereo-parser/cameras.js';
+import { CAMERAS, findCamera, cameraType, fisheyeCircleSquares } from '../../parsers/stereo-parser/cameras.js';
 
 const CANON = { Make: 'Canon', LensModel: 'RF5.2mm F2.8 L DUAL FISHEYE' };
 
@@ -22,15 +22,44 @@ test('pictures of the Canon dual fisheye lens are right-left, unless processed w
 test('places the fisheye circles of the Canon lens as on the reference picture', () => {
   const { fisheyeCircles } = findCamera(CANON, 'picture.jpg');
 
-  assert.deepStrictEqual(fisheyeCircleEdges(fisheyeCircles, 8192, 5464),
-    { top: 857, bottom: 4607, leftLeft: 105, leftRight: 3855, rightLeft: 4337, rightRight: 8087 });
+  assert.deepStrictEqual(fisheyeCircleSquares(fisheyeCircles, 8192, 5464), {
+    left: { x: 133, y: 882, size: 3700 },
+    right: { x: 4359, y: 882, size: 3700 },
+  });
 });
 
 test('scales the fisheye circles to the size of the picture', () => {
   const { fisheyeCircles } = findCamera(CANON, 'picture.jpg');
 
-  assert.deepStrictEqual(fisheyeCircleEdges(fisheyeCircles, 4096, 2732),
-    { top: 429, bottom: 2304, leftLeft: 53, leftRight: 1928, rightLeft: 2169, rightRight: 4044 });
+  assert.deepStrictEqual(fisheyeCircleSquares(fisheyeCircles, 4096, 2732), {
+    left: { x: 67, y: 441, size: 1850 },
+    right: { x: 2180, y: 441, size: 1850 },
+  });
+});
+
+test('keeps the fisheye circles round and in the middle of a picture of another shape', () => {
+  const { fisheyeCircles } = findCamera(CANON, 'picture.jpg');
+
+  // a frame of a video is less high than a photo
+  assert.deepStrictEqual(fisheyeCircleSquares(fisheyeCircles, 8192, 4320), {
+    left: { x: 133, y: 310, size: 3700 },
+    right: { x: 4359, y: 310, size: 3700 },
+  });
+});
+
+test('places a fisheye circle lower than the other one', () => {
+  const { fisheyeCircles } = findCamera(CANON, 'picture.jpg');
+
+  // the circle on the right is 18 pixels lower: each one takes half of it
+  assert.deepStrictEqual(fisheyeCircleSquares(fisheyeCircles, 8192, 5464, 18), {
+    left: { x: 133, y: 873, size: 3700 },
+    right: { x: 4359, y: 891, size: 3700 },
+  });
+  // and the other way round
+  assert.deepStrictEqual(fisheyeCircleSquares(fisheyeCircles, 8192, 5464, -32), {
+    left: { x: 133, y: 898, size: 3700 },
+    right: { x: 4359, y: 866, size: 3700 },
+  });
 });
 
 test('finds a GoPro from the metadata or from the file name', () => {
@@ -95,8 +124,8 @@ test('every camera of the list is well formed', () => {
       assert.ok(camera.angle.vertical > 0 && camera.angle.vertical <= 180);
     }
     if (camera.fisheyeCircles) {
-      const { width, height, diameter, leftCenter } = camera.fisheyeCircles;
-      assert.ok(diameter <= height && leftCenter - diameter / 2 >= 0 && leftCenter + diameter / 2 <= width / 2);
+      const { width, diameter, leftCenter } = camera.fisheyeCircles;
+      assert.ok(diameter > 0 && leftCenter - diameter / 2 >= 0 && leftCenter + diameter / 2 <= width / 2);
     }
   }
   assert.equal(new Set(CAMERAS.map(camera => camera.name)).size, CAMERAS.length);

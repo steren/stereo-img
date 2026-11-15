@@ -28,8 +28,10 @@
  *     Can be a function of the metadata, when it depends on how the picture was processed.
  * - angle: horizontal and vertical angles of view, in degrees. Used when the picture has no focal length.
  * - fisheyeCircles: for fisheye pictures, where the two circles are, as measured on a reference picture:
- *     width and height of that picture, diameter of a circle and horizontal position of the centre of the left one.
- *     Circles are vertically centred and placed symmetrically.
+ *     width of that picture, diameter of the circle that 180° cover and horizontal position of the centre of the left one.
+ *     The viewer displays these 180°, on half a sphere: what a lens sees beyond is left out.
+ *     It expects an equidistant fisheye, where the distance to the centre of the circle is proportional to the angle to the axis of the lens.
+ *     Circles are placed symmetrically, around the middle of the height.
  */
 const CAMERAS = [
   {
@@ -37,10 +39,13 @@ const CAMERAS = [
     exif: { Make: 'Canon', LensModel: 'RF5.2mm F2.8 L DUAL FISHEYE' },
     // Unprocessed pictures are right-left. Pictures processed with EOS VR Utility software are left-right.
     type: exif => exif.Software?.includes('EOS VR Utility') ? 'left-right' : 'right-left',
-    // TODO: This lens has a 190º angle of view, but the viewer doesn't support any other angle than 180 for fisheye.
+    // This lens has a 190º angle of view, of which the 180° in the middle are displayed.
     angle: { horizontal: 180, vertical: 180 },
-    // Measured on examples/canon-eos-r5-dual-fisheye.jpg
-    fisheyeCircles: { width: 8192, height: 5464, diameter: 3750, leftCenter: 1980 },
+    // The lens is equidistant, see https://paulbourke.net/stereoscopy/Canon_RF_dual_fisheye/
+    // Measured on examples/canon-eos-r5-dual-fisheye.jpg, by comparing it with what EOS VR Utility makes of it,
+    // which is examples/canon-eos-r5-dual-fisheye-processed.jpg: 180° cover 3700 pixels, so the 190° of the lens cover 3905.
+    // Centres are where both eyes see at the same place what is far away.
+    fisheyeCircles: { width: 8192, diameter: 3700, leftCenter: 1983 },
   },
   {
     name: 'GoPro',
@@ -102,20 +107,21 @@ function cameraType(camera, exif) {
  * @param {Object} circles - fisheyeCircles of the entry of the camera
  * @param {number} width - width of the picture
  * @param {number} height - height of the picture
- * @returns {{top: number, bottom: number, leftLeft: number, leftRight: number, rightLeft: number, rightRight: number}} the edges of both circles, in pixels
+ * @param {number} [verticalOffset] - how many pixels lower the circle on the right is than the one on the left.
+ *     It changes from one copy of a lens to another.
+ * @returns {{left: {x: number, y: number, size: number}, right: {x: number, y: number, size: number}}}
+ *     the square around each circle, in pixels: its left, its top and the length of its sides. It can go beyond the picture.
  */
-function fisheyeCircleEdges(circles, width, height) {
-  const radius = circles.diameter / 2;
-  const horizontal = position => Math.round(position * width / circles.width);
-  const vertical = position => Math.round(position * height / circles.height);
+function fisheyeCircleSquares(circles, width, height, verticalOffset = 0) {
+  // Circles are as large on a picture that is cropped, as a frame of a video is: only the width tells the scale.
+  const scale = width / circles.width;
+  const size = Math.round(circles.diameter * scale);
+  const leftCenter = circles.leftCenter * scale;
+  const square = (centerX, centerY) => ({ x: Math.round(centerX - size / 2), y: Math.round(centerY - size / 2), size });
   return {
-    top: vertical(circles.height / 2 - radius),
-    bottom: vertical(circles.height / 2 + radius),
-    leftLeft: horizontal(circles.leftCenter - radius),
-    leftRight: horizontal(circles.leftCenter + radius),
-    rightLeft: horizontal(circles.width - circles.leftCenter - radius),
-    rightRight: horizontal(circles.width - circles.leftCenter + radius),
+    left: square(leftCenter, height / 2 - verticalOffset / 2),
+    right: square(width - leftCenter, height / 2 + verticalOffset / 2),
   };
 }
 
-export { CAMERAS, findCamera, cameraType, fisheyeCircleEdges };
+export { CAMERAS, findCamera, cameraType, fisheyeCircleSquares };

@@ -802,10 +802,14 @@ class StereoImg extends HTMLElement {
         const y = normals[i * 3 + 1];
         const z = normals[i * 3 + 2];
 
-        // TODO: understand and check this line of math. It is taken from https://github.com/mrdoob/three.js/blob/f32e6f14046b5affabe35a0f42f0cad7b5f2470e/examples/webgl_panorama_dualfisheye.html
+        // An equidistant fisheye: the distance to the centre of the circle is proportional to the angle to the axis of the lens,
+        // which is the X axis here, and the edge of the circle is at 90°.
+        // The normal is the direction of the vertex: (z, y) is what it has across the axis, of length the sine of that angle.
+        // Dividing by that sine gives the direction in the picture, and multiplying by the angle, as a share of 90°, the distance to the centre.
+        // Lenses are close to it: see https://paulbourke.net/stereoscopy/Canon_RF_dual_fisheye/ for the Canon RF 5.2mm.
         var correction = (y == 0 && z == 0) ? 1 : (Math.acos(x) / Math.sqrt(y * y + z * z)) * (2 / Math.PI);
-        // We expect that the left/right eye images have already been cropped of any black border.
-        // Therefore, UVs expand the whole u and v axis 
+        // We expect that the left/right eye images have already been cropped to the circle that 180° cover.
+        // Therefore, UVs expand the whole u and v axis
         uvs[i * 2 + 0] = z * 0.5 * correction + 0.5;
         uvs[i * 2 + 1] = y * 0.5 * correction + 0.5;
       }
