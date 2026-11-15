@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CAMERAS, findCamera, cameraType, fisheyeCircleSquares } from '../../parsers/stereo-parser/cameras.js';
+import { CAMERAS, findCamera, cameraType, fisheyeCircleSquares, fisheyeCirclesFit } from '../../parsers/stereo-parser/cameras.js';
 
 const CANON = { Make: 'Canon', LensModel: 'RF5.2mm F2.8 L DUAL FISHEYE' };
 
@@ -129,4 +129,13 @@ test('every camera of the list is well formed', () => {
     }
   }
   assert.equal(new Set(CAMERAS.map(camera => camera.name)).size, CAMERAS.length);
+});
+
+test('the circles of the Canon lens do not fit in pictures much shorter than them', () => {
+  const { fisheyeCircles } = findCamera(CANON, 'picture.jpg');
+
+  assert.equal(fisheyeCirclesFit(fisheyeCircles, 8192, 5464), true);
+  assert.equal(fisheyeCirclesFit(fisheyeCircles, 8192, 4320), true);
+  assert.equal(fisheyeCirclesFit(fisheyeCircles, 32000, 64), false);
+  assert.equal(fisheyeCirclesFit(fisheyeCircles, 8192, 0), false);
 });

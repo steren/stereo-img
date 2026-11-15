@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import exifr from './../../vendor/exifr/full.esm.js';
-import { findCamera, cameraType, fisheyeCircleSquares } from './cameras.js';
+import { findCamera, cameraType, fisheyeCircleSquares, fisheyeCirclesFit } from './cameras.js';
 import { pixelReader } from './../../lib/pixels.js';
 import { verticalOffset } from './../../lib/verticalOffset.js';
 
@@ -124,7 +124,8 @@ async function parseStereoPair(url, secondaryURL, options) {
   // TODO: This assumes left-right or right-left. Make compatible with top-bottom and bottom-top.
   if(projection === 'fisheye') {
 
-    if(camera?.fisheyeCircles) {
+    // Only for pictures of a plausible size: the size of the circles comes from the width alone.
+    if(camera?.fisheyeCircles && fisheyeCirclesFit(camera.fisheyeCircles, width, height)) {
 
       // The circles of this camera are about at the same place in every picture.
       const circles = camera.fisheyeCircles;

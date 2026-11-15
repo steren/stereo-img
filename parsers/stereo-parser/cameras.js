@@ -124,4 +124,21 @@ function fisheyeCircleSquares(circles, width, height, verticalOffset = 0) {
   };
 }
 
-export { CAMERAS, findCamera, cameraType, fisheyeCircleSquares };
+// How much higher than a picture the circles of a camera can be. Pictures and frames of videos cut a bit of the top and bottom
+// of the circles. A picture much shorter than its circles is not from the camera, whatever its metadata say:
+// the squares around its circles would be many times larger than the picture.
+const LARGEST_CIRCLE_TO_HEIGHT = 1.5;
+
+/**
+ * Tell if the circles of a camera can be in a picture of that size.
+ * @param {Object} circles - fisheyeCircles of the entry of the camera
+ * @param {number} width - width of the picture
+ * @param {number} height - height of the picture
+ * @returns {boolean}
+ */
+function fisheyeCirclesFit(circles, width, height) {
+  const { size } = fisheyeCircleSquares(circles, width, height).left;
+  return width > 0 && height > 0 && size <= height * LARGEST_CIRCLE_TO_HEIGHT;
+}
+
+export { CAMERAS, findCamera, cameraType, fisheyeCircleSquares, fisheyeCirclesFit };

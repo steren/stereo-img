@@ -30,11 +30,14 @@ const MP_ENTRY_SIZE = 16;
 // Type of an image of the file, in the lower 24 bits of its attribute:
 // one of the views of a stereoscopic picture.
 const DISPARITY_IMAGE = 0x020002;
+// The most images read from an index: files of cameras hold a few of them.
+const MAX_IMAGES = 64;
 
 /**
  * Find the index of a Multi-Picture Format file.
  * @param {Uint8Array} bytes - content of the file
- * @returns {{start: number, littleEndian: boolean}|undefined} position of the header that the offsets of the index are relative to
+ * @returns {{start: number, end: number, littleEndian: boolean}|undefined} position of the header that the offsets of the index are relative to,
+ *     and of the end of the segment that holds the index
  */
 function findIndex(bytes) {
   if (bytes[0] !== 0xff || bytes[1] !== 0xd8) {
@@ -56,7 +59,7 @@ function findIndex(bytes) {
       if (byteOrder !== 'II' && byteOrder !== 'MM') {
         return;
       }
-      return { start, littleEndian: byteOrder === 'II' };
+      return { start, end: Math.min(position + 2 + length, bytes.length), littleEndian: byteOrder === 'II' };
     }
     position += 2 + length;
   }
@@ -72,12 +75,16 @@ function readMpoIndex(bytes) {
   if (!index) {
     return [];
   }
-  const { start, littleEndian } = index;
+  const { start, end, littleEndian } = index;
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const images = [];
   try {
+    // The whole index is in its segment: what points elsewhere is corrupt.
     const directory = start + view.getUint32(start + 4, littleEndian);
-    const count = view.getUint16(directory, littleEndian);
+    if (directory + 2 > end) {
+      return [];
+    }
+    const count = Math.min(view.getUint16(directory, littleEndian), Math.floor((end - directory - 2) / 12));
     for (let i = 0; i < count; i++) {
       const entry = directory + 2 + 12 * i;
       if (view.getUint16(entry, littleEndian) !== MP_ENTRY_TAG) {
@@ -85,7 +92,9 @@ function readMpoIndex(bytes) {
       }
       const length = view.getUint32(entry + 4, littleEndian);
       const entries = start + view.getUint32(entry + 8, littleEndian);
-      for (let j = 0; j < length / MP_ENTRY_SIZE; j++) {
+      const available = Math.max(0, Math.floor((end - entries) / MP_ENTRY_SIZE));
+      const imageCount = Math.min(Math.floor(length / MP_ENTRY_SIZE), available, MAX_IMAGES);
+      for (let j = 0; j < imageCount; j++) {
         const image = entries + MP_ENTRY_SIZE * j;
         const attribute = view.getUint32(image, littleEndian);
         const size = view.getUint32(image + 4, littleEndian);
@@ -97,6 +106,8 @@ function readMpoIndex(bytes) {
           images.push({ type: attribute & 0xffffff, offset, size });
         }
       }
+      // An index has one list of images: a repeated one is ignored.
+      break;
     }
   } catch (e) {
     // truncated index: keep what was read

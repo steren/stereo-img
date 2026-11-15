@@ -114,3 +114,28 @@ test('finds nothing in files that are not Multi-Picture Format', () => {
     assert.deepStrictEqual(readStereoPair(bytes), []);
   }
 });
+
+// Where the directory of the index of a file made by makeMpo is, in little endian.
+const DIRECTORY = 10 + 8;
+
+test('reads the list of images of an index once, even when it is repeated', () => {
+  const bytes = makeMpo([DISPARITY, DISPARITY]);
+  const view = new DataView(bytes.buffer);
+  // Every tag of the directory points to the list of images.
+  for (let i = 0; i < 3; i++) {
+    view.setUint16(DIRECTORY + 2 + 12 * i, 0xb002, true);
+    view.setUint32(DIRECTORY + 2 + 12 * i + 4, view.getUint32(DIRECTORY + 2 + 12 * 2 + 4, true), true);
+    view.setUint32(DIRECTORY + 2 + 12 * i + 8, view.getUint32(DIRECTORY + 2 + 12 * 2 + 8, true), true);
+  }
+
+  assert.equal(readMpoIndex(bytes).length, 2);
+});
+
+test('reads no image entry beyond the segment of the index', () => {
+  const bytes = makeMpo([DISPARITY, DISPARITY]);
+  const view = new DataView(bytes.buffer);
+  // The list of images claims to be huge.
+  view.setUint32(DIRECTORY + 2 + 12 * 2 + 4, 0xffffff00, true);
+
+  assert.equal(readMpoIndex(bytes).length, 2);
+});
