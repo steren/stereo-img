@@ -14,10 +14,8 @@
 
 import exifr from './vendor/exifr/full.esm.js';
 
-import * as THREE from './vendor/three/three.module.js';
 import { VRButton } from './lib/VRButton.js';
 import { LookControls } from './lib/LookControls.js';
-import { AnaglyphEffect } from './lib/AnaglyphEffect.js';
 import { flatModeButton } from './lib/flatModeButton.js';
 import { soundButton } from './lib/soundButton.js';
 import { loadingHints } from './lib/https.js';
@@ -25,6 +23,35 @@ import { Picture } from './lib/picture.js';
 import { edgeColors } from './lib/edgeColors.js';
 import { tilePadding, planTiles, pickTriangles, tileUvs, cropPixels } from './lib/tiles.js';
 import { directionOfSelect, directionOfThumbstick } from './lib/xrInput.js';
+
+// three.js is most of what the element downloads. It is not imported with the rest: the element is defined,
+// and downloads its picture, without waiting for it. Nothing uses these before loadThree() is done.
+let THREE;
+let AnaglyphEffect;
+let threeLoading = null;
+
+/**
+ * Load three.js, once for all the elements. Called again after a failure, it tries again.
+ * @returns {Promise<void>}
+ */
+function loadThree() {
+  threeLoading ||= Promise.all([
+    import('./vendor/three/three.module.js'),
+    import('./lib/AnaglyphEffect.js'),
+  ]).then(([three, anaglyph]) => {
+    THREE = three;
+    AnaglyphEffect = anaglyph.AnaglyphEffect;
+  }, error => {
+    threeLoading = null;
+    throw error;
+  });
+  return threeLoading;
+}
+
+// Every element needs it: start now, as soon as the script runs.
+loadThree().catch(() => {
+  // reported by the elements that need it
+});
 
 
 /**
@@ -512,7 +539,7 @@ class StereoImg extends HTMLElement {
       return;
     }
     // The element that draws stills loads when it is told to.
-    if (!this.renderer || this._drawsOnDemand) {
+    if (!this._initialized || this._drawsOnDemand) {
       return;
     }
 
@@ -523,8 +550,16 @@ class StereoImg extends HTMLElement {
       case 'angle':
       case 'projection':
       case 'debug':
+        // The picture is parsed while three.js loads: a change cannot wait for the renderer.
         this._scheduleRenderUpdate();
-        break;
+        return;
+    }
+    // The others are read when the renderer is made.
+    if (!this.renderer) {
+      return;
+    }
+
+    switch (name) {
       case 'flat':
         this.updateflatMode();
         break;
@@ -1281,8 +1316,9 @@ class StereoImg extends HTMLElement {
   }
 
   updateflatMode() {
-    if (!this.isConnected) {
-      // Nothing to render while out of the document. connectedCallback calls this again.
+    if (!this.isConnected || !this.renderer) {
+      // Nothing to render while out of the document, or before three.js has loaded.
+      // connectedCallback, and the display of the picture, call this again.
       return;
     }
 
@@ -1393,7 +1429,8 @@ class StereoImg extends HTMLElement {
     const previous = this._displaying;
     const display = (async () => {
       await previous;
-      if (signal.aborted) {
+      if (signal.aborted || !this.renderer) {
+        // Cancelled, or three.js could not be loaded: nothing can be displayed.
         return;
       }
       try {
@@ -1531,7 +1568,8 @@ class StereoImg extends HTMLElement {
     const loaderMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true });
     this.loadingIndicator = new THREE.Mesh(loaderGeometry, loaderMaterial);
     this.loadingIndicator.position.set(0, 0, -LOADING_INDICATOR_DISTANCE);
-    this.loadingIndicator.visible = false;
+    // The picture may already be loading: it started before three.js was there.
+    this.loadingIndicator.visible = !!this._loadController;
     this.loadingIndicator.layers.enable(1);
     this.loadingIndicator.layers.enable(2);
     this.scene.add(this.loadingIndicator);
@@ -1556,6 +1594,38 @@ class StereoImg extends HTMLElement {
 
     this._giveHeight();
 
+    // Download and parse the picture while three.js loads: both take long, and parsing does not need it.
+    // Displaying the picture waits for the renderer.
+    // Once three.js is there, as for the elements added after the first ones, the renderer is made right away.
+    const settingUp = THREE ? Promise.resolve(this._makeRenderer()) : this._loadThreeAndMakeRenderer();
+    this._displaying = settingUp.catch(() => {});
+    const loading = this.parseImageAndInitialize3DScene();
+    try {
+      await settingUp;
+    } finally {
+      await loading;
+    }
+  }
+
+  /**
+   * Load three.js, then make the renderer.
+   * @private
+   */
+  async _loadThreeAndMakeRenderer() {
+    try {
+      await loadThree();
+    } catch (error) {
+      console.error('<stereo-img> could not load three.js, which it needs to display pictures.', error);
+      throw error;
+    }
+    this._makeRenderer();
+  }
+
+  /**
+   * Make the renderer, the scene, the camera and the controls. three.js must be loaded.
+   * @private
+   */
+  _makeRenderer() {
     this.renderer = new THREE.WebGLRenderer();
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.xr.enabled = true;
@@ -1637,9 +1707,11 @@ class StereoImg extends HTMLElement {
     // Listen for component resize
     this._resizeObserver = new ResizeObserver(() => this._resize());
 
-    this._resizeObserver.observe(this);
-
-    await this.parseImageAndInitialize3DScene();
+    if (this.isConnected) {
+      this._resizeObserver.observe(this);
+    }
+    // the size may have changed while three.js loaded
+    this._resize();
   }
 
   /**
@@ -2019,7 +2091,8 @@ class StereoImg extends HTMLElement {
   connectedCallback() {
     if (this._initialized) {
       // Back in the document (for example after being moved): resume what disconnectedCallback paused.
-      this._resizeObserver.observe(this);
+      // Before three.js has loaded, there is neither: init observes and renders once it is there.
+      this._resizeObserver?.observe(this);
       this.updateflatMode();
       return;
     }
