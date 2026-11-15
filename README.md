@@ -48,6 +48,7 @@ This component has been manually tested to load pictures taken with the followin
 | ✔️     | Leia Lume Pad 2                     | Leia Image Format   | (none)                                |  ✓           | X 
 | ✔️     | Leia Lume Pad 2                     | left-right          | (none)                                |  X           | X 
 | ✔️     | Apple Vision Pro                    | HEIC                | (none)                                |  ✓           | X 
+| ✔️     | iPhone 17 Pro spatial photo         | HEIC                | (none)                                |  ✓           | X 
 | ✔️     | Spatialify (half side by side)      | half-left-right     | (none) if the file name has `HSBS`, otherwise `type="half-left-right"` |  X           | X 
 
 ### Supported viewers and headsets

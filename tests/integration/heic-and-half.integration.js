@@ -53,6 +53,17 @@ describe('HEIC Parser', function () {
     expect(result.phiLength * 180 / Math.PI).to.be.within(60, 90);
   });
 
+  it('decodes the stereo pair of an iPhone spatial photo, not its primary picture', async () => {
+    // The file also holds a 5712 by 4284 picture, the one displayed by other apps. The left view is its third picture.
+    const result = await parseHEIC('/examples/iphone-spatial.HEIC');
+    expect([result.leftEye.width, result.leftEye.height]).to.deep.equal([2688, 2016]);
+    expect([result.rightEye.width, result.rightEye.height]).to.deep.equal([2688, 2016]);
+    const views = difference(result.leftEye, result.rightEye);
+    expect(views).to.be.above(0.5);
+    expect(views).to.be.below(60);
+    expect(result.phiLength / result.thetaLength).to.be.closeTo(4 / 3, 0.05);
+  });
+
   it('is detected without the "type" attribute', async () => {
     const element = document.createElement('stereo-img');
     element.setAttribute('src', VISION_PRO);

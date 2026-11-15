@@ -50,6 +50,10 @@ Apple Vision Pro
 
 * [`vision-pro.HEIC`](vision-pro.HEIC): personal picture taken using Apple Vision Pro camera (Donated by [Cyril Dorsaz](https://twitter.com/cyrildorsaz))
 
+Apple iPhone
+
+* [`iphone-spatial.HEIC`](iphone-spatial.HEIC): spatial photo taken using an iPhone 17 Pro (Donated by [Cyril Dorsaz](https://twitter.com/cyrildorsaz))
+
 iPhone with [Spatialify](https://apps.apple.com/us/app/spatialify/id6471922894)
 
 * [`spatialify-iphone_HSBS.jpg`](spatialify-iphone_HSBS.jpg): picture taken with the spatial photo capture mode of Spatialify on iPhone, exported as half side by side (Donated by [Josh3DIRL](https://github.com/Josh3DIRL) in [this issue](https://github.com/steren/stereo-img/issues/33)). Originally named `1704619673618_HSBS.jpg`.
