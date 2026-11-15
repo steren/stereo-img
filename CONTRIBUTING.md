@@ -30,25 +30,34 @@ To update the [npm package](https://www.npmjs.com/package/stereo-img)
 
 Run the following:
 
-* `npm test`
-* `npm run test:integration`
 * `npm version minor`
 * `git push --follow-tags`
 
-Then a [GitHub Action](https://github.com/steren/stereo-img/blob/main/.github/workflows/release.yml) automatically publishes to npm.
+Then create a GitHub release for the tag you just pushed, either from the
+[releases page](https://github.com/steren/stereo-img/releases/new) or with:
 
-## Contributor License Agreement
+* `gh release create "v$(node -p "require('./package.json').version")" --generate-notes`
 
-Contributions to this project must be accompanied by a Contributor License
-Agreement (CLA). You (or your employer) retain the copyright to your
-contribution; this simply gives us permission to use and redistribute your
-contributions as part of the project. Head over to
-<https://cla.developers.google.com/> to see your current agreements on file or
-to sign a new one.
+Creating the release is what triggers the
+[GitHub Action](https://github.com/steren/stereo-img/blob/main/.github/workflows/npm-publish.yml)
+that publishes to npm. Pushing the tag on its own does not publish anything.
 
-You generally only need to submit a CLA once, so if you've already submitted one
-(even if it was for a different project), you probably don't need to do it
-again.
+### Authentication
+
+The workflow authenticates to npm with
+[trusted publishing](https://docs.npmjs.com/trusted-publishers) (OIDC), so there
+is no npm token stored in this repository and nothing to rotate. The trust
+relationship is configured once on npmjs.com, under the package's
+*Settings -> Trusted publisher*:
+
+* Publisher: GitHub Actions
+* Organization or user: `steren`
+* Repository: `stereo-img`
+* Workflow filename: `npm-publish.yml`
+* Environment: (leave empty)
+
+As a side effect, published versions also carry
+[provenance attestations](https://docs.npmjs.com/generating-provenance-statements).
 
 ## Code Reviews
 
@@ -57,7 +66,3 @@ use GitHub pull requests for this purpose. Consult
 [GitHub Help](https://help.github.com/articles/about-pull-requests/) for more
 information on using pull requests.
 
-## Community Guidelines
-
-This project follows
-[Google's Open Source Community Guidelines](https://opensource.google/conduct/).
