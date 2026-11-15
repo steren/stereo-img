@@ -245,6 +245,24 @@ describe('stereo-img controls outside of VR', function () {
     expect(element.controls.lon).to.be.greaterThan(before);
   });
 
+  it('should not overlap its buttons, even when narrow', async () => {
+    const button = () => element.shadowRoot.querySelector('#VRButton');
+    await waitFor(() => button()?.textContent === 'ENTER VR', 'the "Enter VR" button');
+    const flat = element.shadowRoot.querySelector('#flatModeButton');
+    const overlap = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+
+    for (const width of [320, WIDTH, 800]) {
+      element.style.width = `${width}px`;
+      const vr = button().getBoundingClientRect();
+      const modes = flat.getBoundingClientRect();
+      expect(overlap(vr, modes), `the buttons overlap at ${width}px`).to.equal(false);
+      if (width === 800) {
+        // wide enough: all the buttons on one row
+        expect(vr.bottom).to.equal(modes.bottom);
+      }
+    }
+  });
+
   it('should go back to the view of the element after VR', async () => {
     const button = () => element.shadowRoot.querySelector('#VRButton');
     await waitFor(() => button()?.textContent === 'ENTER VR', 'the "Enter VR" button');
