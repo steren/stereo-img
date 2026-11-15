@@ -1,36 +1,28 @@
-name: Publish package on npm and create GitHub release
+# Publishes the package to npm when a GitHub release is published.
+# Authentication uses npm trusted publishing (OIDC), so no npm token is stored
+# in this repository. The trust relationship is configured once on npmjs.com:
+# Package settings -> Trusted publisher -> GitHub Actions (workflow: npm-publish.yml)
+# See https://docs.npmjs.com/trusted-publishers
+
+name: Node.js Package
 
 on:
-  push:
-    tags:
-      - 'v*'
+  release:
+    types: [published]
 
 jobs:
-  publish:
+  publish-npm:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '24.x'
-          registry-url: 'https://registry.npmjs.org'
+          node-version: 24
+          registry-url: https://registry.npmjs.org/
+      # Trusted publishing requires npm 11.5.1 or later
+      - run: npm install -g npm@latest
       - run: npm ci
-      - run: npm test
       - run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{secrets.npm_token}}
-
-  create-github-release:
-    name: Create GitHub Release
-    runs-on: ubuntu-latest
-    needs: publish
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/github-script@v9
-        with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
-          script: |
-            await github.request(`POST /repos/${{ github.repository }}/releases`, {
-              tag_name: "${{ github.ref }}",
-              generate_release_notes: true
-            });
