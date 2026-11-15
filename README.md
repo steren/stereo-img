@@ -33,16 +33,22 @@ npm install stereo-img
 * `src-right`: (Optional) source of the right eye picture (absolute or relative) for the `pair` type. If used, the source for the left eye picture is read from the `src` attribute.
 * `type`: (Optional) type of stereo picture:
   - If unset, type is inferred from heuristics
-  - `vr` (or its alias `vr180`): [VR Photo](https://developers.google.com/vr/reference/cardboard-camera-vr-photo-format) - VR180, Google Camera panorama, Cardboard Camera, Photosphere images (Where right eye image and angle of view info are embedded in the image metadata) 
+  - `vr` (or its alias `vr180`): [VR Photo](https://developers.google.com/vr/reference/cardboard-camera-vr-photo-format) - VR180, Google Camera panorama, Cardboard Camera, Photosphere images (Where right eye image and angle of view info are embedded in the image metadata)  When the picture holds the sound recorded with it, a button plays it, and it plays in VR.
   - `left-right`: left eye on the left, right eye on the right, Exif angle of view is used if present.
   - `right-left`: left eye on the right, right eye on the left, Exif angle of view is used if present.
   - `top-bottom`: left eye on the top, right eye on the bottom, Exif angle of view is used if present.
   - `bottom-top`: left eye on the bottom, right eye on the top, Exif angle of view is used if present.
+  - `interlaced`: rows alternate between the eyes, the first row being for the left eye.
+  - `interlaced-reverse`: rows alternate between the eyes, the first row being for the right eye.
+  - `column-interlaced`: columns alternate between the eyes, the first column being for the left eye.
+  - `column-interlaced-reverse`: columns alternate between the eyes, the first column being for the right eye.
   - `pair`: separate files for left and right image. Left eye image read from `src` attribute, right eye image read from attribute `src-right`. Adding the `src-right` attribute will enable the `pair` type without the need to use the `type` attribute.
-  - `anaglyph`: [Anaglyph 3D](https://en.wikipedia.org/wiki/Anaglyph_3D) - currently only supporting red / green
-  - `depth`: Picture with depth map (e.g. portrait mode on Google Camera)
+  - `mpo`: [Multi-Picture Format](https://en.wikipedia.org/wiki/JPEG#JPEG_Multi-Picture_Format) file of a stereo camera, holding the left and right pictures. Files ending with `.mpo` are detected without the `type` attribute.
+  - `lif`: Leia Image Format, the pictures of the Lume Pad tablets. They are detected without the `type` attribute.
+  - `anaglyph`: [Anaglyph 3D](https://en.wikipedia.org/wiki/Anaglyph_3D). The colours of the picture are detected. To name them instead, use `anaglyph-red-cyan`, `anaglyph-red-green`, `anaglyph-red-blue`, `anaglyph-green-magenta` or `anaglyph-amber-blue`: the first colour is the one of the left eye.
+  - `depth`: Picture with depth map (e.g. portrait or lens blur mode on Google Camera). Detected from the metadata of the picture.
   - `mono`: A regular, non-stereo picture. The same image is displayed on both eyes.
-* `angle`: (Optional) hint at angle of view for `left-right`, `top-bottom`, `pair` or `anaglyph` types
+* `angle`: (Optional) hint at angle of view for `left-right`, `top-bottom`, `interlaced`, `pair` or `anaglyph` types
   - If unset, Exif angle of view is used if present.
   - `DEGREE`: any degree number between 0 and 360
   - `180`: Half sphere (VR180)
@@ -51,6 +57,10 @@ npm install stereo-img
   - If unset, projection is inferred from heuristics.
   - `equirectangular`: Equirectangular projection
   - `fisheye`: Fisheye projection
+* `disparity-adjustment`: (Optional) Distance to add between the pictures of the two eyes, in percent of the width of one of them. Useful when the two lenses of the camera were further apart, or closer, than human eyes.
+  - A negative value moves the pictures closer together: the left one to the right and the right one to the left.
+  - A positive value moves them apart.
+  - Each picture moves by half of the value. The picture is not loaded again when the value changes.
 * `flat`: (Optional) When viewing in 2D, set the display mode.
   - `left`: (Default) Show the left eye image.
   - `right`: Show the right eye image.
@@ -62,9 +72,84 @@ npm install stereo-img
   - `right`: Allow the "right" flat mode.
   - `wiggle`: Allow the "wiggle" flat mode.
   - `anaglyph`: Allow the "anaglyph" flat mode.
+  - `sound`: Show the sound button, for pictures that have sound.
+* `muted`: (Optional) When set, the sound of the picture does not start by itself when entering VR. The sound button still plays it.
+* `start`: (Optional) Set it to `interaction` on pages with many pictures. See [Pages with many pictures](#pages-with-many-pictures).
 * `debug`: (Optional) When set, logs diagnostic information to the console and displays the wireframe of the 3D geometry.
 
+## Events
+
+In VR, the viewer can ask for another picture without leaving VR. The element does not know which picture comes next: it tells the page, which changes `src`.
+
+* `next`: the trigger of the right controller, a pinch of the right hand, the button of a Cardboard viewer, or a thumbstick pushed to the right.
+* `previous`: the trigger of the left controller, a pinch of the left hand, or a thumbstick pushed to the left.
+
+The `detail` of the event tells what the viewer used: `input` is `"select"` or `"thumbstick"`, `handedness` is `"left"`, `"right"` or `"none"`. The events bubble.
+
+```js
+const pictures = ['first.jpg', 'second.jpg', 'third.jpg'];
+let index = 0;
+const stereoImg = document.querySelector('stereo-img');
+
+function show(newIndex) {
+  index = (newIndex + pictures.length) % pictures.length;
+  stereoImg.src = pictures[index];
+}
+
+stereoImg.addEventListener('next', () => show(index + 1));
+stereoImg.addEventListener('previous', () => show(index - 1));
+```
+
+## Outside of VR
+
+The picture fills the element, like an image with `object-fit: cover`. To see more of it:
+
+* Drag the picture. A flat picture slides; a picture that surrounds the viewer, such as a VR180 photo or a panorama, turns around them.
+* Zoom with the wheel, or with a pinch on a touch screen.
+
+The view stops at the edges of the picture: no empty margin is shown around it.
+
+## In VR
+
+A stereo picture is what two eyes saw from one place: the viewer is kept in the middle of it. Turning the head looks around; moving the head does not move the viewer in the picture, which has no other side to show. A picture with a depth map is the exception: it has relief, stays where it is in the room, and moving the head shows it from another angle.
+
+A picture does not always surround the viewer: a flat picture floats in front of them, a VR180 photo leaves what is behind them empty. What is around the picture takes the colours of its edges, dimmed: the colour of its top above it, the colour of its bottom below it, and a gradient from one to the other beside it.
+
+## Pages with many pictures
+
+Each element draws with WebGL, and browsers limit the WebGL contexts of a page: 16 in Chrome on a computer, 8 on a phone. Beyond the limit, the oldest elements go blank.
+
+With `start="interaction"`, an element shows a still of its picture, drawn without a WebGL context of its own, and starts 3D when the viewer points at it, presses on it or touches it:
+
+```html
+<stereo-img src="first.jpg" start="interaction"></stereo-img>
+<stereo-img src="second.jpg" start="interaction"></stereo-img>
+```
+
+* The still shows what the element would show: the same view, the eye or the anaglyph of the `flat` attribute. With `flat="wiggle"`, it wiggles.
+* The buttons appear when 3D starts.
+* At most four of these elements are started at the same time. Starting a fifth one stops the one used the longest ago, which shows a still again.
+* The picture is loaded once for the still, and once more when 3D starts.
+
+The attribute is read when the element is added to the page.
+
+## Pictures from other sites
+
+A picture can come from another site than the page, like with `<img>`. But unlike `<img>`, the component has to read the pixels of the picture, which browsers only allow when the server of the picture agrees. That server must send this header with the picture:
+
+```
+Access-Control-Allow-Origin: *
+```
+
+(or the origin of your page instead of `*`). Without it, nothing is displayed and the reason is logged in the console.
+
 ## Compatibility
+
+### Large pictures
+
+A GPU limits the size of a texture: often 4096 pixels on a phone, when the picture of one eye of a VR180 camera can be 8192 pixels wide. A picture larger than this limit is cut into tiles, each in its own texture: it keeps all of its details.
+
+Phones also limit the size of a canvas: Safari on iOS leaves a canvas of more than 4096 by 4096 pixels blank. A picture larger than that, such as the 45 million pixels of a camera with two fisheye lenses, is read in parts.
 
 ### Supported cameras
 
@@ -79,7 +164,10 @@ This component has been manually tested to load pictures taken with the followin
 | ✔️     | CALF VR180                          | left-right          | (none)                                |  X           | X 
 | ✔️     | CALF VR180                          | "vr180"             | `angle="180"`                         |  X           | X 
 | ✔️     | Kandao QooCam EGO 3D Camera         | left-right          | (none)                                |  X           | X 
-| ✔️     | Pixel phone                         | depth               | `type="depth"`                        |  X           | X 
+| ✔️     | Pixel phone                         | depth               | (none)                                |  X           | X 
+| ✔️     | Panasonic DMC-GX8 with H-FT012 lens | MPO                 | (none)                                |  ✓           | X 
+| ✔️     | Leia Lume Pad 2                     | Leia Image Format   | (none)                                |  ✓           | X 
+| ✔️     | Leia Lume Pad 2                     | left-right          | (none)                                |  X           | X 
 | ❌     | Vision Pro                          |                     |                                       |              | 
 
 ### Supported viewers and headsets

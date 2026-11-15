@@ -13,12 +13,14 @@
 // limitations under the License.
 
 import exifr from './../../vendor/exifr/full.esm.js';
+import { findCamera, cameraType, fisheyeCircleEdges } from './cameras.js';
+import { pixelReader } from './../../lib/pixels.js';
 
 /**
  * fetch the image from URL
- * return left and right eye images from either left / right, right / left, top / bottom, bottom / top. 
+ * return left and right eye images from either left / right, right / left, top / bottom, bottom / top, or interlaced.
  * @Param {string} url - image url
- * @Param {Object} (options) - Parsing options: type: 'left-right' (default), 'right-left' or 'top-bottom', angle: '180' or '360', signal: AbortSignal to cancel the parsing
+ * @Param {Object} (options) - Parsing options: type: 'left-right' (default), 'right-left', 'top-bottom', 'bottom-top', 'interlaced', 'interlaced-reverse', 'column-interlaced' or 'column-interlaced-reverse', angle: '180' or '360', signal: AbortSignal to cancel the parsing
  * */
 async function parseStereo(url, options) {
   return parseStereoPair(url, null, options);
@@ -30,36 +32,29 @@ async function parseStereo(url, options) {
  * return left and right eye images from either left / right, right / left, top / bottom, bottom / top, url / secondaryURL.
  * @Param {string} url - image url left, or combined left and right
  * @Param {string} secondaryURL - image url right, or null
- * @Param {Object} (options) - Parsing options: type: 'left-right' (default), 'right-left' or 'top-bottom', angle: '180' or '360', signal: AbortSignal to cancel the parsing
+ * @Param {Object} (options) - Parsing options: type: 'left-right' (default), 'right-left' or 'top-bottom', angle: '180' or '360', signal: AbortSignal to cancel the parsing, exif: metadata of the image, when already read, originalUrl: where the picture comes from, when url is a temporary copy of it
  * */
 async function parseStereoPair(url, secondaryURL, options) {
   const signal = options?.signal;
   const image = await createImageFromURL(url, signal);
   //image.crossOrigin = "Anonymous";
   
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d', {willReadFrequently: true});
   const width = image.width;
   const height = image.height;
-  canvas.width = width;
-  canvas.height = height;
-  ctx.drawImage(image, 0, 0);
+  // Gives the pixels of a rectangle of the picture: its left, top, width and height.
+  // A picture too large for a canvas, on a phone, is read in parts.
+  const read = pixelReader(image);
 
   var secondaryImage = null;
-  var secondaryCanvas = null;
-  var secondaryCtx = null;
+  var readSecondary = null;
   var secondaryWidth = 0;
   var secondaryHeight = 0;
   if (secondaryURL) {
     secondaryImage = await createImageFromURL(secondaryURL, signal);
     //secondaryImage.crossOrigin = "Anonymous";
-    secondaryCanvas = document.createElement('canvas');
-    secondaryCtx = secondaryCanvas.getContext('2d', {willReadFrequently: true});
     secondaryWidth = secondaryImage.width;
     secondaryHeight = secondaryImage.height;
-    secondaryCanvas.width = secondaryWidth;
-    secondaryCanvas.height = secondaryHeight;
-    secondaryCtx.drawImage(secondaryImage, 0, 0);
+    readSecondary = pixelReader(secondaryImage);
   }
 
   function pixelIsBlack(pixel, threshold) {
@@ -67,30 +62,28 @@ async function parseStereoPair(url, secondaryURL, options) {
     return pixel[0] < blackThreshold && pixel[1] < blackThreshold && pixel[2] < blackThreshold;
   }
 
-  let exif = {};
-  try {
-    exif = await exifr.parse(image, {
-      xmp: true,
-      multiSegment: true
-    })
-  } catch (e) {
-    // ignore
+  // The metadata can be given by a caller that has already read it.
+  let exif = options?.exif;
+  if (!exif) {
+    exif = {};
+    try {
+      exif = await exifr.parse(image, {
+        xmp: true,
+        multiSegment: true
+      })
+    } catch (e) {
+      // ignore
+    }
   }
   signal?.throwIfAborted();
 
 
-  // Images
-  let type = options.type || 'left-right';
+  // What is known about the camera, for the ones listed in cameras.js
+  // The picture may be read from a temporary URL: the one it comes from tells its file name.
+  const camera = findCamera(exif, options?.originalUrl || url);
 
-  // Heuristics for Canon RF5.2mm F2.8 L DUAL FISHEYE
-  // Unprocessed pictures are right-left. Pictures processed with EOS VR Utility software are left-right.
-  if(exif?.Make === 'Canon' && exif?.LensModel === 'RF5.2mm F2.8 L DUAL FISHEYE') {
-    if(exif?.Software?.includes('EOS VR Utility')) {
-      type = 'left-right';
-    } else {
-      type = 'right-left';
-    }
-  }
+  // Images
+  const type = cameraType(camera, exif) || options.type || 'left-right';
 
   // check if fisheye projection
   let projection;
@@ -100,11 +93,11 @@ async function parseStereoPair(url, secondaryURL, options) {
     ;
   } else {
     // Read pixels in each corner and middle to see if they are black. If black, assume fisheye image
-    const topLeft = ctx.getImageData(0, 0, 1, 1).data;
-    const topRight = ctx.getImageData(width - 1, 0, 1, 1).data;
-    const bottomLeft = ctx.getImageData(0, height - 1, 1, 1).data;
-    const bottomRight = ctx.getImageData(width - 1, height - 1, 1, 1).data;
-    const middle = ctx.getImageData(width / 2, height / 2, 1, 1).data;
+    const topLeft = read(0, 0, 1, 1).data;
+    const topRight = read(width - 1, 0, 1, 1).data;
+    const bottomLeft = read(0, height - 1, 1, 1).data;
+    const bottomRight = read(width - 1, height - 1, 1, 1).data;
+    const middle = read(width / 2, height / 2, 1, 1).data;
     if(pixelIsBlack(topLeft) && pixelIsBlack(topRight) && pixelIsBlack(bottomLeft) && pixelIsBlack(bottomRight) && pixelIsBlack(middle, 50)) {
         projection = 'fisheye';
         console.log("Detected fisheye image");
@@ -125,22 +118,10 @@ async function parseStereoPair(url, secondaryURL, options) {
   // TODO: This assumes left-right or right-left. Make compatible with top-bottom and bottom-top.
   if(projection === 'fisheye') {
 
-    // Heuristics for Canon RF5.2mm F2.8 L DUAL FISHEYE
-    if(exif?.Make === 'Canon' && exif?.LensModel === 'RF5.2mm F2.8 L DUAL FISHEYE') {
+    if(camera?.fisheyeCircles) {
 
-      // Measured values on a reference image, see excmples/canon-eos-r5-dual-fisheye.jpg
-      const referenceImageWidth = 8192;
-      const referenceImageHeight = 5464;
-
-      const referenceEyeDiameter = 3750;
-      const referenceLeftEyeCenter = 1980;
-
-      top        = Math.round( (referenceImageHeight / 2 - referenceEyeDiameter / 2)                      * height / referenceImageHeight );
-      bottom     = Math.round( (referenceImageHeight / 2 + referenceEyeDiameter / 2)                      * height / referenceImageHeight );
-      leftLeft   = Math.round( (referenceLeftEyeCenter - referenceEyeDiameter / 2)                        * width / referenceImageWidth );
-      leftRight  = Math.round( (referenceLeftEyeCenter + referenceEyeDiameter / 2)                        * width / referenceImageWidth );
-      rightLeft  = Math.round( (referenceImageWidth - referenceLeftEyeCenter - referenceEyeDiameter / 2)  * width / referenceImageWidth );
-      rightRight = Math.round( (referenceImageWidth - referenceLeftEyeCenter + referenceEyeDiameter / 2)  * width / referenceImageWidth );
+      // The circles of this camera are always at the same place.
+      ({ top, bottom, leftLeft, leftRight, rightLeft, rightRight } = fisheyeCircleEdges(camera.fisheyeCircles, width, height));
 
     } else {
       // March from the edges and the middle to find hte actual edges of the fisheye image.
@@ -151,7 +132,7 @@ async function parseStereoPair(url, secondaryURL, options) {
 
       // top
       for(let y = 0; y < height / 2; y++) {
-        const pixel = ctx.getImageData(width / 4, y, 1, 1).data;
+        const pixel = read(width / 4, y, 1, 1).data;
         if(!pixelIsBlack(pixel)) {
           top = y;
           break;
@@ -160,7 +141,7 @@ async function parseStereoPair(url, secondaryURL, options) {
 
       // bottom
       for(let y = height - 1; y > height / 2; y--) {
-        const pixel = ctx.getImageData(width / 4, y, 1, 1).data;
+        const pixel = read(width / 4, y, 1, 1).data;
         if(!pixelIsBlack(pixel)) {
           bottom = y;
           break;
@@ -169,7 +150,7 @@ async function parseStereoPair(url, secondaryURL, options) {
 
       // left of the left fisheye
       for(let x = 0; x < width / 4; x++) {
-        const pixel = ctx.getImageData(x, height / 2, 1, 1).data;
+        const pixel = read(x, height / 2, 1, 1).data;
         if(!pixelIsBlack(pixel)) {
           leftLeft = x;
           break;
@@ -178,7 +159,7 @@ async function parseStereoPair(url, secondaryURL, options) {
 
       // right of the left fisheye
       for(let x = width / 2 - 1; x > width / 4; x--) {
-        const pixel = ctx.getImageData(x, height / 2, 1, 1).data;
+        const pixel = read(x, height / 2, 1, 1).data;
         if(!pixelIsBlack(pixel)) {
           leftRight = x;
           break;
@@ -187,7 +168,7 @@ async function parseStereoPair(url, secondaryURL, options) {
 
       // right of the right fisheye
       for(let x = width  - 1; x > 3 * width / 4; x--) {
-        const pixel = ctx.getImageData(x, height / 2, 1, 1).data;
+        const pixel = read(x, height / 2, 1, 1).data;
         if(!pixelIsBlack(pixel)) {
           rightRight = x;
           break;
@@ -196,7 +177,7 @@ async function parseStereoPair(url, secondaryURL, options) {
 
       // left of the right fisheye
       for(let x = width / 2; x < 3 * width / 4; x++) {
-        const pixel = ctx.getImageData(x, height / 2, 1, 1).data;
+        const pixel = read(x, height / 2, 1, 1).data;
         if(!pixelIsBlack(pixel)) {
           rightLeft = x;
           break;
@@ -210,25 +191,33 @@ async function parseStereoPair(url, secondaryURL, options) {
 
   switch(type) {
     case 'left-right':
-      leftEye =  ctx.getImageData(leftLeft, top, leftRight - leftLeft, bottom - top);
-      rightEye = ctx.getImageData(rightLeft, top, rightRight - rightLeft, bottom - top);
+      leftEye =  read(leftLeft, top, leftRight - leftLeft, bottom - top);
+      rightEye = read(rightLeft, top, rightRight - rightLeft, bottom - top);
       break;
     case 'right-left':
-      leftEye =  ctx.getImageData(rightLeft, top, rightRight - rightLeft, bottom - top);
-      rightEye = ctx.getImageData(leftLeft, top, leftRight - leftLeft, bottom - top);
+      leftEye =  read(rightLeft, top, rightRight - rightLeft, bottom - top);
+      rightEye = read(leftLeft, top, leftRight - leftLeft, bottom - top);
       break;
     case 'top-bottom':
-      leftEye = ctx.getImageData(0, 0, width, height / 2); 
-      rightEye = ctx.getImageData(0, height / 2, width, height / 2);
+      leftEye = read(0, 0, width, height / 2); 
+      rightEye = read(0, height / 2, width, height / 2);
       break;
     case 'bottom-top':
-      leftEye = ctx.getImageData(0, height / 2, width, height / 2);
-      rightEye = ctx.getImageData(0, 0, width, height / 2);
+      leftEye = read(0, height / 2, width, height / 2);
+      rightEye = read(0, 0, width, height / 2);
       break;
     case 'pair':
-      leftEye =  ctx.getImageData(0, 0, width, height);
-      rightEye = secondaryCtx.getImageData(0, 0, secondaryWidth, secondaryHeight);
+      leftEye =  read(0, 0, width, height);
+      rightEye = readSecondary(0, 0, secondaryWidth, secondaryHeight);
       break;
+    case 'interlaced':
+    case 'interlaced-reverse':
+    case 'column-interlaced':
+    case 'column-interlaced-reverse': {
+      const views = deinterlace(read(0, 0, width, height), type.startsWith('column'));
+      [leftEye, rightEye] = type.endsWith('reverse') ? views.reverse() : views;
+      break;
+    }
   }
   
   // The angles of view apply to what one eye sees, so they depend on the size
@@ -278,19 +267,9 @@ async function parseStereoPair(url, secondaryURL, options) {
     phiLength = angle.horizontalAngle;
     thetaLength = angle.verticalAngle;
 
-  } else if(exif?.Make === 'GoPro' || isGoProFilename(url)) {
-    // GoPro (https://gopro.com/help/articles/question_answer/hero7-field-of-view-fov-information?sf96748270=1)
-    phiLength = 2.1397737; // 122.6º
-    thetaLength = 1.647591;  // 94.4º
-
-  } else if(exif?.Make === 'Canon' && exif?.LensModel === 'RF5.2mm F2.8 L DUAL FISHEYE') {
-    // TODO: This lense has a 190º angle of view, but the viewer doesn't support any other angle than 180 for fisheye.
-    phiLength = Math.PI;
-    thetaLength = Math.PI;
-
-  } else if(exif?.Model === 'insta360 evo') {
-    phiLength = Math.PI;
-    thetaLength = Math.PI;
+  } else if(camera?.angle) {
+    phiLength = camera.angle.horizontal * Math.PI / 180;
+    thetaLength = camera.angle.vertical * Math.PI / 180;
 
   } else {
     const assumeFocalLengthIn35mmFormat = 27;
@@ -303,6 +282,41 @@ async function parseStereoPair(url, secondaryURL, options) {
 
 
   return {leftEye, rightEye, phiLength, thetaStart, thetaLength, projection};
+}
+
+/**
+ * Separate the two pictures of an interlaced one, where the lines of both pictures alternate.
+ * Each picture keeps the size of the interlaced one: its lines are doubled.
+ * @param {ImageData} imageData - the interlaced picture
+ * @param {boolean} byColumns - true if columns alternate, false if rows alternate
+ * @returns {Array<ImageData>} the picture made of the first, third, fifth... lines, then the one made of the others
+ */
+function deinterlace(imageData, byColumns) {
+  const { width, height } = imageData;
+  const source = new Uint32Array(imageData.data.buffer, imageData.data.byteOffset, width * height);
+  const count = byColumns ? width : height;
+
+  return [0, 1].map(parity => {
+    const pixels = new Uint32Array(width * height);
+    for (let line = 0; line < count; line++) {
+      // the closest line of this picture: itself, or the neighbour it is doubled from
+      let from = line - (line % 2) + parity;
+      if (from >= count) {
+        from -= 2;
+      }
+      if (from < 0) {
+        from = line;
+      }
+      if (byColumns) {
+        for (let y = 0; y < height; y++) {
+          pixels[y * width + line] = source[y * width + from];
+        }
+      } else {
+        pixels.set(source.subarray(from * width, (from + 1) * width), line * width);
+      }
+    }
+    return new ImageData(new Uint8ClampedArray(pixels.buffer), width, height);
+  });
 }
 
 async function createImageFromURL(url, signal) {
@@ -320,7 +334,6 @@ async function createImageFromURL(url, signal) {
     signal?.addEventListener('abort', onAbort, { once: true });
     image.onload = () => {
       signal?.removeEventListener('abort', onAbort);
-      URL.revokeObjectURL(url);
       resolve(image);
     };
     image.onerror = (error) => {
@@ -328,19 +341,6 @@ async function createImageFromURL(url, signal) {
       reject(error);
     };
   });
-}
-
-/**
- * GoPro cameras name their pictures "GOPR0001.JPG".
- * @param {string} url - image url, absolute or relative
- * @returns {boolean} true if the file name of the URL looks like a GoPro one
- */
-function isGoProFilename(url) {
-  if (url.startsWith('data:')) {
-    return false;
-  }
-  const filename = url.split(/[?#]/)[0].split('/').pop();
-  return /^gopr/i.test(filename);
 }
 
 export {parseStereo, parseStereoPair}

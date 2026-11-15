@@ -99,7 +99,9 @@ describe('stereo-img', function () {
     it('should detect a VR photo from its metadata', async () => {
       await create({ src: VR180 });
 
-      expect(element.stereoData.leftEye === VR180).to.be.true;
+      // the left eye is the picture itself
+      expect(element.stereoData.leftEye instanceof HTMLImageElement).to.be.true;
+      expect(element.stereoData.leftEye.naturalWidth).to.equal(3016);
       expect(typeof element.stereoData.rightEye).to.equal('string');
       expect(element.stereoData.rightEye.startsWith('data:image/jpg;base64,')).to.be.true;
       expect(element.stereoData.phiLength).to.be.closeTo(Math.PI, 0.001);
@@ -126,7 +128,7 @@ describe('stereo-img', function () {
       expect(geometryTypes(element)).to.deep.equal(['PlaneGeometry', 'PlaneGeometry']);
     }).timeout(30000);
 
-    it('should detect a portrait picture with a depth map from its file name', async () => {
+    it('should detect a portrait picture with a depth map', async () => {
       await create({ src: PORTRAIT });
 
       expect(element.stereoData.depth instanceof HTMLImageElement).to.be.true;

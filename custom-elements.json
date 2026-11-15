@@ -37,7 +37,7 @@
               "type": {
                 "text": "string | null"
               },
-              "description": "Type of stereo picture: \"vr\", \"left-right\", \"right-left\", \"top-bottom\", \"bottom-top\", \"pair\", \"anaglyph\", \"depth\" or \"mono\". If unset, the type is inferred from heuristics.",
+              "description": "Type of stereo picture: \"vr\", \"left-right\", \"right-left\", \"top-bottom\", \"bottom-top\", \"interlaced\", \"interlaced-reverse\", \"column-interlaced\", \"column-interlaced-reverse\", \"pair\", \"mpo\", \"lif\", \"anaglyph\" (or \"anaglyph-red-cyan\", \"anaglyph-red-green\", \"anaglyph-red-blue\", \"anaglyph-green-magenta\", \"anaglyph-amber-blue\" to name its colours), \"depth\" or \"mono\". If unset, the type is inferred from heuristics.",
               "attribute": "type",
               "reflects": true
             },
@@ -63,6 +63,16 @@
             },
             {
               "kind": "field",
+              "name": "disparityAdjustment",
+              "type": {
+                "text": "string | null"
+              },
+              "description": "Distance to add between the pictures of the two eyes, in percent of the width of one of them. A negative value moves them closer together.",
+              "attribute": "disparity-adjustment",
+              "reflects": true
+            },
+            {
+              "kind": "field",
               "name": "flat",
               "type": {
                 "text": "string | null"
@@ -77,7 +87,7 @@
               "type": {
                 "text": "string | null"
               },
-              "description": "Space-separated list of controls to display: \"vr\", \"left\", \"right\", \"wiggle\" and \"anaglyph\". All are displayed by default.",
+              "description": "Space-separated list of controls to display: \"vr\", \"left\", \"right\", \"wiggle\", \"anaglyph\" and \"sound\". All are displayed by default.",
               "attribute": "controlslist",
               "reflects": true
             },
@@ -101,6 +111,26 @@
               "attribute": "wiggle",
               "reflects": true,
               "deprecated": "Use the \"flat\" attribute with a value of \"wiggle\" instead."
+            },
+            {
+              "kind": "field",
+              "name": "muted",
+              "type": {
+                "text": "boolean"
+              },
+              "description": "When set, the sound of the picture does not start by itself when entering VR.",
+              "attribute": "muted",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "start",
+              "type": {
+                "text": "'interaction' | null"
+              },
+              "description": "When 3D starts. With \"interaction\", the element shows a still of the picture and starts WebGL when the viewer points at it or touches it. Read when the element is added to the page.",
+              "attribute": "start",
+              "reflects": true
             }
           ],
           "attributes": [
@@ -125,7 +155,7 @@
               "type": {
                 "text": "string"
               },
-              "description": "Type of stereo picture: \"vr\", \"left-right\", \"right-left\", \"top-bottom\", \"bottom-top\", \"pair\", \"anaglyph\", \"depth\" or \"mono\". If unset, the type is inferred from heuristics.",
+              "description": "Type of stereo picture: \"vr\", \"left-right\", \"right-left\", \"top-bottom\", \"bottom-top\", \"interlaced\", \"interlaced-reverse\", \"column-interlaced\", \"column-interlaced-reverse\", \"pair\", \"mpo\", \"lif\", \"anaglyph\" (or \"anaglyph-red-cyan\", \"anaglyph-red-green\", \"anaglyph-red-blue\", \"anaglyph-green-magenta\", \"anaglyph-amber-blue\" to name its colours), \"depth\" or \"mono\". If unset, the type is inferred from heuristics.",
               "fieldName": "type"
             },
             {
@@ -145,6 +175,14 @@
               "fieldName": "projection"
             },
             {
+              "name": "disparity-adjustment",
+              "type": {
+                "text": "string"
+              },
+              "description": "Distance to add between the pictures of the two eyes, in percent of the width of one of them. A negative value moves them closer together.",
+              "fieldName": "disparityAdjustment"
+            },
+            {
               "name": "flat",
               "type": {
                 "text": "string"
@@ -157,7 +195,7 @@
               "type": {
                 "text": "string"
               },
-              "description": "Space-separated list of controls to display: \"vr\", \"left\", \"right\", \"wiggle\" and \"anaglyph\". All are displayed by default.",
+              "description": "Space-separated list of controls to display: \"vr\", \"left\", \"right\", \"wiggle\", \"anaglyph\" and \"sound\". All are displayed by default.",
               "fieldName": "controlslist"
             },
             {
@@ -176,6 +214,38 @@
               "description": "Alternate between the left and right images.",
               "fieldName": "wiggle",
               "deprecated": "Use the \"flat\" attribute with a value of \"wiggle\" instead."
+            },
+            {
+              "name": "muted",
+              "type": {
+                "text": "boolean"
+              },
+              "description": "When set, the sound of the picture does not start by itself when entering VR.",
+              "fieldName": "muted"
+            },
+            {
+              "name": "start",
+              "type": {
+                "text": "'interaction'"
+              },
+              "description": "When 3D starts. With \"interaction\", the element shows a still of the picture and starts WebGL when the viewer points at it or touches it. Read when the element is added to the page.",
+              "fieldName": "start"
+            }
+          ],
+          "events": [
+            {
+              "name": "next",
+              "type": {
+                "text": "CustomEvent<{input: 'select' | 'thumbstick', handedness: 'left' | 'right' | 'none'}>"
+              },
+              "description": "In VR, the viewer asks for the next picture: with the trigger of the right controller, a pinch of the right hand, the button of a Cardboard viewer, or a thumbstick pushed to the right."
+            },
+            {
+              "name": "previous",
+              "type": {
+                "text": "CustomEvent<{input: 'select' | 'thumbstick', handedness: 'left' | 'right' | 'none'}>"
+              },
+              "description": "In VR, the viewer asks for the previous picture: with the trigger of the left controller, a pinch of the left hand, or a thumbstick pushed to the left."
             }
           ],
           "superclass": {

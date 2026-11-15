@@ -119,11 +119,13 @@ limitations under the License.
         <option value='{"src": "examples/stereograph.left-right.jpg", "type": "left-right"}'>     Stereograph from 1901</option>
         <option value='{"src": "examples/wikipedia.anaglyph.jpg", "type": "anaglyph"}'>           Anaglyph</option>  
         <option value='{"src": "examples/Panasonic-DMC-GX8-left.jpg", "src-right": "examples/Panasonic-DMC-GX8-right.jpg", "type": "pair"}'>Left / Right images</option>          
+        <option value='{"src": "examples/Panasonic-DMC-GX8.mpo"}'>                                Panasonic DMC-GX8 (MPO)</option>
+        <option value='{"src": "examples/leia_lume_pad2.jpg"}'>                                    Leia Lume Pad 2 (Leia Image Format)</option>
       </select>
     </p>
 
     <stereo-img src="examples/vr180-lenovo-mirage.vr.jpg" type="vr"></stereo-img>
-    <button id="previous">Previous</button> <button id="next">Next</button> (or use left/right keyboard keys)
+    <button id="previous">Previous</button> <button id="next">Next</button> (or use left/right keyboard keys, or in VR the triggers or the thumbsticks of the controllers)
 
     <p>These are best viewed in VR, click "Enter VR" if your device supports VR.</p>
 
@@ -194,6 +196,10 @@ limitations under the License.
 
     document.getElementById('previous').addEventListener('click', previous);
     document.getElementById('next').addEventListener('click', next);
+
+    // In VR, the controllers ask the element for the previous or the next picture
+    document.querySelector('stereo-img').addEventListener('previous', previous);
+    document.querySelector('stereo-img').addEventListener('next', next);
 
     // listen for arrow keypress and go to previous / next option in dropdown examples
     document.addEventListener('keydown', (e) => {

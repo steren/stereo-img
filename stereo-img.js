@@ -16,11 +16,246 @@ import exifr from './vendor/exifr/full.esm.js';
 
 import * as THREE from './vendor/three/three.module.min.js';
 import { VRButton } from './lib/VRButton.js';
-import { OrbitControls } from './lib/OrbitControls.js';
+import { LookControls } from './lib/LookControls.js';
 import { AnaglyphEffect } from './lib/AnaglyphEffect.js';
 import { flatModeButton } from './lib/flatModeButton.js';
-import { mixedContentHint } from './lib/https.js';
+import { soundButton } from './lib/soundButton.js';
+import { loadingHints } from './lib/https.js';
+import { Picture } from './lib/picture.js';
+import { edgeColors } from './lib/edgeColors.js';
+import { tilePadding, planTiles, pickTriangles, tileUvs, cropPixels } from './lib/tiles.js';
+import { directionOfSelect, directionOfThumbstick } from './lib/xrInput.js';
 
+
+/**
+ * Read the metadata of a picture.
+ * @param {Uint8Array} bytes - The content of the file.
+ * @returns {Promise<Object>} - Its metadata, grouped by kind.
+ */
+function readMetadata(bytes) {
+  return exifr.parse(bytes, {
+    xmp: true,
+    multiSegment: true,
+    mergeOutput: false,
+    ihdr: true, //unclear why we need this, but if not enabled, some VR180 XMP Data are not parsed
+  });
+}
+
+/**
+ * Tell if a ray hits the picture drawn by a mesh of the scene.
+ * @param {THREE.Mesh} mesh - The mesh of an eye: a plane, or a part of a sphere seen from inside.
+ * @param {THREE.Vector3} origin - Where the ray starts, in the scene.
+ * @param {THREE.Vector3} direction - Where the ray goes, in the scene.
+ * @returns {boolean} - True if the ray ends on the picture.
+ */
+function rayHitsPicture(mesh, origin, direction) {
+  // Work in the space of the mesh, where the picture is centred on the X axis.
+  const inverse = mesh.matrixWorld.clone().invert();
+  const from = origin.clone().applyMatrix4(inverse);
+  const along = direction.clone().transformDirection(inverse);
+  const parameters = mesh.geometry.parameters;
+  // a small tolerance, so that a view that exactly fits is accepted
+  const epsilon = 1e-6;
+
+  if (mesh.geometry.type === 'PlaneGeometry') {
+    // A plane facing the viewer, at a distance on the X axis
+    if (along.x <= 0) {
+      return false;
+    }
+    // With a depth map, parts of the picture are pushed away from the viewer, where they look smaller: count on the farthest.
+    const material = mesh.material;
+    const relief = material.displacementMap ? Math.max(Math.abs(material.displacementBias), Math.abs(material.displacementScale + material.displacementBias)) : 0;
+    const distance = (PICTURE_DISTANCE + relief - from.x) / along.x;
+    const y = from.y + distance * along.y;
+    const z = from.z + distance * along.z;
+    return Math.abs(y) <= parameters.height / 2 * (1 + epsilon) && Math.abs(z) <= parameters.width / 2 * (1 + epsilon);
+  }
+
+  // A part of a sphere around the viewer: angles around the vertical axis and from the top
+  const phi = Math.atan2(along.z, along.x);
+  const theta = Math.acos(Math.max(-1, Math.min(1, along.y)));
+  const insideHorizontally = parameters.phiLength >= 2 * Math.PI - epsilon || Math.abs(phi) <= parameters.phiLength / 2 + epsilon;
+  const insideVertically = theta >= parameters.thetaStart - epsilon && theta <= parameters.thetaStart + parameters.thetaLength + epsilon;
+  return insideHorizontally && insideVertically;
+}
+
+/**
+ * Tell if the metadata of a picture describes a depth map embedded in it.
+ * @param {Object} exif - The metadata of the picture, as read by readMetadata.
+ * @returns {boolean} - True for the two formats of Google Camera: "GDepth" and "Dynamic Depth".
+ */
+function describesDepthMap(exif) {
+  if (exif?.GDepth?.Data) {
+    return true;
+  }
+  // Dynamic Depth lists the images appended to the file.
+  const items = [].concat(exif?.Container?.Directory || []).map(entry => entry?.Item || entry);
+  return items.some(item => item?.Semantic === 'Depth' || /depthmap/i.test(item?.DataURI));
+}
+
+/**
+ * Quickly tell if a file may be in the Multi-Picture Format, by looking for the name of its index ("MPF")
+ * at the start of the file.
+ * @param {Uint8Array} bytes - The content of the file.
+ * @returns {boolean} - False if it is certainly not in that format.
+ */
+function mayHaveMultiPictureIndex(bytes) {
+  const end = Math.min(bytes.length, 1 << 18) - 3;
+  for (let i = 0; i < end; i++) {
+    if (bytes[i] === 0x4d && bytes[i + 1] === 0x50 && bytes[i + 2] === 0x46 && bytes[i + 3] === 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Distance between the viewer and the picture, in the 3D scene.
+const PICTURE_DISTANCE = 10;
+// How many elements that start on interaction can be started at the same time on a page: the others show a still.
+// Browsers limit the WebGL contexts of a page, to 16 in Chrome on a computer and 8 on a phone.
+const MOST_STARTED = 4;
+// What a viewer does to start an element that starts on interaction: point at it, press on it, touch it.
+const START_EVENTS = ['pointerenter', 'pointerdown', 'touchstart'];
+// The styles of the element, started or not.
+const HOST_STYLE = `
+      <style>
+        :host {
+          display: block;
+          contain: content;
+        }
+        #flatModeButton:hover {
+          opacity: 1.0 !important;
+        }
+        .still {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          pointer-events: none;
+        }
+      </style>
+      `;
+// The attributes that change what a still shows.
+const STILL_ATTRIBUTES = ['src', 'src-right', 'type', 'angle', 'projection', 'flat', 'disparity-adjustment'];
+// How far in front of the viewer the sign that a picture is loading is.
+const LOADING_INDICATOR_DISTANCE = 1;
+// What surrounds the picture is drawn on a sphere this far from the viewer.
+const SURROUNDINGS_RADIUS = 1000;
+// What surrounds the picture takes the colours of its edges, dimmed to leave the picture in front.
+const SURROUNDINGS_BRIGHTNESS = 0.5;
+// The colour of the surroundings is never darker than this, on a scale of 255.
+const SURROUNDINGS_DARKEST = 16;
+// Vertical field of view of the camera outside of VR, in degrees.
+const DEFAULT_FOV = 70;
+// Layers on which the pictures of each eye are drawn.
+const LEFT_EYE_LAYER = 1;
+
+/** The elements that started on interaction and are started, the most recently used last. */
+const startedOnInteraction = [];
+
+/** A hidden element that draws the stills of the elements that are not started: one WebGL context for all of them. */
+let stillDrawer = null;
+
+/** The stills are drawn one at a time. */
+let stillQueue = Promise.resolve();
+
+/**
+ * The hidden element that draws stills. Made when the first still is needed, and again if the browser took its GPU away.
+ * @returns {StereoImg}
+ */
+function getStillDrawer() {
+  if (stillDrawer && !stillDrawer.renderer?.getContext().isContextLost()) {
+    return stillDrawer;
+  }
+  if (stillDrawer) {
+    const host = stillDrawer.getRootNode().host;
+    stillDrawer._teardown();
+    host?.remove();
+  }
+  // Out of the page: not seen, and in a shadow tree, where the styles and the scripts of the page do not find it.
+  const host = document.createElement('div');
+  host.setAttribute('aria-hidden', 'true');
+  host.style.cssText = 'position:fixed;left:-100000px;top:0;width:0;height:0;overflow:hidden;visibility:hidden;pointer-events:none;';
+  stillDrawer = document.createElement('stereo-img');
+  stillDrawer._drawsOnDemand = true;
+  stillDrawer.setAttribute('controlslist', 'none');
+  stillDrawer.style.cssText = 'position:absolute;left:0;top:0;';
+  host.attachShadow({ mode: 'open' }).appendChild(stillDrawer);
+  return stillDrawer;
+}
+
+/**
+ * Draw the stills of an element that is not started: what it would show if it was.
+ * @param {StereoImg} element - The element.
+ * @param {number} job - Which of the requests of the element this is: only its latest counts.
+ * @returns {Promise<Array<HTMLCanvasElement>|null>} - One still, or one per eye for an element that wiggles. Null if they are not needed anymore.
+ */
+function drawStills(element, job) {
+  const drawing = stillQueue.then(async () => {
+    const isNeeded = () => element.isConnected && element._preview?.job === job;
+    const width = element.clientWidth;
+    const height = element.clientHeight;
+    if (!isNeeded() || width === 0 || height === 0) {
+      return null;
+    }
+
+    const drawer = getStillDrawer();
+    drawer.style.width = `${width}px`;
+    drawer.style.height = `${height}px`;
+    for (const name of STILL_ATTRIBUTES) {
+      if (element.hasAttribute(name)) {
+        drawer.setAttribute(name, element.getAttribute(name));
+      } else {
+        drawer.removeAttribute(name);
+      }
+    }
+
+    const host = drawer.getRootNode().host;
+    if (!host.isConnected) {
+      // its first picture: the element starts, and loads it
+      document.body.appendChild(host);
+      await drawer._started;
+    } else {
+      drawer._resize();
+      await drawer.parseImageAndInitialize3DScene();
+    }
+
+    try {
+      return isNeeded() ? drawer._captureFrames() : null;
+    } finally {
+      // keep nothing of the picture until the next still
+      await drawer._display(drawer._emptyStereoData(), new AbortController().signal);
+    }
+  });
+  stillQueue = drawing.catch(() => {});
+  return drawing;
+}
+
+/**
+ * Note that an element that starts on interaction is being used, and stop the ones used the longest ago if too many are started.
+ * @param {StereoImg} element - The element.
+ */
+function noteUse(element) {
+  const index = startedOnInteraction.indexOf(element);
+  if (index >= 0) {
+    startedOnInteraction.splice(index, 1);
+  }
+  startedOnInteraction.push(element);
+
+  let extra = startedOnInteraction.length - MOST_STARTED;
+  for (const candidate of [...startedOnInteraction]) {
+    if (extra <= 0) {
+      break;
+    }
+    // not the one being used, and not one that someone is in, in VR
+    if (candidate !== element && !candidate.renderer?.xr.isPresenting) {
+      candidate._stopAndShowPreview(true);
+      extra--;
+    }
+  }
+}
 
 class StereoImg extends HTMLElement {
 
@@ -68,6 +303,21 @@ class StereoImg extends HTMLElement {
     }
   }
 
+  /**
+   * When 3D starts: "interaction" to show a still until the viewer points at the element or touches it.
+   * Read when the element is added to the page.
+   */
+  get start() {
+    return this.getAttribute('start');
+  }
+  set start(val) {
+    if (val) {
+      this.setAttribute('start', val);
+    } else {
+      this.removeAttribute('start');
+    }
+  }
+
   get controlslist() {
     return this.getAttribute('controlslist');
   }
@@ -87,6 +337,28 @@ class StereoImg extends HTMLElement {
       this.setAttribute('flat', val);
     } else {
       this.removeAttribute('flat');
+    }
+  }
+
+  get muted() {
+    return this.hasAttribute('muted');
+  }
+  set muted(val) {
+    if (val) {
+      this.setAttribute('muted', '');
+    } else {
+      this.removeAttribute('muted');
+    }
+  }
+
+  get disparityAdjustment() {
+    return this.getAttribute('disparity-adjustment');
+  }
+  set disparityAdjustment(val) {
+    if (val || val === 0) {
+      this.setAttribute('disparity-adjustment', val);
+    } else {
+      this.removeAttribute('disparity-adjustment');
     }
   }
 
@@ -126,7 +398,7 @@ class StereoImg extends HTMLElement {
   }
 
   static get observedAttributes() {
-    return ['type', 'angle', 'debug', 'projection', 'controlslist', 'flat', 'wiggle', 'src', 'src-right'];
+    return ['type', 'angle', 'debug', 'projection', 'controlslist', 'flat', 'wiggle', 'src', 'src-right', 'disparity-adjustment'];
   }
 
   _scheduleRenderUpdate() {
@@ -142,7 +414,21 @@ class StereoImg extends HTMLElement {
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
-    if (oldValue === newValue || !this.renderer) {
+    if (oldValue === newValue) {
+      return;
+    }
+    if (this._preview) {
+      // not started: draw the stills again, once for all the attributes changed together
+      if (STILL_ATTRIBUTES.includes(name) && !this._previewUpdate) {
+        this._previewUpdate = Promise.resolve().then(() => {
+          this._previewUpdate = null;
+          this._drawPreview();
+        });
+      }
+      return;
+    }
+    // The element that draws stills loads when it is told to.
+    if (!this.renderer || this._drawsOnDemand) {
       return;
     }
 
@@ -161,20 +447,21 @@ class StereoImg extends HTMLElement {
       case 'controlslist':
         this.updateButtons();
         break;
+      case 'disparity-adjustment':
+        this.updateDisparityAdjustment();
+        break;
     }
   }
 
   /**
-   * Checks if an image is stereoscopic
-   * @param {string} imageUrl - The URL of the image to check.
-   * @param {AbortSignal} [signal] - Aborted when the answer is not needed anymore.
-   * @returns {Promise<boolean>} - True if the image is likely stereoscopic, false otherwise.
+   * Load an image.
+   * @param {string} url - The URL of the image.
+   * @param {AbortSignal} [signal] - Aborted when the image is not needed anymore.
+   * @returns {Promise<HTMLImageElement>} - The loaded image.
    * @private
    */
-  async _isStereo(imageUrl, signal) {
-    // Compare the left and right halves.
-    // Renders the image to a small canvas and calculates the average pixel difference.
-    const image = await new Promise((resolve, reject) => {
+  _loadImage(url, signal) {
+    return new Promise((resolve, reject) => {
       const img = new Image();
       const onAbort = () => {
         // Stop downloading the image.
@@ -193,8 +480,21 @@ class StereoImg extends HTMLElement {
         signal?.removeEventListener('abort', onAbort);
         reject(err);
       };
-      img.src = imageUrl;
+      img.src = url;
     });
+  }
+
+  /**
+   * Checks if an image is stereoscopic
+   * @param {string} imageUrl - The URL of the image to check.
+   * @param {AbortSignal} [signal] - Aborted when the answer is not needed anymore.
+   * @returns {Promise<boolean>} - True if the image is likely stereoscopic, false otherwise.
+   * @private
+   */
+  async _isStereo(imageUrl, signal) {
+    // Compare the left and right halves.
+    // Renders the image to a small canvas and calculates the average pixel difference.
+    const image = await this._loadImage(imageUrl, signal);
 
     const canvas = document.createElement('canvas');
     const width = 20;
@@ -261,77 +561,145 @@ class StereoImg extends HTMLElement {
       return this._emptyStereoData();
     }
 
+    // Each file is downloaded once, however many times it is read.
+    const picture = new Picture(src, signal);
+    const pictureRight = srcRight ? new Picture(srcRight, signal) : null;
+    try {
+      return await this._parsePicture(picture, pictureRight, { type, angle, projection, signal });
+    } finally {
+      picture.release();
+      pictureRight?.release();
+    }
+  }
+
+  /**
+   * Parse a downloaded picture.
+   * @param {Picture} picture - The picture of the "src" attribute.
+   * @param {Picture} [pictureRight] - The picture of the "src-right" attribute, if any.
+   * @param {Object} options - type, angle and projection attributes, and the signal to abort the parsing.
+   * @returns {Promise<Object>} - The stereo data of the picture.
+   * @private
+   */
+  async _parsePicture(picture, pictureRight, { type, angle, projection, signal }) {
+    const src = picture.url;
+    // Parsers read the downloaded file through this URL. They also get the URL the picture
+    // comes from: its file name can tell which camera took it.
+    const url = await picture.objectURL();
+    const stereoOptions = { angle, projection, signal, originalUrl: src };
+
     if (type === 'vr180' || type === 'vr') {
-      const { parseVR } = await import('./parsers/vr-parser/vr-parser.js');
-      return parseVR(src, { signal });
+      return this._parseVR(picture, signal);
     }
 
-    if (type === 'left-right' || type === 'right-left' || type === 'bottom-top' || type === 'top-bottom') {
+    if (['left-right', 'right-left', 'bottom-top', 'top-bottom', 'interlaced', 'interlaced-reverse', 'column-interlaced', 'column-interlaced-reverse'].includes(type)) {
       const { parseStereo } = await import('./parsers/stereo-parser/stereo-parser.js');
-      return parseStereo(src, { type, angle, projection, signal });
+      return parseStereo(url, { ...stereoOptions, type });
     }
 
-    if (type === 'anaglyph') {
+    if (type === 'anaglyph' || type?.startsWith('anaglyph-')) {
       const { parseAnaglyph } = await import('./parsers/anaglyph-parser/anaglyph-parser.js');
-      return parseAnaglyph(src, { angle, projection, signal });
+      // "anaglyph-red-cyan" names the colours of the picture, "anaglyph" lets the parser find them
+      return parseAnaglyph(url, { colors: type.slice('anaglyph-'.length), angle, projection, signal });
     }
 
     if (type === 'depth') {
       const { parseDepth } = await import('./parsers/depth-parser/depth-parser.js');
-      return parseDepth(src, { signal });
+      return parseDepth(url, { signal });
     }
 
     if (type === 'mono') {
       const { parseMono } = await import('./parsers/mono-parser/mono-parser.js');
-      return parseMono(src, { angle, projection, signal });
+      return parseMono(url, { angle, projection, signal });
     }
 
-    if (type === 'pair' || (!type && srcRight)) {
-      if (srcRight) {
+    if (type === 'lif') {
+      const { parseLIF } = await import('./parsers/lif-parser/lif-parser.js');
+      return parseLIF(url, { angle, projection, signal });
+    }
+
+    if (type === 'mpo') {
+      const { parseMPO } = await import('./parsers/mpo-parser/mpo-parser.js');
+      return parseMPO(url, { angle, projection, signal });
+    }
+
+    if (type === 'pair' || (!type && pictureRight)) {
+      if (pictureRight) {
         const { parseStereoPair } = await import('./parsers/stereo-parser/stereo-parser.js');
-        return parseStereoPair(src, srcRight, { type: 'pair', angle, projection, signal });
+        return parseStereoPair(url, await pictureRight.objectURL(), { ...stereoOptions, type: 'pair' });
       }
       console.error('<stereo-img> type "pair" is missing the "src-right" attribute for the right eye image.');
       const { parseStereo } = await import('./parsers/stereo-parser/stereo-parser.js');
-      return parseStereo(src, { angle, projection, signal });
+      return parseStereo(url, stereoOptions);
     }
 
     // No type specified
 
-    // if url ends with `PORTRAIT.jpg` assume type = depth
-    if (src.toUpperCase().endsWith('PORTRAIT.JPG')) {
-      const { parseDepth } = await import('./parsers/depth-parser/depth-parser.js');
-      return parseDepth(src, { signal });
+    const bytes = await picture.bytes();
+
+    // Multi-Picture Format: files of stereo cameras, usually ending with .mpo
+    const isNamedMpo = /\.mpo$/i.test(src.split(/[?#]/)[0]);
+    if (isNamedMpo || mayHaveMultiPictureIndex(bytes)) {
+      const { parseMPO, readStereoPair } = await import('./parsers/mpo-parser/mpo-parser.js');
+      // Regular pictures can use that format to hold previews: only use it for stereo pairs.
+      if (isNamedMpo || readStereoPair(bytes).length === 2) {
+        return parseMPO(url, { angle, projection, signal });
+      }
+    }
+
+    // Leia Image Format: the file ends with a marker
+    if (bytes[bytes.length - 2] === 0x1e && bytes[bytes.length - 1] === 0x1a) {
+      const { parseLIF, readStereoPair } = await import('./parsers/lif-parser/lif-parser.js');
+      if (readStereoPair(bytes)) {
+        return parseLIF(url, { angle, projection, signal });
+      }
     }
 
     // try to read XMP metadata to see if VR Photo, otherwise assume stereo-style (e.g. "left right")
-    // Read XMP metadata
-    const exif = await exifr.parse(src, {
-      xmp: true,
-      multiSegment: true,
-      mergeOutput: false,
-      ihdr: true, //unclear why we need this, but if not enabled, some VR180 XMP Data are not parsed
-    });
+    const exif = await readMetadata(bytes);
     signal?.throwIfAborted();
+
+    if (describesDepthMap(exif)) {
+      // Checked before VR Photos: a picture with a depth map can also hold a second image, the original picture.
+      const { parseDepth } = await import('./parsers/depth-parser/depth-parser.js');
+      return parseDepth(url, { signal, exif });
+    }
 
     if (exif?.GImage?.Data) {
       // GImage XMP for left eye found, assume VR Photo
-      const { parseVR } = await import('./parsers/vr-parser/vr-parser.js');
-      return parseVR(src, { signal });
+      return this._parseVR(picture, signal, exif);
     }
 
     // no left eye found, check if it is a stereo or mono image
-    const isStereo = await this._isStereo(src, signal);
+    const isStereo = await this._isStereo(url, signal);
 
     if (isStereo) {
       console.info('<stereo-img> does not have a "type" attribute and image does not have XMP metadata of a VR picture. Use "type" attribute to specify the type of stereoscopic image. Image seems to be "left-right" stereo.');
       const { parseStereo } = await import('./parsers/stereo-parser/stereo-parser.js');
-      return parseStereo(src, { angle, projection, signal });
+      return parseStereo(url, stereoOptions);
     }
 
     console.info('<stereo-img> does not have a "type" attribute and image does not have XMP metadata of a VR picture. Image does not seem to be stereoscopic. Displaying as mono.');
     const { parseMono } = await import('./parsers/mono-parser/mono-parser.js');
-    return parseMono(src, { angle, projection, signal });
+    return parseMono(url, { angle, projection, signal });
+  }
+
+  /**
+   * Parse a VR Photo.
+   * @param {Picture} picture - The picture.
+   * @param {AbortSignal} [signal] - Aborted when the picture is not needed anymore.
+   * @param {Object} [exif] - The metadata of the picture, when already read.
+   * @returns {Promise<Object>} - The stereo data of the picture.
+   * @private
+   */
+  async _parseVR(picture, signal, exif) {
+    const { parseVR } = await import('./parsers/vr-parser/vr-parser.js');
+    const url = await picture.objectURL();
+    const stereoData = await parseVR(url, { signal, exif: exif || await readMetadata(await picture.bytes()) });
+    if (stereoData.leftEye === url) {
+      // The left eye is the picture itself: load it while the downloaded file is at hand.
+      stereoData.leftEye = await this._loadImage(url, signal);
+    }
+    return stereoData;
   }
 
   /**
@@ -363,7 +731,7 @@ class StereoImg extends HTMLElement {
    * @param {String} eye: "left" or "right"
    */
   async createEye(eye, debug) {
-    const radius = 10; // 500
+    const radius = PICTURE_DISTANCE;
     const depth = radius / 5;
     const planeSegments = this.stereoData.depth ? 256 : 1;
     const sphereWidthSegments = 60;
@@ -383,24 +751,14 @@ class StereoImg extends HTMLElement {
       });
     }
 
-    // if max texture size supported by the GPU is below the eye image size, resize the image
-    const maxTextureSize = this.renderer.capabilities.maxTextureSize;
-    if (imageData.width > maxTextureSize || imageData.height > maxTextureSize) {
-      const newWidth = Math.min(imageData.width, maxTextureSize);
-      const newHeight = Math.min(imageData.height, maxTextureSize);
-      console.warn(`Image size (${imageData.width}x${imageData.height}) exceeds max texture size (${maxTextureSize}x${maxTextureSize}). Resizing to ${newWidth}x${newHeight}.`);
-      const canvas = document.createElement("canvas");
-      canvas.width = newWidth;
-      canvas.height = newHeight;
-      const ctx = canvas.getContext("2d");
-      const imageBitmap = await createImageBitmap(imageData);
-      ctx.drawImage(imageBitmap, 0, 0, newWidth, newHeight);
-      imageData = ctx.getImageData(0, 0, newWidth, newHeight);
+    if (eye === "left") {
+      // the surroundings take their colours from this picture
+      this._leftPicture = imageData;
     }
 
-    const texture = new THREE.Texture(imageData);
-    texture.needsUpdate = true;
-    texture.colorSpace = THREE.SRGBColorSpace;
+    // A picture larger than the largest texture of the GPU is cut into tiles: several textures, on several meshes.
+    const maxTextureSize = this._maxTextureSize();
+    const fitsInOneTexture = imageData.width <= maxTextureSize && imageData.height <= maxTextureSize;
 
     let geometry;
     // if angle is less than Pi / 2, use a plane, otherwise use a sphere
@@ -413,7 +771,12 @@ class StereoImg extends HTMLElement {
       const planeHeight = planeWidth / aspectRatio;
       const planeDistance = radius;
 
-      geometry = new THREE.PlaneGeometry(planeWidth, planeHeight, planeSegments, planeSegments);
+      // Tiles are made of whole triangles: a large picture needs at least a pair of triangles per tile.
+      const tileSize = maxTextureSize - 2 * tilePadding(maxTextureSize);
+      const widthSegments = fitsInOneTexture ? planeSegments : Math.max(planeSegments, Math.ceil(imageWidth / tileSize));
+      const heightSegments = fitsInOneTexture ? planeSegments : Math.max(planeSegments, Math.ceil(imageHeight / tileSize));
+
+      geometry = new THREE.PlaneGeometry(planeWidth, planeHeight, widthSegments, heightSegments);
       // Put the plane in front of the camera (rotate and translate it)
       geometry.rotateY(-Math.PI / 2);
       geometry.translate(planeDistance, 0, 0);
@@ -448,25 +811,60 @@ class StereoImg extends HTMLElement {
       }
     }
 
-    const material = new THREE.MeshStandardMaterial({
-      map: texture,
-      displacementScale: -1 * depth,
-      displacementBias: depth / 2,
-      flatShading: true,
-    });
+    let displacementMap = null;
     if (this.stereoData.depth) {
-      material.displacementMap = new THREE.Texture(this.stereoData.depth);
-      material.displacementMap.needsUpdate = true;
-      // material.displacementMap.colorSpace = THREE.SRGBColorSpace;
+      displacementMap = new THREE.Texture(this.stereoData.depth);
+      displacementMap.needsUpdate = true;
+      // displacementMap.colorSpace = THREE.SRGBColorSpace;
     }
 
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.rotation.reorder('YXZ');
-    mesh.rotation.y = Math.PI / 2;
-    mesh.rotation.x = this.stereoData.roll || 0;
-    mesh.rotation.z = this.stereoData.pitch || 0;
-    mesh.layers.set(eyeNumber); // display in left/right eye only
-    this.stereoImageGroup.add(mesh);
+    // The parts of the picture: all of it on the whole geometry, or tiles, each on some of the triangles.
+    let parts = null;
+    if (fitsInOneTexture) {
+      parts = [{ geometry, image: imageData }];
+    } else {
+      parts = this._cutIntoTiles(geometry, imageData, maxTextureSize);
+      if (parts) {
+        // The depth map is not cut: tiles also know where they are on the whole picture.
+        if (displacementMap) {
+          displacementMap.channel = 1;
+        }
+      } else {
+        parts = [{ geometry, image: await this._shrinkPicture(imageData, maxTextureSize) }];
+      }
+    }
+
+    for (const part of parts) {
+      const texture = new THREE.Texture(part.image);
+      texture.needsUpdate = true;
+      texture.colorSpace = THREE.SRGBColorSpace;
+
+      const material = new THREE.MeshStandardMaterial({
+        map: texture,
+        displacementScale: -1 * depth,
+        displacementBias: depth / 2,
+        flatShading: true,
+      });
+      material.displacementMap = displacementMap;
+
+      const mesh = new THREE.Mesh(part.geometry, material);
+      mesh.rotation.reorder('YXZ');
+      mesh.rotation.y = Math.PI / 2;
+      mesh.rotation.x = this.stereoData.roll || 0;
+      mesh.rotation.z = this.stereoData.pitch || 0;
+      mesh.layers.set(eyeNumber); // display in left/right eye only
+      this.stereoImageGroup.add(mesh);
+
+      if (part.tile) {
+        /** Which pixels of the picture this mesh draws, when the picture is cut into tiles. */
+        mesh.userData.tile = part.tile;
+        // Tiles are copies of parts of the picture. Send each to the GPU now and let go of the copy:
+        // the memory of a large picture is not needed twice.
+        this.renderer.initTexture(texture);
+        texture.image = null;
+        this._hasTiles = true;
+      }
+    }
 
     if (this.debug) {
       const wireframe = new THREE.WireframeGeometry(geometry);
@@ -483,9 +881,270 @@ class StereoImg extends HTMLElement {
     }
   }
 
+  /**
+   * In VR, keep the viewer in the middle of the picture, wherever their head is in the room.
+   *
+   * A stereo picture is what two eyes saw from one place. Seen from anywhere else it is distorted: the middle of what it is
+   * drawn on has to be where the head is, and to stay there when the head moves. Only turning the head changes the view.
+   *
+   * A picture with a depth map is different: it has relief, and moving the head shows its sides. It is placed once,
+   * in front of where the viewer is, and stays there.
+   * @param {XRFrame} frame - The frame being drawn.
+   * @private
+   */
+  _followViewer(frame) {
+    const referenceSpace = this.renderer.xr.getReferenceSpace();
+    const pose = referenceSpace && frame?.getViewerPose(referenceSpace);
+    if (!pose) {
+      // the headset does not know where it is, for now
+      return;
+    }
+    const head = pose.transform.position;
+
+    this.loadingIndicator.position.set(head.x, head.y, head.z - LOADING_INDICATOR_DISTANCE);
+
+    const group = this.stereoImageGroup;
+    if (!group) {
+      return;
+    }
+    const hasRelief = !!this.stereoData?.depth;
+    if (!hasRelief || this._placedGroup !== group) {
+      group.position.set(head.x, head.y, head.z);
+      this._placedGroup = group;
+    }
+  }
+
+  /**
+   * Out of VR, the picture is around the middle of the scene, where the camera of the element is.
+   * @private
+   */
+  _stopFollowingViewer() {
+    this._placedGroup = null;
+    this.stereoImageGroup?.position.set(0, 0, 0);
+    this.loadingIndicator.position.set(0, 0, -LOADING_INDICATOR_DISTANCE);
+  }
+
+  /**
+   * In VR, look at the thumbsticks of the controllers: pushed to a side, they ask for the previous or the next picture.
+   * @private
+   */
+  _readThumbsticks() {
+    const session = this.renderer.xr.getSession();
+    if (!session || !this._pushedThumbsticks) {
+      return;
+    }
+    for (const inputSource of session.inputSources) {
+      const direction = directionOfThumbstick(this._pushedThumbsticks, inputSource);
+      if (direction) {
+        this._askForPicture(direction, 'thumbstick', inputSource);
+      }
+    }
+  }
+
+  /**
+   * Tell the page that the viewer asks for another picture.
+   * @param {string} direction - "previous" or "next": the name of the event.
+   * @param {string} input - What the viewer used: "select" or "thumbstick".
+   * @param {XRInputSource} [inputSource] - The controller.
+   * @private
+   */
+  _askForPicture(direction, input, inputSource) {
+    this.dispatchEvent(new CustomEvent(direction, {
+      detail: { input, handedness: inputSource?.handedness || 'none' },
+      bubbles: true,
+      composed: true,
+    }));
+  }
+
+  /**
+   * The largest width and height of a texture, in pixels: a limit of the GPU.
+   * @returns {number}
+   * @private
+   */
+  _maxTextureSize() {
+    return this.renderer.capabilities.maxTextureSize;
+  }
+
+  /**
+   * Cut the picture of an eye, too large for one texture, into tiles.
+   * @param {THREE.BufferGeometry} geometry - What the whole picture is drawn on.
+   * @param {ImageData|HTMLImageElement|ImageBitmap|HTMLCanvasElement} picture - The picture.
+   * @param {number} maxSize - The largest width and height of a tile, in pixels.
+   * @returns {Array<{geometry: THREE.BufferGeometry, image: ImageData|HTMLCanvasElement, tile: Object}>|null} - For each tile, the triangles it is drawn on and its pixels. Null if the picture cannot be cut.
+   * @private
+   */
+  _cutIntoTiles(geometry, picture, maxSize) {
+    const { width, height } = picture;
+    // every triangle with its own corners, to give triangles to tiles
+    const triangles = geometry.index ? geometry.toNonIndexed() : geometry;
+    const { position, normal, uv } = triangles.attributes;
+
+    const tiles = planTiles(uv.array, width, height, maxSize);
+    if (triangles !== geometry) {
+      triangles.dispose();
+    }
+    if (!tiles) {
+      return null;
+    }
+
+    return tiles.map(tile => {
+      const part = new THREE.BufferGeometry();
+      part.setAttribute('position', new THREE.BufferAttribute(pickTriangles(position.array, 3, tile.triangles), 3));
+      part.setAttribute('normal', new THREE.BufferAttribute(pickTriangles(normal.array, 3, tile.triangles), 3));
+      // where the triangles are on the tile, and on the whole picture
+      part.setAttribute('uv', new THREE.BufferAttribute(tileUvs(uv.array, tile, width, height), 2));
+      part.setAttribute('uv1', new THREE.BufferAttribute(pickTriangles(uv.array, 2, tile.triangles), 2));
+      // A tile keeps the shape of the picture it is a part of: what looks at the shape of the picture sees no difference.
+      part.type = geometry.type;
+      part.parameters = geometry.parameters;
+
+      const rectangle = { x: tile.x, y: tile.y, width: tile.width, height: tile.height };
+      let image;
+      if (picture instanceof ImageData) {
+        image = new ImageData(cropPixels(picture.data, width, rectangle), tile.width, tile.height);
+      } else {
+        image = document.createElement('canvas');
+        image.width = tile.width;
+        image.height = tile.height;
+        image.getContext('2d').drawImage(picture, tile.x, tile.y, tile.width, tile.height, 0, 0, tile.width, tile.height);
+      }
+      return { geometry: part, image, tile: rectangle };
+    });
+  }
+
+  /**
+   * Reduce a picture to the largest size of a texture. Only for a picture that cannot be cut into tiles.
+   * @param {ImageData|HTMLImageElement|ImageBitmap|HTMLCanvasElement} picture - The picture.
+   * @param {number} maxSize - The largest width and height of a texture, in pixels.
+   * @returns {Promise<ImageData>} - The reduced picture.
+   * @private
+   */
+  async _shrinkPicture(picture, maxSize) {
+    const newWidth = Math.min(picture.width, maxSize);
+    const newHeight = Math.min(picture.height, maxSize);
+    console.warn(`Image size (${picture.width}x${picture.height}) exceeds max texture size (${maxSize}x${maxSize}). Resizing to ${newWidth}x${newHeight}.`);
+    const canvas = document.createElement("canvas");
+    canvas.width = newWidth;
+    canvas.height = newHeight;
+    const ctx = canvas.getContext("2d");
+    const imageBitmap = await createImageBitmap(picture);
+    ctx.drawImage(imageBitmap, 0, 0, newWidth, newHeight);
+    return ctx.getImageData(0, 0, newWidth, newHeight);
+  }
+
+  /**
+   * Tell if a view of the camera shows nothing but the picture: no margin around it.
+   * A view is given the way the controls move it: for a picture on a sphere, the direction of the camera,
+   * to the right and upwards in degrees. For a flat picture, the position of the camera, to the right and upwards.
+   * @param {number} first - Direction or position of the view, to the right.
+   * @param {number} second - Direction or position of the view, upwards.
+   * @param {number} fov - Vertical field of view, in degrees.
+   * @returns {boolean} - True if the picture fills the view, for both eyes.
+   * @private
+   */
+  _viewIsInsidePicture(first, second, fov) {
+    const meshes = this.stereoImageGroup?.children.filter(object => object.isMesh) || [];
+    const aspect = this.camera.aspect;
+    if (meshes.length === 0 || !(aspect > 0)) {
+      return true;
+    }
+    this.stereoImageGroup.updateMatrixWorld(true);
+
+    if (this._fitsGroup !== this.stereoImageGroup || this._fitsAspect !== aspect) {
+      // A picture that cannot fill even the narrowest view, in its middle, is left free: there is nothing to keep the view on.
+      this._fitsGroup = this.stereoImageGroup;
+      this._fitsAspect = aspect;
+      this._fits = true;
+      const center = this.controls.mode === 'pan' ? { lon: 0, lat: 0 } : this._pictureCenter();
+      this._fits = this._viewIsInsidePicture(center.lon, center.lat, this.controls.minFov);
+    }
+    if (!this._fits) {
+      return true;
+    }
+
+    const isPanning = this.controls.mode === 'pan';
+    const origin = new THREE.Vector3(isPanning ? first : 0, isPanning ? second : 0, 0);
+    const [lon, lat] = isPanning ? [0, 0] : [first, second];
+
+    const radians = Math.PI / 180;
+    const [sinLon, cosLon, sinLat, cosLat] = [Math.sin(lon * radians), Math.cos(lon * radians), Math.sin(lat * radians), Math.cos(lat * radians)];
+    // The camera looks at `forward`, with `right` and `up` on its sides.
+    const forward = [sinLon * cosLat, sinLat, -cosLon * cosLat];
+    const right = [cosLon, 0, sinLon];
+    const up = [-sinLon * sinLat, cosLat, cosLon * sinLat];
+    const tanV = Math.tan(fov * radians / 2);
+    const tanH = tanV * aspect;
+
+    // The corners of the view, and the middle of its sides
+    for (const [h, v] of [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, -1], [0, 1], [-1, 0], [1, 0]]) {
+      const direction = new THREE.Vector3(
+        forward[0] + h * tanH * right[0] + v * tanV * up[0],
+        forward[1] + h * tanH * right[1] + v * tanV * up[1],
+        forward[2] + h * tanH * right[2] + v * tanV * up[2]);
+      if (!meshes.every(mesh => rayHitsPicture(mesh, origin, direction))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * The direction of the middle of the picture, seen from the camera.
+   * @returns {{lon: number, lat: number}} - Angles to the right and upwards, in degrees.
+   * @private
+   */
+  _pictureCenter() {
+    const mesh = this.stereoImageGroup?.children.find(object => object.isMesh);
+    if (!mesh) {
+      return { lon: 0, lat: 0 };
+    }
+    this.stereoImageGroup.updateMatrixWorld(true);
+    // In the space of its mesh, a picture is centred on the X axis. On a sphere it can be above or below it.
+    const { thetaStart, thetaLength } = mesh.geometry.parameters;
+    const theta = thetaLength > 0 ? thetaStart + thetaLength / 2 : Math.PI / 2;
+    const center = new THREE.Vector3(Math.sin(theta), Math.cos(theta), 0).transformDirection(mesh.matrixWorld);
+    return {
+      lon: Math.atan2(center.x, -center.z) * 180 / Math.PI,
+      lat: Math.asin(Math.max(-1, Math.min(1, center.y))) * 180 / Math.PI,
+    };
+  }
+
+  /**
+   * Move the pictures of the two eyes horizontally, in opposite directions.
+   *
+   * The "disparity-adjustment" attribute is the distance to add between the two pictures,
+   * in percent of the width of one of them. A negative value moves them closer together:
+   * the left picture to the right and the right picture to the left. Each moves by half of the value.
+   */
+  updateDisparityAdjustment() {
+    if (!this.stereoImageGroup || !this.stereoData) {
+      return;
+    }
+    const adjustment = (parseFloat(this.getAttribute('disparity-adjustment')) || 0) / 100;
+    // same rule as in createEye
+    const isPlane = this.stereoData.phiLength < Math.PI / 2;
+
+    for (const object of this.stereoImageGroup.children) {
+      const isLeftEye = object.layers.isEnabled(LEFT_EYE_LAYER);
+      // how far the picture of this eye moves to the right, as a fraction of its width
+      const shift = (isLeftEye ? -1 : 1) * adjustment / 2;
+      if (isPlane) {
+        object.position.x = shift * PICTURE_DISTANCE * 2;
+      } else {
+        // a picture on a sphere moves by turning around the viewer
+        object.rotation.y = Math.PI / 2 - shift * this.stereoData.phiLength;
+      }
+    }
+
+    // the pictures of both eyes must still fill the view
+    this.controls?.constrain();
+  }
+
   async initialize3DScene() {
     if (this.stereoImageGroup) {
       this.scene.remove(this.stereoImageGroup);
+    }
+    if (this.stereoImageGroup && !this._gpuWasEmptied) {
       // Free the GPU memory used by the previous picture.
       this.stereoImageGroup.traverse(object => {
         object.geometry?.dispose();
@@ -498,11 +1157,15 @@ class StereoImg extends HTMLElement {
     }
     this.stereoImageGroup = new THREE.Group();
     this.scene.add(this.stereoImageGroup);
+    this._leftPicture = null;
+    this._hasTiles = false;
 
     this.scene.background = new THREE.Color(0x101010);
 
     await this.createEye("left");
     await this.createEye("right");
+
+    this.updateDisparityAdjustment();
 
     this.updateflatMode();
   }
@@ -515,24 +1178,26 @@ class StereoImg extends HTMLElement {
 
     const flatMode = this.getAttribute('flat');
 
-    const animation = () => {
+    const animation = (time, frame) => {
       if (this.loadingIndicator && this.loadingIndicator.visible) {
         this.loadingIndicator.rotation.y += 0.01;
         this.loadingIndicator.rotation.x += 0.01;
       }
 
-      if (flatMode === 'wiggle') {
-        this.renderer.render(this.scene, this.camera);
-      } else if (flatMode === 'right') {
-        this.camera.layers.set(2);
-        this.renderer.render(this.scene, this.camera);
-      } else if (flatMode === 'anaglyph') {
-        this.anaglyphEffect.render(this.scene, this.camera);
-      } else { // 'left' is the default
-        this.camera.layers.set(1);
-        this.renderer.render(this.scene, this.camera);
+      if (this.renderer.xr.isPresenting) {
+        this._readThumbsticks();
+        this._followViewer(frame);
       }
+
+      this._renderFrame();
     };
+
+    if (this._drawsOnDemand) {
+      // draws when asked: nothing to animate
+      this.toggleWiggle(false);
+      this.renderer.setAnimationLoop(null);
+      return;
+    }
 
     if (flatMode === 'wiggle') {
       this.toggleWiggle(true);
@@ -568,7 +1233,7 @@ class StereoImg extends HTMLElement {
           // Cancelled: a more recent load is in charge.
           return;
         }
-        console.error(`<stereo-img> could not display "${this.src}".${mixedContentHint(this.src, location.href)}`, error);
+        console.error(`<stereo-img> could not display "${this.src}".${loadingHints(this.src, location.href)}`, error);
         // Do not keep displaying the previous picture.
         stereoData = this._emptyStereoData();
       }
@@ -581,6 +1246,33 @@ class StereoImg extends HTMLElement {
         }
       }
     }
+  }
+
+  /**
+   * Build the scene of the picture being displayed again, without moving the view.
+   * Like any other change of the scene, it waits for the one in progress.
+   * @private
+   */
+  async _rebuildScene() {
+    const previous = this._displaying;
+    const rebuild = (async () => {
+      await previous;
+      if (!this.stereoData || !this.renderer) {
+        return;
+      }
+      try {
+        // What the previous scene had on the GPU went away with it: there is nothing to free.
+        this._gpuWasEmptied = true;
+        await this.initialize3DScene();
+        this.updateSurroundings();
+      } catch (error) {
+        console.error(`<stereo-img> could not display "${this.src}" again.`, error);
+      } finally {
+        this._gpuWasEmptied = false;
+      }
+    })();
+    this._displaying = rebuild;
+    await rebuild;
   }
 
   /**
@@ -597,15 +1289,25 @@ class StereoImg extends HTMLElement {
       try {
         this.stereoData = stereoData;
         await this.initialize3DScene();
+        this.updateSurroundings();
+        this.updateSound();
+        // A flat picture slides in front of the viewer. A picture on a sphere is looked around.
+        const isFlat = this.stereoImageGroup.children.some(object => object.geometry.type === 'PlaneGeometry');
+        this.controls.mode = isFlat ? 'pan' : 'look';
+        this.controls.distance = PICTURE_DISTANCE;
+        // start in front of the new picture, as wide as it allows
+        this.controls.reset(DEFAULT_FOV, this._pictureCenter());
       } catch (error) {
         if (signal.aborted) {
           // The more recent load replaces this scene.
           return;
         }
-        console.error(`<stereo-img> could not display "${this.src}".${mixedContentHint(this.src, location.href)}`, error);
+        console.error(`<stereo-img> could not display "${this.src}".${loadingHints(this.src, location.href)}`, error);
         try {
           this.stereoData = this._emptyStereoData();
           await this.initialize3DScene();
+          this.updateSurroundings();
+          this.updateSound();
         } catch (e) {
           // Nothing more can be done.
         }
@@ -628,11 +1330,97 @@ class StereoImg extends HTMLElement {
     };
   }
 
+  /**
+   * What is seen around the picture, where it does not fill the view: mostly in VR.
+   * A very large sphere around the viewer, coloured from the bottom to the top.
+   */
+  setupSurroundings() {
+    const geometry = new THREE.SphereGeometry(SURROUNDINGS_RADIUS, 32, 64);
+    geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(geometry.attributes.position.count * 3), 3));
+    const material = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, depthWrite: false, fog: false });
+    this.surroundings = new THREE.Mesh(geometry, material);
+    // behind everything, for both eyes
+    this.surroundings.renderOrder = -1;
+    this.surroundings.layers.enable(1);
+    this.surroundings.layers.enable(2);
+    this.scene.add(this.surroundings);
+    this.setSurroundingsColors([0, 0, 0], [0, 0, 0]);
+  }
+
+  /**
+   * Colour the surroundings of the picture: one colour above it, another below it, and from one to the other beside it.
+   * @param {Array<number>} top - Red, green and blue above the picture, from 0 to 255.
+   * @param {Array<number>} bottom - Red, green and blue below the picture, from 0 to 255.
+   * @param {number} [topLatitude] - How high the top of the picture is, in radians above the horizon.
+   * @param {number} [bottomLatitude] - How high the bottom of the picture is, in radians above the horizon.
+   */
+  setSurroundingsColors(top, bottom, topLatitude = Math.PI / 2, bottomLatitude = -Math.PI / 2) {
+    // dimmed, to leave the picture in front, but never darker than the surroundings of an element without a picture
+    const dim = color => color.map(value => Math.round(Math.max(SURROUNDINGS_DARKEST, value * SURROUNDINGS_BRIGHTNESS)));
+    const topColor = new THREE.Color().setRGB(...dim(top).map(value => value / 255), THREE.SRGBColorSpace);
+    const bottomColor = new THREE.Color().setRGB(...dim(bottom).map(value => value / 255), THREE.SRGBColorSpace);
+
+    const { position, color } = this.surroundings.geometry.attributes;
+    const mixed = new THREE.Color();
+    for (let i = 0; i < position.count; i++) {
+      const latitude = Math.asin(THREE.MathUtils.clamp(position.getY(i) / SURROUNDINGS_RADIUS, -1, 1));
+      // from 0 at the height of the bottom of the picture to 1 at the height of its top
+      const height = THREE.MathUtils.clamp((latitude - bottomLatitude) / (topLatitude - bottomLatitude), 0, 1);
+      mixed.lerpColors(bottomColor, topColor, height);
+      color.setXYZ(i, mixed.r, mixed.g, mixed.b);
+    }
+    color.needsUpdate = true;
+
+    /** The colours of the surroundings of the picture: red, green and blue from 0 to 255, above and below the picture. */
+    this.surroundingsColors = { top: dim(top), bottom: dim(bottom) };
+  }
+
+  /**
+   * Give the surroundings the colours of the top and bottom edges of the picture being displayed.
+   */
+  updateSurroundings() {
+    let colors = { top: [0, 0, 0], bottom: [0, 0, 0] };
+    let topLatitude = Math.PI / 2;
+    let bottomLatitude = -Math.PI / 2;
+
+    try {
+      const mesh = this.stereoImageGroup?.children.find(object => object.isMesh && object.material.map);
+      if (mesh && this._leftPicture) {
+        let pixels = this._leftPicture;
+        if (!(pixels instanceof ImageData)) {
+          // a small copy of the picture is enough to know the colours of its edges
+          const canvas = document.createElement('canvas');
+          canvas.width = 64;
+          canvas.height = 64;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          ctx.drawImage(pixels, 0, 0, canvas.width, canvas.height);
+          pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        }
+        colors = edgeColors(pixels, { circle: this.stereoData.projection === 'fisheye' });
+
+        // how high and how low the picture goes, seen from the middle of the scene
+        const { type, parameters } = mesh.geometry;
+        if (type === 'PlaneGeometry') {
+          topLatitude = Math.atan2(parameters.height / 2, PICTURE_DISTANCE);
+          bottomLatitude = -topLatitude;
+        } else {
+          topLatitude = Math.PI / 2 - parameters.thetaStart;
+          bottomLatitude = topLatitude - parameters.thetaLength;
+        }
+      }
+    } catch (error) {
+      // The colours are a decoration: a picture whose pixels cannot be read keeps dark surroundings.
+      colors = { top: [0, 0, 0], bottom: [0, 0, 0] };
+    }
+
+    this.setSurroundingsColors(colors.top, colors.bottom, topLatitude, bottomLatitude);
+  }
+
   setupLoadingIndicator() {
     const loaderGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
     const loaderMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true });
     this.loadingIndicator = new THREE.Mesh(loaderGeometry, loaderMaterial);
-    this.loadingIndicator.position.set(0, 0, -1);
+    this.loadingIndicator.position.set(0, 0, -LOADING_INDICATOR_DISTANCE);
     this.loadingIndicator.visible = false;
     this.loadingIndicator.layers.enable(1);
     this.loadingIndicator.layers.enable(2);
@@ -650,32 +1438,48 @@ class StereoImg extends HTMLElement {
       this.debug = true;
     }
 
-    this.shadowRoot.innerHTML = `
-      <style>
-        :host {
-          display: block;
-          contain: content;
-        }
-        #flatModeButton:hover {
-          opacity: 1.0 !important;
-        }
-      </style>
-      `;
-
-    // TODO: should we also read width and height attributes and resize element accordingly?
-    if (this.clientHeight === 0) {
-      const aspectRatio = 4 / 3;
-      this.style.height = this.clientWidth / aspectRatio + "px";
+    this.shadowRoot.innerHTML = HOST_STYLE;
+    if (this._still) {
+      // Started on interaction: the still stays over the picture until the picture is displayed.
+      this.shadowRoot.appendChild(this._still);
     }
+
+    this._giveHeight();
 
     this.renderer = new THREE.WebGLRenderer();
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.xr.enabled = true;
+    // The sound of the picture plays in VR, unless the element is muted. It goes back to how it was when leaving VR.
+    this.renderer.xr.addEventListener('sessionstart', () => {
+      this._soundBeforeVR = this.soundOn;
+      if (!this.muted) {
+        this.setSound(true);
+      }
+    });
+    this.renderer.xr.addEventListener('sessionend', () => {
+      this.setSound(!!this._soundBeforeVR);
+    });
+    // In VR, the controllers ask for the previous or the next picture: the page decides which pictures these are.
+    this.renderer.xr.addEventListener('sessionstart', () => {
+      this._pushedThumbsticks = new WeakSet();
+      // the trigger of a controller, a pinch of the fingers, the button of a Cardboard viewer
+      this.renderer.xr.getSession().addEventListener('select', event => {
+        this._askForPicture(directionOfSelect(event.inputSource?.handedness), 'select', event.inputSource);
+      });
+    });
     this.renderer.setSize(this.clientWidth, this.clientHeight);
     this.shadowRoot.appendChild(this.renderer.domElement);
+    // A browser can take the GPU away from a page, then give it back empty: phones do when the page is in the background.
+    // The renderer sends what it still has again. The tiles of a large picture are not kept: cut them again.
+    this.renderer.domElement.addEventListener('webglcontextrestored', () => {
+      if (this._hasTiles) {
+        this._rebuildScene();
+      }
+    });
 
     this.scene = new THREE.Scene();
     this.setupLoadingIndicator();
+    this.setupSurroundings();
 
     const light = new THREE.AmbientLight(0xffffff, 3);
     light.layers.enable(1);
@@ -690,26 +1494,323 @@ class StereoImg extends HTMLElement {
     }
 
     // TODO: Should we use component size instead?
-    this.camera = new THREE.PerspectiveCamera(70, this.clientWidth / this.clientHeight, 1, 2000);
+    this.camera = new THREE.PerspectiveCamera(DEFAULT_FOV, this.clientWidth / this.clientHeight, 1, 2000);
     this.camera.layers.enable(1);
 
-    const controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.camera.position.set(0, 0, 0.1);
-    controls.update();
+    // Look around by dragging the picture. In VR, the headset decides where the camera looks.
+    this.controls = new LookControls(this.camera, this.renderer.domElement);
+    // Only look at the picture: no margin around it.
+    this.controls.isAllowed = (lon, lat, fov) => this._viewIsInsidePicture(lon, lat, fov);
+    this.renderer.xr.addEventListener('sessionstart', () => {
+      this.controls.enabled = false;
+      this._fovBeforeVR = this.camera.fov;
+    });
+    this.renderer.xr.addEventListener('sessionend', () => {
+      // Some WebXR runtimes move the canvas to show it full screen, and cannot put it back in the element.
+      const canvas = this.renderer.domElement;
+      if (canvas.parentNode !== this.shadowRoot) {
+        this.shadowRoot.insertBefore(canvas, this.shadowRoot.querySelector('style').nextSibling);
+      }
+      // The picture followed the viewer in the room: put it back.
+      this._stopFollowingViewer();
+      // The headset changed the camera: go back to the view of the element.
+      this.camera.fov = this._fovBeforeVR;
+      this.camera.aspect = this.clientWidth / this.clientHeight;
+      this.camera.updateProjectionMatrix();
+      this.renderer.setSize(this.clientWidth, this.clientHeight);
+      this.controls.enabled = true;
+      this.controls.constrain();
+    });
 
     this.updateButtons();
 
     // Listen for component resize
-    this._resizeObserver = new ResizeObserver(() => {
-      this.renderer.setSize(this.clientWidth, this.clientHeight);
-      this.camera.aspect = this.clientWidth / this.clientHeight;
-      this.camera.updateProjectionMatrix();
-      this.anaglyphEffect.setSize(this.clientWidth, this.clientHeight);
-    });
+    this._resizeObserver = new ResizeObserver(() => this._resize());
 
     this._resizeObserver.observe(this);
 
     await this.parseImageAndInitialize3DScene();
+  }
+
+  /**
+   * Give a height to an element that has none: three quarters of its width.
+   * @private
+   */
+  _giveHeight() {
+    // TODO: should we also read width and height attributes and resize element accordingly?
+    if (this.clientHeight === 0) {
+      const aspectRatio = 4 / 3;
+      this.style.height = this.clientWidth / aspectRatio + "px";
+    }
+  }
+
+  /**
+   * Draw at the size of the element.
+   * @private
+   */
+  _resize() {
+    if (!this.renderer) {
+      return;
+    }
+    this.renderer.setSize(this.clientWidth, this.clientHeight);
+    this.camera.aspect = this.clientWidth / this.clientHeight;
+    this.camera.updateProjectionMatrix();
+    this.anaglyphEffect.setSize(this.clientWidth, this.clientHeight);
+    // the picture may not fill the new shape of the element with the same view
+    this.controls.constrain();
+  }
+
+  /**
+   * Draw the picture once, the way the "flat" attribute says.
+   * @param {number} [eye] - Draw what this eye sees instead: 1 for the left eye, 2 for the right eye.
+   * @private
+   */
+  _renderFrame(eye) {
+    const flatMode = this.getAttribute('flat');
+    if (eye) {
+      this.camera.layers.set(eye);
+      this.renderer.render(this.scene, this.camera);
+    } else if (flatMode === 'wiggle') {
+      this.renderer.render(this.scene, this.camera);
+    } else if (flatMode === 'right') {
+      this.camera.layers.set(2);
+      this.renderer.render(this.scene, this.camera);
+    } else if (flatMode === 'anaglyph') {
+      this.anaglyphEffect.render(this.scene, this.camera);
+    } else { // 'left' is the default
+      this.camera.layers.set(1);
+      this.renderer.render(this.scene, this.camera);
+    }
+  }
+
+  /**
+   * Copy what the element shows: a still. An element that wiggles gets one still per eye.
+   * @returns {Array<HTMLCanvasElement>}
+   * @private
+   */
+  _captureFrames() {
+    const canvas = this.renderer.domElement;
+    const eyes = this.getAttribute('flat') === 'wiggle' ? [1, 2] : [0];
+    return eyes.map(eye => {
+      this._renderFrame(eye);
+      const still = document.createElement('canvas');
+      still.width = canvas.width;
+      still.height = canvas.height;
+      still.getContext('2d').drawImage(canvas, 0, 0);
+      return still;
+    });
+  }
+
+  /**
+   * Show stills of the picture instead of starting 3D: for an element that starts on interaction.
+   * Nothing of WebGL is made, so a page can have many of these.
+   * @param {Array<HTMLCanvasElement>} [stills] - What to show. When missing, the stills are drawn from the picture.
+   * @private
+   */
+  _showPreview(stills) {
+    this.shadowRoot.innerHTML = HOST_STYLE;
+    this._giveHeight();
+    this._preview = { job: 0, stills: [], timer: null, aspect: 0 };
+
+    for (const type of START_EVENTS) {
+      this.addEventListener(type, this._startOnInteraction, { passive: true });
+    }
+    // an element that changes shape needs another still, and one that had no size gets its first
+    this._previewResizeObserver = new ResizeObserver(() => {
+      const aspect = this.clientWidth / this.clientHeight;
+      const drawnFor = this._preview?.aspect;
+      if (this._preview && aspect > 0 && (!(drawnFor > 0) || Math.abs(aspect / drawnFor - 1) > 0.01)) {
+        this._drawPreview();
+      }
+    });
+
+    if (stills?.length > 0) {
+      this._setStills(stills);
+    } else {
+      this._drawPreview();
+    }
+    this._previewResizeObserver.observe(this);
+  }
+
+  /**
+   * Draw the stills of an element that is not started, from its picture.
+   * @private
+   */
+  async _drawPreview() {
+    const preview = this._preview;
+    if (!preview) {
+      return;
+    }
+    const job = ++preview.job;
+    preview.aspect = this.clientWidth / this.clientHeight;
+    const stills = await drawStills(this, job);
+    if (this._preview !== preview || preview.job !== job) {
+      // started meanwhile, or asked again
+      return;
+    }
+    if (stills) {
+      this._setStills(stills);
+    } else {
+      // Not drawn: the element had no size, or was out of the page. To be drawn when it has a size.
+      preview.aspect = 0;
+      if (this.isConnected && this.clientWidth > 0 && this.clientHeight > 0) {
+        this._drawPreview();
+      }
+    }
+  }
+
+  /**
+   * Show stills in an element that is not started. With one per eye, they alternate: the picture wiggles.
+   * @param {Array<HTMLCanvasElement>} stills - What to show.
+   * @private
+   */
+  _setStills(stills) {
+    const preview = this._preview;
+    clearInterval(preview.timer);
+    preview.stills.forEach(still => still.remove());
+    preview.stills = stills;
+    preview.aspect = stills[0].width / stills[0].height;
+    stills.forEach((still, index) => {
+      still.className = 'still';
+      still.style.visibility = index === 0 ? 'visible' : 'hidden';
+      this.shadowRoot.appendChild(still);
+    });
+    this._wigglePreview();
+  }
+
+  /**
+   * Alternate the stills of the two eyes, at the pace of toggleWiggle.
+   * @private
+   */
+  _wigglePreview() {
+    const preview = this._preview;
+    clearInterval(preview.timer);
+    preview.timer = null;
+    if (preview.stills.length > 1 && this.isConnected) {
+      let shown = 0;
+      preview.timer = setInterval(() => {
+        shown = (shown + 1) % preview.stills.length;
+        preview.stills.forEach((still, index) => {
+          still.style.visibility = index === shown ? 'visible' : 'hidden';
+        });
+      }, 1000 / 10);
+    }
+  }
+
+  /**
+   * Start 3D in an element that showed stills.
+   * @private
+   */
+  _start() {
+    const preview = this._preview;
+    if (!preview) {
+      return;
+    }
+    clearInterval(preview.timer);
+    this._previewResizeObserver.disconnect();
+    for (const type of START_EVENTS) {
+      this.removeEventListener(type, this._startOnInteraction);
+    }
+    this._preview = null;
+
+    // One still stays over the picture until the picture is displayed, and is kept in case the browser takes the GPU away.
+    this._still = preview.stills.find(still => still.style.visibility === 'visible') || preview.stills[0] || null;
+    preview.stills.forEach(still => still.style.visibility = 'visible');
+
+    this._started = this.init();
+    this._started.finally(() => {
+      if (this.renderer && this._still?.isConnected) {
+        // the picture, not the sign that it was loading
+        if (!this.renderer.xr.isPresenting) {
+          this._renderFrame();
+        }
+        this._still.remove();
+      }
+    }).catch(() => {
+      // reported by the browser, as for an element that starts by itself
+    });
+    if (!this.renderer) {
+      // WebGL is not available
+      return;
+    }
+
+    this.renderer.domElement.addEventListener('webglcontextlost', this._stopOnContextLoss);
+    for (const type of ['pointerenter', 'pointerdown']) {
+      this.addEventListener(type, this._noteUse, { passive: true });
+    }
+    noteUse(this);
+  }
+
+  /**
+   * Stop 3D in an element that starts on interaction, and show stills again. The next interaction starts it again.
+   * @param {boolean} capture - True to show what the element was showing. False to show the still from before it started.
+   * @private
+   */
+  _stopAndShowPreview(capture) {
+    if (!this.renderer) {
+      return;
+    }
+    let stills = this._still ? [this._still] : [];
+    if (capture && !this.renderer.getContext().isContextLost() && this.stereoData && !this.loadingIndicator.visible) {
+      stills = this._captureFrames();
+    }
+    this.renderer.domElement.removeEventListener('webglcontextlost', this._stopOnContextLoss);
+    for (const type of ['pointerenter', 'pointerdown']) {
+      this.removeEventListener(type, this._noteUse);
+    }
+    const index = startedOnInteraction.indexOf(this);
+    if (index >= 0) {
+      startedOnInteraction.splice(index, 1);
+    }
+    this._teardown();
+    this._still = null;
+    this._showPreview(stills);
+  }
+
+  /**
+   * Stop 3D and give back everything it uses: the GPU first.
+   * @private
+   */
+  _teardown() {
+    this._loadController?.abort();
+    this._loadController = null;
+    this.toggleWiggle(false);
+    this._resizeObserver?.disconnect();
+    if (this.soundOn) {
+      this.setSound(false);
+    }
+    this.audio = null;
+    if (this.renderer) {
+      this.renderer.setAnimationLoop(null);
+      this.controls.dispose();
+      this.scene.traverse(object => {
+        object.geometry?.dispose();
+        if (object.material) {
+          object.material.map?.dispose();
+          object.material.displacementMap?.dispose();
+          object.material.dispose();
+        }
+      });
+      this.anaglyphEffect.dispose();
+      const gl = this.renderer.getContext();
+      this.renderer.dispose();
+      // tell the browser now, instead of when it notices that nothing uses the context
+      if (!gl.isContextLost()) {
+        gl.getExtension('WEBGL_lose_context')?.loseContext();
+      }
+    }
+    this.renderer = null;
+    this.scene = null;
+    this.camera = null;
+    this.controls = null;
+    this.anaglyphEffect = null;
+    this.loadingIndicator = null;
+    this.surroundings = null;
+    this.stereoImageGroup = null;
+    this.stereoData = null;
+    this._leftPicture = null;
+    this._displaying = null;
+    this._initialized = false;
   }
 
   updateButtons() {
@@ -720,7 +1821,7 @@ class StereoImg extends HTMLElement {
     if (flatButton) flatButton.remove();
 
     // Space-separated list of tokens, compared as whole words.
-    const controlslist = (this.getAttribute('controlslist') || 'vr wiggle left right anaglyph').toLowerCase().split(/\s+/);
+    const controlslist = (this.getAttribute('controlslist') || 'vr wiggle left right anaglyph sound').toLowerCase().split(/\s+/);
     const availableFlatModes = ['left', 'right', 'wiggle', 'anaglyph'].filter(mode => controlslist.includes(mode));
 
     if (controlslist.includes('vr')) {
@@ -731,6 +1832,64 @@ class StereoImg extends HTMLElement {
     if (availableFlatModes.length > 1) {
       this.shadowRoot.appendChild(flatModeButton.createButton(this));
     }
+
+    this.updateSoundButton();
+  }
+
+  /**
+   * Show the sound button when the picture has sound, unless "controlslist" leaves it out.
+   */
+  updateSoundButton() {
+    this.shadowRoot.querySelector('#soundButton')?.remove();
+    const controlslist = (this.getAttribute('controlslist') || 'sound').toLowerCase().split(/\s+/);
+    if (this.audio && controlslist.includes('sound')) {
+      this.shadowRoot.appendChild(soundButton.createButton(this));
+    }
+  }
+
+  /**
+   * Get ready to play the sound of the picture being displayed, if it has one.
+   * The sound keeps playing from one picture to the next when it was on.
+   */
+  updateSound() {
+    const wasOn = this.soundOn;
+    this.audio?.pause();
+    this.audio = null;
+    this.soundOn = false;
+    if (this.stereoData?.audio) {
+      this.audio = new Audio(this.stereoData.audio);
+      this.audio.loop = true;
+      if (wasOn) {
+        this.setSound(true);
+      }
+    }
+    this.updateSoundButton();
+  }
+
+  /**
+   * Turn the sound of the picture on or off.
+   * Browsers only let a page play sound once the user has interacted with it: until then, the sound stays off.
+   * @param {boolean} on - true to play the sound
+   */
+  setSound(on) {
+    this.soundOn = !!on && !!this.audio;
+    if (this.soundOn) {
+      const audio = this.audio;
+      Promise.resolve(audio.play()).catch(() => {
+        // not allowed to play, or the sound cannot be read
+        if (this.audio === audio) {
+          this.soundOn = false;
+          this.shadowRoot.querySelector('#soundButton')?.update();
+        }
+      });
+    } else {
+      this.audio?.pause();
+    }
+    this.shadowRoot.querySelector('#soundButton')?.update();
+  }
+
+  toggleSound() {
+    this.setSound(!this.soundOn);
   }
 
 
@@ -741,10 +1900,27 @@ class StereoImg extends HTMLElement {
       this.updateflatMode();
       return;
     }
-    this.init();
+    if (this._preview) {
+      // Back in the document without having started: the stills are still there.
+      this._wigglePreview();
+      if (this._preview.stills.length === 0) {
+        this._drawPreview();
+      }
+      return;
+    }
+    if (this.getAttribute('start') === 'interaction') {
+      // Show stills, and start 3D when the viewer shows interest.
+      this._showPreview();
+      return;
+    }
+    this._started = this.init();
   }
 
   disconnectedCallback() {
+    if (this._preview) {
+      clearInterval(this._preview.timer);
+      this._preview.timer = null;
+    }
     if (this._resizeObserver) {
       this._resizeObserver.disconnect();
     }
@@ -756,6 +1932,10 @@ class StereoImg extends HTMLElement {
       // Stop rendering, so that a removed element does not keep drawing frames forever.
       this.renderer.setAnimationLoop(null);
     }
+    // A removed element must not keep playing.
+    if (this.soundOn) {
+      this.setSound(false);
+    }
   }
 
   constructor() {
@@ -765,6 +1945,11 @@ class StereoImg extends HTMLElement {
     this.stereoImageGroup = null;
     this._initialized = false;
     this.attachShadow({ mode: 'open' });
+
+    // For an element that starts on interaction
+    this._startOnInteraction = () => this._start();
+    this._noteUse = () => noteUse(this);
+    this._stopOnContextLoss = () => this._stopAndShowPreview(false);
   }
 
 }
