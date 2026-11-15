@@ -2,7 +2,9 @@ import { fromRollup } from '@web/dev-server-rollup';
 import { puppeteerLauncher } from '@web/test-runner-puppeteer';
 import resolve from '@rollup/plugin-node-resolve';
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile, realpath } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { join, sep } from 'node:path';
 import { existsSync } from 'node:fs';
 
 // Use the Chrome installed on this machine when there is one, instead of the one Puppeteer downloads.
@@ -11,21 +13,44 @@ const executablePath = existsSync(SYSTEM_CHROME) ? SYSTEM_CHROME : undefined;
 
 /**
  * A second server, on another port, to test pictures coming from another origin.
- * It serves the files of the repository under two paths:
- * - /cors/... allows other origins to read the file
- * - /no-cors/... does not
+ * It serves the pictures of the examples folder, and nothing else, under two paths:
+ * - /cors/examples/... allows other origins to read the file
+ * - /no-cors/examples/... does not
+ * It only listens on this machine.
  */
 const OTHER_ORIGIN_PORT = 8643;
+const POLICIES = new Set(['cors', 'no-cors']);
+const EXAMPLES = fileURLToPath(new URL('./examples/', import.meta.url));
+
+/** The path on disk of the example a request asks for, or undefined when it asks for anything else. */
+async function exampleFile(url) {
+  const [, policy, folder, ...rest] = new URL(url, 'http://localhost').pathname.split('/');
+  if (!POLICIES.has(policy) || folder !== 'examples' || rest.length === 0) {
+    return undefined;
+  }
+  const names = rest.map(decodeURIComponent);
+  if (names.some(name => name === '' || name === '.' || name === '..' || name.includes('/') || name.includes('\\') || name.includes('\0'))) {
+    return undefined;
+  }
+  const root = await realpath(EXAMPLES);
+  // Resolve symbolic links too, so that a link in the examples folder cannot point outside of it.
+  const file = await realpath(join(root, ...names));
+  return file.startsWith(root + sep) ? { file, policy } : undefined;
+}
+
 let otherOrigin;
 const otherOriginServer = {
   name: 'other-origin-server',
   serverStart() {
     otherOrigin = createServer(async (request, response) => {
-      const [, policy, ...path] = new URL(request.url, 'http://localhost').pathname.split('/');
       try {
-        const file = await readFile(new URL(path.join('/'), import.meta.url));
+        const found = await exampleFile(request.url);
+        if (!found) {
+          throw new Error('Not an example');
+        }
+        const file = await readFile(found.file);
         const headers = { 'content-type': 'image/jpeg' };
-        if (policy === 'cors') {
+        if (found.policy === 'cors') {
           headers['access-control-allow-origin'] = '*';
         }
         response.writeHead(200, headers);
@@ -34,7 +59,7 @@ const otherOriginServer = {
         response.writeHead(404);
         response.end();
       }
-    }).listen(OTHER_ORIGIN_PORT);
+    }).listen(OTHER_ORIGIN_PORT, 'localhost');
   },
   serverStop() {
     otherOrigin?.close();
