@@ -120,7 +120,15 @@ This component has been manually tested on the following hardware, OS and browse
 * `muted`: (Optional) When set, the sound of the picture does not start by itself when entering VR. The sound button still plays it.
 * `start`: (Optional) Set it to `interaction` on pages with many pictures. See [Pages with many pictures](#pages-with-many-pictures).
 * `width` and `height`: (Optional) Size of the element in CSS pixels, like the `width` and `height` attributes of `<img>`. Set them to reserve the space of the element and avoid layout shifts. The CSS of the page wins over them: with both attributes set, an element styled with `width: 100%; height: auto;` keeps their aspect ratio. Without them, an element with no height is given three quarters of its width.
-  - Until the script defines `<stereo-img>`, the browser lays it out as an unknown inline element and ignores its size. To reserve its space from the first paint, add `stereo-img { display: block; }` to the CSS of the page.
+  - The attributes take effect once the script has defined `<stereo-img>`. Until then, the browser lays it out as an unknown inline element of no height, and the content below moves when the script loads. To reserve the space from the first paint, also give the element its layout and size in the CSS of the page, for example for `<stereo-img src="picture.vr.jpg" width="700" height="400">`:
+    ```css
+    stereo-img {
+      display: block;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 700 / 400;
+    }
+    ```
 * `debug`: (Optional) When set, logs diagnostic information to the console and displays the wireframe of the 3D geometry.
 
 ## Events

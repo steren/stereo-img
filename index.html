@@ -71,11 +71,13 @@ limitations under the License.
       height: 400px;
     }
 
-    /* Before the script defines it, a custom element is inline and ignores its size: lay it out as a block right away. */
+    /* Before the script defines it, a custom element is inline and knows nothing of its width and height attributes:
+       give it its layout and their aspect ratio right away, so that nothing moves when the script loads. */
     stereo-img {
       display: block;
       width: 100%;
       height: auto;
+      aspect-ratio: 700 / 400;
     }
 
     .icon {
