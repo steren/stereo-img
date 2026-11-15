@@ -2,7 +2,7 @@
 // and hear about controllers and hands.
 // There is no headset where the tests run, and the browser refuses VR sessions without one.
 
-import * as THREE from '../../../vendor/three/three.module.min.js';
+import * as THREE from '../../../vendor/three/three.module.js';
 
 /** One half of the canvas for each eye. */
 class FakeLayer {

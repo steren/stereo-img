@@ -14,7 +14,7 @@
 
 import exifr from './vendor/exifr/full.esm.js';
 
-import * as THREE from './vendor/three/three.module.min.js';
+import * as THREE from './vendor/three/three.module.js';
 import { VRButton } from './lib/VRButton.js';
 import { LookControls } from './lib/LookControls.js';
 import { AnaglyphEffect } from './lib/AnaglyphEffect.js';
