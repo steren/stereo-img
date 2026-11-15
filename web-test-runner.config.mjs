@@ -3,6 +3,11 @@ import { puppeteerLauncher } from '@web/test-runner-puppeteer';
 import resolve from '@rollup/plugin-node-resolve';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+
+// Use the Chrome installed on this machine when there is one, instead of the one Puppeteer downloads.
+const SYSTEM_CHROME = '/usr/bin/google-chrome-stable';
+const executablePath = existsSync(SYSTEM_CHROME) ? SYSTEM_CHROME : undefined;
 
 /**
  * A second server, on another port, to test pictures coming from another origin.
@@ -45,6 +50,6 @@ export default {
   // It used to do so by itself, which it now calls deprecated: after a hundred seconds of tests or so, that way stops
   // answering and every test file that follows times out. Asking for software WebGL avoids it.
   // The flag only allows drawing in software: a machine with a GPU still uses it.
-  browsers: [puppeteerLauncher({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } })],
+  browsers: [puppeteerLauncher({ launchOptions: { executablePath, args: ['--enable-unsafe-swiftshader'] } })],
   plugins: [fromRollup(resolve)(), otherOriginServer],
 };
