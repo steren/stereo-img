@@ -66,9 +66,16 @@ limitations under the License.
       margin-bottom: 2em;
     }
 
-    img, stereo-img {
+    img {
       width: 100%;
       height: 400px;
+    }
+
+    /* Before the script defines it, a custom element is inline and ignores its size: lay it out as a block right away. */
+    stereo-img {
+      display: block;
+      width: 100%;
+      height: auto;
     }
 
     .icon {
@@ -124,7 +131,7 @@ limitations under the License.
       </select>
     </p>
 
-    <stereo-img src="examples/vr180-lenovo-mirage.vr.jpg" type="vr"></stereo-img>
+    <stereo-img src="examples/vr180-lenovo-mirage.vr.jpg" type="vr" width="700" height="400"></stereo-img>
     <button id="previous">Previous</button> <button id="next">Next</button> (or use left/right keyboard keys, or in VR the triggers or the thumbsticks of the controllers)
 
     <p>These are best viewed in VR, click "Enter VR" if your device supports VR.</p>

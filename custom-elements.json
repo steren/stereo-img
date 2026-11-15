@@ -199,6 +199,20 @@
               "fieldName": "controlslist"
             },
             {
+              "name": "width",
+              "type": {
+                "text": "string"
+              },
+              "description": "Width of the element in CSS pixels, like the \"width\" attribute of <img>. With \"height\", it also gives the element their aspect ratio. The CSS of the page wins over it."
+            },
+            {
+              "name": "height",
+              "type": {
+                "text": "string"
+              },
+              "description": "Height of the element in CSS pixels, like the \"height\" attribute of <img>. With \"width\", it also gives the element their aspect ratio. The CSS of the page wins over it."
+            },
+            {
               "name": "debug",
               "type": {
                 "text": "string"

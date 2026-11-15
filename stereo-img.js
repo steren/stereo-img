@@ -126,6 +126,23 @@ const HOST_STYLE = `
         #flatModeButton:hover {
           opacity: 1.0 !important;
         }
+        /* The buttons, over the picture. Its width decides where they go, so that they never overlap. */
+        #controls {
+          position: absolute;
+          inset: 0;
+          z-index: 999;
+          pointer-events: none;
+          container-type: inline-size;
+        }
+        #controls > * {
+          pointer-events: auto;
+        }
+        /* Too narrow for the VR button between the sound and flat mode buttons: put it above them. */
+        @container (max-width: 480px) {
+          #VRButton {
+            bottom: 70px !important;
+          }
+        }
         .still {
           position: absolute;
           left: 0;
@@ -398,7 +415,33 @@ class StereoImg extends HTMLElement {
   }
 
   static get observedAttributes() {
-    return ['type', 'angle', 'debug', 'projection', 'controlslist', 'flat', 'wiggle', 'src', 'src-right', 'disparity-adjustment'];
+    return ['type', 'angle', 'debug', 'projection', 'controlslist', 'flat', 'wiggle', 'src', 'src-right', 'disparity-adjustment', 'width', 'height'];
+  }
+
+  /**
+   * Size the element from its "width" and "height" attributes, in CSS pixels, like an <img>:
+   * with both, the element also keeps their aspect ratio when CSS sets only one of its dimensions.
+   * The rule is in the shadow tree, so the CSS of the page still wins over it.
+   * @private
+   */
+  _applySizeAttributes() {
+    const dimension = (name) => {
+      const value = parseFloat(this.getAttribute(name));
+      return Number.isFinite(value) && value >= 0 ? value : null;
+    };
+    const width = dimension('width');
+    const height = dimension('height');
+    const declarations = [];
+    if (width !== null) {
+      declarations.push(`width: ${width}px;`);
+    }
+    if (height !== null) {
+      declarations.push(`height: ${height}px;`);
+    }
+    if (width && height) {
+      declarations.push(`aspect-ratio: auto ${width} / ${height};`);
+    }
+    this._sizeSheet.replaceSync(declarations.length ? `:host { ${declarations.join(' ')} }` : '');
   }
 
   _scheduleRenderUpdate() {
@@ -415,6 +458,11 @@ class StereoImg extends HTMLElement {
 
   attributeChangedCallback(name, oldValue, newValue) {
     if (oldValue === newValue) {
+      return;
+    }
+    if (name === 'width' || name === 'height') {
+      // The resize observers draw again at the new size.
+      this._applySizeAttributes();
       return;
     }
     if (this._preview) {
@@ -1541,7 +1589,6 @@ class StereoImg extends HTMLElement {
    * @private
    */
   _giveHeight() {
-    // TODO: should we also read width and height attributes and resize element accordingly?
     if (this.clientHeight === 0) {
       const aspectRatio = 4 / 3;
       this.style.height = this.clientWidth / aspectRatio + "px";
@@ -1829,12 +1876,12 @@ class StereoImg extends HTMLElement {
     const availableFlatModes = ['left', 'right', 'wiggle', 'anaglyph'].filter(mode => controlslist.includes(mode));
 
     if (controlslist.includes('vr')) {
-      this.shadowRoot.appendChild(VRButton.createButton(this.renderer));
+      this._controls().appendChild(VRButton.createButton(this.renderer));
     }
 
     // Only show the flatModeButton if there is more than one mode to cycle through.
     if (availableFlatModes.length > 1) {
-      this.shadowRoot.appendChild(flatModeButton.createButton(this));
+      this._controls().appendChild(flatModeButton.createButton(this));
     }
 
     this.updateSoundButton();
@@ -1847,8 +1894,22 @@ class StereoImg extends HTMLElement {
     this.shadowRoot.querySelector('#soundButton')?.remove();
     const controlslist = (this.getAttribute('controlslist') || 'sound').toLowerCase().split(/\s+/);
     if (this.audio && controlslist.includes('sound')) {
-      this.shadowRoot.appendChild(soundButton.createButton(this));
+      this._controls().appendChild(soundButton.createButton(this));
     }
+  }
+
+  /**
+   * The element that holds the buttons, made the first time it is needed.
+   * @returns {HTMLElement}
+   */
+  _controls() {
+    let controls = this.shadowRoot.querySelector('#controls');
+    if (!controls) {
+      controls = document.createElement('div');
+      controls.id = 'controls';
+      this.shadowRoot.appendChild(controls);
+    }
+    return controls;
   }
 
   /**
@@ -1949,6 +2010,9 @@ class StereoImg extends HTMLElement {
     this.stereoImageGroup = null;
     this._initialized = false;
     this.attachShadow({ mode: 'open' });
+    // The size from the "width" and "height" attributes: kept when the content of the shadow tree is replaced.
+    this._sizeSheet = new CSSStyleSheet();
+    this.shadowRoot.adoptedStyleSheets = [this._sizeSheet];
 
     // For an element that starts on interaction
     this._startOnInteraction = () => this._start();
