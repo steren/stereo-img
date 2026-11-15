@@ -27,6 +27,47 @@ Alternatively, you can serve the module from your own server, install it via npm
 npm install stereo-img
 ```
 
+
+## Compatibility
+
+### Supported cameras
+
+This component has been manually tested to load pictures taken with the following cameras:
+
+| Status | Camera                              | Picture type        | Attributes required                   |  Field of view | Orientation |
+| ------ | ----------------------------------- | ------------------- | ------------------------------------- | ------------- | ----------- |
+| ✔️     | Lenovo Mirage Camera                | VR180               | (none)                                |  ✓           | ✓ 
+| ✔️     | Canon RF5.2mm F2.8 L Dual Fisheye unprocessed | left-right fisheye           | (none)             |  X           | X 
+| ✔️     | Canon RF5.2mm F2.8 L Dual Fisheye processed with EOS VR Utility | left-right | (none)             |  X           | X 
+| ✔️     | Insta360 Evo                        | left-right          | (none)                                |  X           | X 
+| ✔️     | CALF VR180                          | left-right          | (none)                                |  X           | X 
+| ✔️     | CALF VR180                          | "vr180"             | `angle="180"`                         |  X           | X 
+| ✔️     | Kandao QooCam EGO 3D Camera         | left-right          | (none)                                |  X           | X 
+| ✔️     | Pixel phone                         | depth               | (none)                                |  X           | X 
+| ✔️     | Panasonic DMC-GX8 with H-FT012 lens | MPO                 | (none)                                |  ✓           | X 
+| ✔️     | Leia Lume Pad 2                     | Leia Image Format   | (none)                                |  ✓           | X 
+| ✔️     | Leia Lume Pad 2                     | left-right          | (none)                                |  X           | X 
+| ❌     | Vision Pro                          |                     |                                       |              | 
+
+### Supported viewers and headsets
+
+Entering VR requires the page to be served over HTTPS (or from `localhost`): browsers do not expose WebXR to other pages. The component logs a warning in the console when that is the case.
+
+This component has been manually tested on the following hardware, OS and browsers:
+
+| Hardware    | OS          | Browser         | Status |
+| ----------- | -------     | --------------- | ------ |
+| HTC Vive    | Windows     | Chrome          | ✔️
+| HTC Vive    | Windows     | Firefox         | ✔️⚠️ With [WebXR polyfill](https://github.com/immersive-web/webxr-polyfill)
+| HTC Vive    | Windows     | Firefox Reality | ✔️
+| Cardboard   | Android     | Chrome          | ✔️
+| Cardboard   | Android     | Firefox         | ❌
+| Cardboard   | iOS         |                 | ❌ [#18](https://github.com/steren/stereo-img/issues/18)
+| Quest 1     |             | Default         | ✔️
+| Quest 2     |             | Default         | ✔️️
+| Quest 3     |             | Default         | ✔️️
+| Vision Pro  |             | Safari          | ✔️️ [to be confirmed](https://github.com/steren/stereo-img/issues/34)
+
 ## Attributes
 
 * `src`: (Required) source of the stereo picture (absolute or relative)
@@ -84,8 +125,6 @@ In VR, the viewer can ask for another picture without leaving VR. The element do
 * `next`: the trigger of the right controller, a pinch of the right hand, the button of a Cardboard viewer, or a thumbstick pushed to the right.
 * `previous`: the trigger of the left controller, a pinch of the left hand, or a thumbstick pushed to the left.
 
-The `detail` of the event tells what the viewer used: `input` is `"select"` or `"thumbstick"`, `handedness` is `"left"`, `"right"` or `"none"`. The events bubble.
-
 ```js
 const pictures = ['first.jpg', 'second.jpg', 'third.jpg'];
 let index = 0;
@@ -100,24 +139,9 @@ stereoImg.addEventListener('next', () => show(index + 1));
 stereoImg.addEventListener('previous', () => show(index - 1));
 ```
 
-## Outside of VR
-
-The picture fills the element, like an image with `object-fit: cover`. To see more of it:
-
-* Drag the picture. A flat picture slides; a picture that surrounds the viewer, such as a VR180 photo or a panorama, turns around them.
-* Zoom with the wheel, or with a pinch on a touch screen.
-
-The view stops at the edges of the picture: no empty margin is shown around it.
-
-## In VR
-
-A stereo picture is what two eyes saw from one place: the viewer is kept in the middle of it. Turning the head looks around; moving the head does not move the viewer in the picture, which has no other side to show. A picture with a depth map is the exception: it has relief, stays where it is in the room, and moving the head shows it from another angle.
-
-A picture does not always surround the viewer: a flat picture floats in front of them, a VR180 photo leaves what is behind them empty. What is around the picture takes the colours of its edges, dimmed: the colour of its top above it, the colour of its bottom below it, and a gradient from one to the other beside it.
-
 ## Pages with many pictures
 
-Each element draws with WebGL, and browsers limit the WebGL contexts of a page: 16 in Chrome on a computer, 8 on a phone. Beyond the limit, the oldest elements go blank.
+Each element draws with WebGL, and browsers limit the WebGL contexts of a page.
 
 With `start="interaction"`, an element shows a still of its picture, drawn without a WebGL context of its own, and starts 3D when the viewer points at it, presses on it or touches it:
 
@@ -125,13 +149,6 @@ With `start="interaction"`, an element shows a still of its picture, drawn witho
 <stereo-img src="first.jpg" start="interaction"></stereo-img>
 <stereo-img src="second.jpg" start="interaction"></stereo-img>
 ```
-
-* The still shows what the element would show: the same view, the eye or the anaglyph of the `flat` attribute. With `flat="wiggle"`, it wiggles.
-* The buttons appear when 3D starts.
-* At most four of these elements are started at the same time. Starting a fifth one stops the one used the longest ago, which shows a still again.
-* The picture is loaded once for the still, and once more when 3D starts.
-
-The attribute is read when the element is added to the page.
 
 ## Pictures from other sites
 
@@ -142,81 +159,6 @@ Access-Control-Allow-Origin: *
 ```
 
 (or the origin of your page instead of `*`). Without it, nothing is displayed and the reason is logged in the console.
-
-## Compatibility
-
-### Large pictures
-
-A GPU limits the size of a texture: often 4096 pixels on a phone, when the picture of one eye of a VR180 camera can be 8192 pixels wide. A picture larger than this limit is cut into tiles, each in its own texture: it keeps all of its details.
-
-Phones also limit the size of a canvas: Safari on iOS leaves a canvas of more than 4096 by 4096 pixels blank. A picture larger than that, such as the 45 million pixels of a camera with two fisheye lenses, is read in parts.
-
-### Supported cameras
-
-This component has been manually tested to load pictures taken with the following cameras:
-
-| Status | Camera                              | Picture type        | Attributes required                   |  Field of view | Orientation |
-| ------ | ----------------------------------- | ------------------- | ------------------------------------- | ------------- | ----------- |
-| ✔️     | Lenovo Mirage Camera                | VR180               | (none)                                |  ✓           | ✓ 
-| ✔️     | Canon RF5.2mm F2.8 L Dual Fisheye unprocessed | left-right fisheye           | (none)             |  X           | X 
-| ✔️     | Canon RF5.2mm F2.8 L Dual Fisheye processed with EOS VR Utility | left-right | (none)             |  X           | X 
-| ✔️     | Insta360 Evo                        | left-right          | (none)                                |  X           | X 
-| ✔️     | CALF VR180                          | left-right          | (none)                                |  X           | X 
-| ✔️     | CALF VR180                          | "vr180"             | `angle="180"`                         |  X           | X 
-| ✔️     | Kandao QooCam EGO 3D Camera         | left-right          | (none)                                |  X           | X 
-| ✔️     | Pixel phone                         | depth               | (none)                                |  X           | X 
-| ✔️     | Panasonic DMC-GX8 with H-FT012 lens | MPO                 | (none)                                |  ✓           | X 
-| ✔️     | Leia Lume Pad 2                     | Leia Image Format   | (none)                                |  ✓           | X 
-| ✔️     | Leia Lume Pad 2                     | left-right          | (none)                                |  X           | X 
-| ❌     | Vision Pro                          |                     |                                       |              | 
-
-### Supported viewers and headsets
-
-Entering VR requires the page to be served over HTTPS (or from `localhost`): browsers do not expose WebXR to other pages. The component logs a warning in the console when that is the case.
-
-This component has been manually tested on the following hardware, OS and browsers:
-
-| Hardware    | OS          | Browser         | Status |
-| ----------- | -------     | --------------- | ------ |
-| HTC Vive    | Windows     | Chrome          | ✔️
-| HTC Vive    | Windows     | Firefox         | ✔️⚠️ With [WebXR polyfill](https://github.com/immersive-web/webxr-polyfill)
-| HTC Vive    | Windows     | Firefox Reality | ✔️
-| Cardboard   | Android     | Chrome          | ✔️
-| Cardboard   | Android     | Firefox         | ❌
-| Cardboard   | iOS         |                 | ❌ [#18](https://github.com/steren/stereo-img/issues/18)
-| Quest 1     |             | Default         | ✔️
-| Quest 2     |             | Default         | ✔️️
-| Quest 3     |             | Default         | ✔️️
-| Vision Pro  |             | Safari          | ✔️️ [to be confirmed](https://github.com/steren/stereo-img/issues/34)
-
-## Installing using npm
-
-Instead of a CDN, you can install the module locally using [npm](https://www.npmjs.com/):
-
-```bash
-npm install stereo-img
-```
-
-The package has no dependency to install or to map: its copies of [three.js](https://threejs.org/) and [exifr](https://github.com/MikeKovarik/exifr) are included in its `vendor` folder and imported with relative paths.
-
-Load the module from where it is installed:
-
-```html
-<script type="module" src="./node_modules/stereo-img/stereo-img.js"></script>
-```
-
-Or, to import it by name, use a JavaScript bundler or an [import map](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script/type/importmap):
-
-```html
-<script type="importmap">
-  {
-    "imports": {
-      "stereo-img": "./node_modules/stereo-img/stereo-img.js"
-    }
-  }
-</script>
-<script type="module">import "stereo-img";</script>
-```
 
 ## Contributing
 
