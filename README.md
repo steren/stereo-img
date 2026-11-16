@@ -60,7 +60,7 @@ This component has been manually tested on the following hardware, OS and browse
 | Hardware    | OS          | Browser         | Status |
 | ----------- | -------     | --------------- | ------ |
 | HTC Vive    | Windows     | Chrome          | ✔️
-| HTC Vive    | Windows     | Firefox         | ✔️⚠️ With [WebXR polyfill](https://github.com/immersive-web/webxr-polyfill)
+| HTC Vive    | Windows     | Firefox         | ❌ No WebXR support
 | HTC Vive    | Windows     | Firefox Reality | ✔️
 | Cardboard   | Android     | Chrome          | ✔️
 | Cardboard   | Android     | Firefox         | ❌
