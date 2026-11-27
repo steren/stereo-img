@@ -526,6 +526,7 @@ const HOST_STYLE = `
         :host {
           display: block;
           contain: content;
+          background: #101010;
         }
         #flatModeButton:hover {
           opacity: 1.0 !important;
@@ -556,8 +557,107 @@ const HOST_STYLE = `
           object-fit: cover;
           pointer-events: none;
         }
+        #loading {
+          position: absolute;
+          inset: 0;
+          z-index: 998;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          pointer-events: none;
+          opacity: 0;
+          background: rgba(16, 16, 16, 0.42);
+          backdrop-filter: blur(3px);
+          -webkit-backdrop-filter: blur(3px);
+          transition: opacity 200ms ease;
+        }
+        #loading.initial {
+          background: linear-gradient(110deg, #141414 30%, #222222 45%, #222222 55%, #141414 70%);
+          background-size: 250% 100%;
+          backdrop-filter: none;
+          -webkit-backdrop-filter: none;
+          animation: stereo-img-shimmer 1.6s ease-in-out infinite;
+        }
+        #loading.visible {
+          opacity: 1;
+          transition: opacity 180ms ease 120ms;
+        }
+        #loading.initial.visible {
+          transition: opacity 120ms ease;
+        }
+        #loading svg {
+          width: 44px;
+          height: 44px;
+          filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.45));
+        }
+        #loading .track {
+          fill: none;
+          stroke: rgba(255, 255, 255, 0.22);
+          stroke-width: 3;
+        }
+        #loading .arc {
+          fill: none;
+          stroke: rgba(255, 255, 255, 0.92);
+          stroke-width: 3;
+          stroke-linecap: round;
+          transform-origin: 24px 24px;
+          transform: rotate(-90deg);
+          transition: stroke-dashoffset 120ms linear;
+        }
+        #loading.indeterminate .arc {
+          stroke-dasharray: 44 100;
+          stroke-dashoffset: 0;
+          animation: stereo-img-spin 0.9s linear infinite;
+        }
+        @keyframes stereo-img-spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @keyframes stereo-img-shimmer {
+          0% { background-position: 100% 0; }
+          100% { background-position: -100% 0; }
+        }
+        #error {
+          position: absolute;
+          inset: 0;
+          z-index: 997;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding: 16px;
+          text-align: center;
+          color: rgba(255, 255, 255, 0.78);
+          font: 14px/1.4 system-ui, -apple-system, sans-serif;
+          pointer-events: none;
+          opacity: 0;
+          transition: opacity 200ms ease;
+        }
+        #error.visible {
+          opacity: 1;
+        }
+        #error svg {
+          width: 28px;
+          height: 28px;
+          stroke: rgba(255, 255, 255, 0.65);
+          fill: none;
+          stroke-width: 1.75;
+          stroke-linecap: round;
+          stroke-linejoin: round;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          #loading.initial {
+            animation: none;
+          }
+          #loading.indeterminate .arc {
+            animation-duration: 2.4s;
+          }
+        }
       </style>
       `;
+// Circumference of the loading progress ring (r = 18).
+const LOADING_RING_CIRCUMFERENCE = 2 * Math.PI * 18;
 // The attributes that change what a still shows.
 const STILL_ATTRIBUTES = ['src', 'src-right', 'type', 'angle', 'projection', 'flat', 'disparity-adjustment'];
 // How far in front of the viewer the sign that a picture is loading is.
@@ -1016,8 +1116,29 @@ class StereoImg extends BaseElement {
     }
 
     // Each file is downloaded once, however many times it is read.
-    const picture = new Picture(src, signal);
-    const pictureRight = srcRight ? new Picture(srcRight, signal) : null;
+    let leftLoaded = 0;
+    let leftTotal = 0;
+    let rightLoaded = 0;
+    let rightTotal = 0;
+    const reportProgress = () => {
+      if (signal?.aborted) {
+        return;
+      }
+      const total = leftTotal + rightTotal;
+      if (total > 0) {
+        this._setLoadingProgress(leftLoaded + rightLoaded, total);
+      }
+    };
+    const picture = new Picture(src, signal, (loaded, total) => {
+      leftLoaded = loaded;
+      leftTotal = total;
+      reportProgress();
+    });
+    const pictureRight = srcRight ? new Picture(srcRight, signal, (loaded, total) => {
+      rightLoaded = loaded;
+      rightTotal = total;
+      reportProgress();
+    }) : null;
     try {
       return await this._parsePicture(picture, pictureRight, { type, angle, projection, signal });
     } finally {
@@ -1418,6 +1539,7 @@ class StereoImg extends BaseElement {
         flatShading: true,
       });
       material.displacementMap = displacementMap;
+      this._applyVRLoadingBlur?.(material);
 
       const mesh = new THREE.Mesh(part.geometry, material);
       mesh.rotation.reorder('YXZ');
@@ -1451,6 +1573,55 @@ class StereoImg extends BaseElement {
       line.layers.set(eyeNumber);
       this.stereoImageGroup.add(line);
     }
+  }
+
+  /**
+   * Inject a lightweight GPU blur + dim pass into the picture material so that
+   * loading a new picture in VR blurs and softens the previous stereo image
+   * just like the 2D frosted-glass scrim, without extra render targets.
+   * @param {THREE.MeshStandardMaterial} material
+   * @private
+   */
+  _applyVRLoadingBlur(material) {
+    this._vrLoadingBlurUniform ||= { value: 0 };
+    const blurUniform = this._vrLoadingBlurUniform;
+    material.customProgramCacheKey = () => 'stereo-img-vr-loading-blur';
+    material.onBeforeCompile = shader => {
+      shader.uniforms.uLoadingBlur = blurUniform;
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          '#include <map_pars_fragment>',
+          `#include <map_pars_fragment>
+          uniform float uLoadingBlur;`
+        )
+        .replace(
+          '#include <map_fragment>',
+          `#ifdef USE_MAP
+            vec4 sampledDiffuseColor;
+            if ( uLoadingBlur > 0.001 ) {
+              float lodBias = uLoadingBlur * 2.5;
+              vec2 stepUv = clamp( max( fwidth( vMapUv ), vec2( 0.0005 ) ) * ( 3.5 * uLoadingBlur ), vec2( 0.0 ), vec2( 0.03 ) );
+              vec4 c = texture2D( map, vMapUv, lodBias ) * 0.25;
+              c += texture2D( map, clamp( vMapUv + vec2( stepUv.x, 0.0 ), 0.0, 1.0 ), lodBias ) * 0.125;
+              c += texture2D( map, clamp( vMapUv - vec2( stepUv.x, 0.0 ), 0.0, 1.0 ), lodBias ) * 0.125;
+              c += texture2D( map, clamp( vMapUv + vec2( 0.0, stepUv.y ), 0.0, 1.0 ), lodBias ) * 0.125;
+              c += texture2D( map, clamp( vMapUv - vec2( 0.0, stepUv.y ), 0.0, 1.0 ), lodBias ) * 0.125;
+              c += texture2D( map, clamp( vMapUv + stepUv, 0.0, 1.0 ), lodBias ) * 0.0625;
+              c += texture2D( map, clamp( vMapUv - stepUv, 0.0, 1.0 ), lodBias ) * 0.0625;
+              c += texture2D( map, clamp( vMapUv + vec2( stepUv.x, -stepUv.y ), 0.0, 1.0 ), lodBias ) * 0.0625;
+              c += texture2D( map, clamp( vMapUv + vec2( -stepUv.x, stepUv.y ), 0.0, 1.0 ), lodBias ) * 0.0625;
+              sampledDiffuseColor = c;
+              sampledDiffuseColor.rgb *= mix( 1.0, 0.58, uLoadingBlur );
+            } else {
+              sampledDiffuseColor = texture2D( map, vMapUv );
+            }
+            #ifdef DECODE_VIDEO_TEXTURE
+              sampledDiffuseColor = sRGBTransferEOTF( sampledDiffuseColor );
+            #endif
+            diffuseColor *= sampledDiffuseColor;
+          #endif`
+        );
+    };
   }
 
   /**
@@ -1751,12 +1922,24 @@ class StereoImg extends BaseElement {
     const flatMode = this.getAttribute('flat');
 
     const animation = (time, frame) => {
-      if (this.loadingIndicator && this.loadingIndicator.visible) {
-        this.loadingIndicator.rotation.y += 0.01;
-        this.loadingIndicator.rotation.x += 0.01;
+      const inVR = !!this.renderer.xr.isPresenting;
+      const loadingInVR = inVR && !!this.loadingIndicator?.visible;
+      if (this._vrLoadingSpinner) {
+        this._vrLoadingSpinner.visible = loadingInVR;
+        if (loadingInVR) {
+          this._vrLoadingSpinner.rotation.z -= 0.08;
+        }
+      }
+      if (this._vrLoadingBlurUniform) {
+        if (loadingInVR) {
+          const elapsed = performance.now() - (this._loadingStartedAt || 0);
+          this._vrLoadingBlurUniform.value = elapsed >= 120 ? Math.min(1, (elapsed - 120) / 200) : 0;
+        } else {
+          this._vrLoadingBlurUniform.value = 0;
+        }
       }
 
-      if (this.renderer.xr.isPresenting) {
+      if (inVR) {
         this._readThumbsticks();
         this._followViewer(frame);
       }
@@ -1780,6 +1963,120 @@ class StereoImg extends BaseElement {
   }
 
   /**
+   * Create the 2D loading overlay in the shadow tree on first use.
+   * @returns {HTMLElement|null}
+   * @private
+   */
+  _loadingOverlay() {
+    if (this._drawsOnDemand || typeof document === 'undefined' || typeof this.shadowRoot?.querySelector !== 'function') {
+      return null;
+    }
+    let overlay = this.shadowRoot.querySelector('#loading');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'loading';
+      overlay.className = 'indeterminate';
+      overlay.setAttribute('role', 'status');
+      overlay.setAttribute('aria-live', 'polite');
+      overlay.setAttribute('aria-label', 'Loading stereo image');
+      overlay.innerHTML = `<svg viewBox="0 0 48 48" aria-hidden="true">
+        <circle class="track" cx="24" cy="24" r="18"></circle>
+        <circle class="arc" cx="24" cy="24" r="18"></circle>
+      </svg>`;
+      this.shadowRoot.appendChild(overlay);
+    }
+    return overlay;
+  }
+
+  /**
+   * Toggle the loading state (both the 2D shadow DOM overlay and the 3D VR indicator).
+   * @param {boolean} loading
+   * @private
+   */
+  _setLoading(loading) {
+    if (loading) {
+      this._loadingStartedAt = performance.now();
+    } else if (this._vrLoadingBlurUniform) {
+      this._vrLoadingBlurUniform.value = 0;
+    }
+    if (this.loadingIndicator) {
+      this.loadingIndicator.visible = loading;
+    }
+    const overlay = this._loadingOverlay();
+    if (!overlay) {
+      return;
+    }
+    if (loading) {
+      this._setError(null);
+      overlay.classList.toggle('initial', !this._hasDisplayedPicture && !this._still);
+      overlay.classList.add('indeterminate', 'visible');
+      const arc = overlay.querySelector('.arc');
+      if (arc) {
+        arc.style.strokeDasharray = '';
+        arc.style.strokeDashoffset = '';
+      }
+    } else {
+      overlay.classList.remove('visible');
+    }
+  }
+
+  /**
+   * Update the determinate download progress ring while a picture is streaming.
+   * Switches back to the indeterminate decoding spinner once the download finishes.
+   * @param {number} loaded - Bytes received so far.
+   * @param {number} total - Total bytes expected.
+   * @private
+   */
+  _setLoadingProgress(loaded, total) {
+    const overlay = this._loadingOverlay();
+    if (!overlay || !overlay.classList.contains('visible')) {
+      return;
+    }
+    const arc = overlay.querySelector('.arc');
+    if (!arc) {
+      return;
+    }
+    if (total > 0 && loaded > 0 && loaded < total) {
+      const ratio = Math.min(1, Math.max(0, loaded / total));
+      overlay.classList.remove('indeterminate');
+      arc.style.strokeDasharray = `${LOADING_RING_CIRCUMFERENCE}`;
+      arc.style.strokeDashoffset = `${LOADING_RING_CIRCUMFERENCE * (1 - ratio)}`;
+    } else {
+      overlay.classList.add('indeterminate');
+      arc.style.strokeDasharray = '';
+      arc.style.strokeDashoffset = '';
+    }
+  }
+
+  /**
+   * Show or hide a minimal error overlay when a picture cannot be displayed.
+   * @param {string|null} message
+   * @private
+   */
+  _setError(message) {
+    if (this._drawsOnDemand || typeof document === 'undefined' || typeof this.shadowRoot?.querySelector !== 'function') {
+      return;
+    }
+    let errorEl = this.shadowRoot.querySelector('#error');
+    if (!message) {
+      errorEl?.classList.remove('visible');
+      return;
+    }
+    if (!errorEl) {
+      errorEl = document.createElement('div');
+      errorEl.id = 'error';
+      errorEl.setAttribute('role', 'alert');
+      errorEl.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+        <path d="M9 9l6 6M15 9l-6 6"></path>
+      </svg><span></span>`;
+      this.shadowRoot.appendChild(errorEl);
+    }
+    errorEl.querySelector('span').textContent = message;
+    errorEl.classList.add('visible');
+  }
+
+  /**
    * Parse the picture described by the attributes and display it.
    * Only the latest call counts: it cancels the load in progress, if any.
    */
@@ -1789,12 +2086,11 @@ class StereoImg extends BaseElement {
     this._loadController = controller;
     const { signal } = controller;
 
-    if (this.loadingIndicator) {
-      this.loadingIndicator.visible = true;
-    }
+    this._setLoading(true);
 
     try {
       let stereoData;
+      let failed = false;
       try {
         stereoData = await this.parse(signal);
         if (!stereoData?.leftEye || !stereoData?.rightEye) {
@@ -1808,14 +2104,17 @@ class StereoImg extends BaseElement {
         console.error(`<stereo-img> could not display "${this.src}".${loadingHints(this.src, location.href)}`, error);
         // Do not keep displaying the previous picture.
         stereoData = this._emptyStereoData();
+        failed = true;
       }
       await this._display(stereoData, signal);
+      if (!signal.aborted) {
+        this._hasDisplayedPicture = !failed && !!this.src;
+        this._setError(failed ? 'Could not load picture' : null);
+      }
     } finally {
       if (this._loadController === controller) {
         this._loadController = null;
-        if (this.loadingIndicator) {
-          this.loadingIndicator.visible = false;
-        }
+        this._setLoading(false);
       }
     }
   }
@@ -1875,6 +2174,8 @@ class StereoImg extends BaseElement {
           return;
         }
         console.error(`<stereo-img> could not display "${this.src}".${loadingHints(this.src, location.href)}`, error);
+        this._hasDisplayedPicture = false;
+        this._setError('Could not load picture');
         try {
           this.stereoData = this._emptyStereoData();
           await this.initialize3DScene();
@@ -1989,13 +2290,33 @@ class StereoImg extends BaseElement {
   }
 
   setupLoadingIndicator() {
-    const loaderGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
-    const loaderMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true });
-    this.loadingIndicator = new THREE.Mesh(loaderGeometry, loaderMaterial);
+    this.loadingIndicator = new THREE.Group();
     this.loadingIndicator.position.set(0, 0, -LOADING_INDICATOR_DISTANCE);
     this.loadingIndicator.visible = false;
-    this.loadingIndicator.layers.enable(1);
-    this.loadingIndicator.layers.enable(2);
+
+    // Displayed inside WebXR sessions; outside VR the 2D shadow DOM overlay handles loading.
+    const spinner = new THREE.Group();
+    spinner.visible = false;
+
+    const track = new THREE.Mesh(
+      new THREE.TorusGeometry(0.06, 0.007, 12, 48),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.22, depthTest: false })
+    );
+    track.renderOrder = 999;
+    track.layers.enable(1);
+    track.layers.enable(2);
+
+    const arc = new THREE.Mesh(
+      new THREE.TorusGeometry(0.06, 0.008, 12, 36, Math.PI * 1.4),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.92, depthTest: false })
+    );
+    arc.renderOrder = 1000;
+    arc.layers.enable(1);
+    arc.layers.enable(2);
+
+    spinner.add(track, arc);
+    this.loadingIndicator.add(spinner);
+    this._vrLoadingSpinner = spinner;
     this.scene.add(this.loadingIndicator);
   }
 
@@ -2066,7 +2387,7 @@ class StereoImg extends BaseElement {
     }
 
     // TODO: Should we use component size instead?
-    this.camera = new THREE.PerspectiveCamera(DEFAULT_FOV, this.clientWidth / this.clientHeight, 1, 2000);
+    this.camera = new THREE.PerspectiveCamera(DEFAULT_FOV, this.clientWidth / this.clientHeight, 0.1, 2000);
     this.camera.layers.enable(1);
 
     // Look around by dragging the picture. In VR, the headset decides where the camera looks.
@@ -2214,6 +2535,9 @@ class StereoImg extends BaseElement {
     }
     const job = ++preview.job;
     preview.aspect = this.clientWidth / this.clientHeight;
+    if (this.src && preview.stills.length === 0) {
+      this._setLoading(true);
+    }
     const stills = await drawStills(this, job);
     if (this._preview !== preview || preview.job !== job) {
       // started meanwhile, or asked again
@@ -2246,6 +2570,8 @@ class StereoImg extends BaseElement {
       still.style.visibility = index === 0 ? 'visible' : 'hidden';
       this.shadowRoot.appendChild(still);
     });
+    this._hasDisplayedPicture = true;
+    this._setLoading(false);
     this._wigglePreview();
   }
 
@@ -2376,6 +2702,8 @@ class StereoImg extends BaseElement {
     this.controls = null;
     this.anaglyphEffect = null;
     this.loadingIndicator = null;
+    this._vrLoadingSpinner = null;
+    this._hasDisplayedPicture = false;
     this.surroundings = null;
     this.stereoImageGroup = null;
     this.stereoData = null;

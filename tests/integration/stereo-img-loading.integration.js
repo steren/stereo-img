@@ -67,10 +67,41 @@ describe('stereo-img loading', () => {
   it('should display a picture again after a failure', async () => {
     element = await createElement({ src: '/examples/does-not-exist.jpg', type: 'mono' });
     expect(element.stereoData.leftEye.width).to.equal(10);
+    const errorOverlay = element.shadowRoot.querySelector('#error');
+    expect(errorOverlay?.classList.contains('visible')).to.be.true;
 
     await change(element, 'src', MONO);
 
     expect(element.stereoData.leftEye.width).to.be.greaterThan(10);
+    expect(element.shadowRoot.querySelector('#error')?.classList.contains('visible')).to.be.false;
+  }).timeout(20000);
+
+  it('should show the 2D loading overlay with determinate progress while loading and hide it when done', async () => {
+    element = await createElement({ src: MONO, type: 'mono' });
+    const loading = element.shadowRoot.querySelector('#loading');
+    expect(loading).to.exist;
+    expect(loading.classList.contains('visible')).to.be.false;
+
+    // Hold the next parse so we can inspect the active loading state and progress ring.
+    let finish;
+    element.parse = () => new Promise(resolve => { finish = () => resolve(emptyStereoData()); });
+    element.setAttribute('src', 'slow.jpg');
+    await waitFor(() => element.loadingIndicator.visible, 'loading to start');
+
+    expect(loading.classList.contains('visible')).to.be.true;
+    expect(loading.classList.contains('initial')).to.be.false;
+    expect(loading.classList.contains('indeterminate')).to.be.true;
+
+    element._setLoadingProgress(50, 100);
+    expect(loading.classList.contains('indeterminate')).to.be.false;
+    expect(Number.parseFloat(loading.querySelector('.arc').style.strokeDashoffset)).to.be.greaterThan(0);
+
+    element._setLoadingProgress(100, 100);
+    expect(loading.classList.contains('indeterminate')).to.be.true;
+
+    finish();
+    await waitFor(() => !element.loadingIndicator.visible, 'loading to finish');
+    expect(loading.classList.contains('visible')).to.be.false;
   }).timeout(20000);
 
   describe('when attributes change while a picture is loading', () => {

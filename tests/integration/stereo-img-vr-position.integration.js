@@ -185,13 +185,39 @@ describe('stereo-img keeps the viewer in the middle of the picture in VR', funct
     expectClose(pictureOrigin(), [-0.2, 1.4, 0.1], 'what the flat picture is in front of, after a move');
   });
 
-  it('shows that a picture is loading in front of the viewer', async () => {
+  it('shows that a picture is loading in front of the viewer and blurs the scene in VR', async () => {
     await display({ src: '/examples/vr180-lenovo-mirage.vr.jpg' });
     await enterVR();
     await moveHead(0.5, 1.1, 0.4);
 
     const { x, y, z } = element.loadingIndicator.position;
     expectClose([x, y, z], [0.5, 1.1, -0.6], 'the loading indicator');
+    expect(element._vrLoadingBlurUniform.value).to.equal(0);
+
+    // Start a slow load while in VR and verify the GPU blur ramps up, then clears when done.
+    let finish;
+    element.parse = () => new Promise(resolve => {
+      finish = () => resolve({
+        leftEye: new ImageData(10, 10),
+        rightEye: new ImageData(10, 10),
+        phiLength: Math.PI,
+        thetaStart: 0,
+        thetaLength: Math.PI,
+      });
+    });
+    element.setAttribute('src', 'next-in-vr.jpg');
+    await waitFor(() => element.loadingIndicator.visible, 'VR load to start');
+    await wait(360);
+    await frames();
+
+    expect(element._vrLoadingSpinner.visible).to.be.true;
+    expect(element._vrLoadingBlurUniform.value).to.be.greaterThan(0.5);
+
+    finish();
+    await waitFor(() => !element.loadingIndicator.visible, 'VR load to finish');
+    await frames();
+    expect(element._vrLoadingBlurUniform.value).to.equal(0);
+    expect(element._vrLoadingSpinner.visible).to.be.false;
   });
 
   it('puts everything back when leaving VR', async () => {

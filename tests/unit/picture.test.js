@@ -83,3 +83,39 @@ test('has nothing to release when no URL was asked for', async () => {
 
   assert.deepStrictEqual(revoked, []);
 });
+
+test('reports download progress when Content-Length and a readable stream are available', async () => {
+  const chunks = [new Uint8Array([10, 20]), new Uint8Array([30, 40, 50])];
+  global.fetch = async (url, options) => {
+    requests.push({ url, signal: options?.signal });
+    let index = 0;
+    return {
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-length': '5', 'content-type': 'image/jpeg' }),
+      body: {
+        getReader() {
+          return {
+            async read() {
+              if (index < chunks.length) {
+                return { done: false, value: chunks[index++] };
+              }
+              return { done: true, value: undefined };
+            },
+            async cancel() {},
+          };
+        },
+      },
+    };
+  };
+
+  const progress = [];
+  const picture = new Picture('large.jpg', undefined, (loaded, total) => progress.push([loaded, total]));
+  const bytes = await picture.bytes();
+  const blob = await picture.blob();
+
+  assert.deepStrictEqual([...bytes], [10, 20, 30, 40, 50]);
+  assert.equal(blob.type, 'image/jpeg');
+  assert.deepStrictEqual(progress, [[2, 5], [5, 5]]);
+  picture.release();
+});
