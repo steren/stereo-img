@@ -166,4 +166,92 @@ async function parseMPO(url, options) {
   }
 }
 
-export { parseMPO, readMpoIndex, readStereoPair };
+const APP1 = 0xe1;
+const XMP_PREFIX = 'http://ns.adobe.com/xap/1.0/\0';
+
+/**
+ * Check if a secondary JPEG inside an MPF container carries Apple Portrait
+ * depth or disparity XMP metadata (apdi:AuxiliaryImageType).
+ * @param {Uint8Array} jpeg - bytes of the secondary JPEG image
+ * @returns {'disparity'|'depth'|undefined}
+ */
+function appleAuxiliaryDepthType(jpeg) {
+  if (jpeg.length < 4 || jpeg[0] !== 0xff || jpeg[1] !== 0xd8) {
+    return;
+  }
+  let position = 2;
+  while (position + 4 <= jpeg.length && jpeg[position] === 0xff) {
+    const marker = jpeg[position + 1];
+    if (marker === START_OF_SCAN) {
+      break;
+    }
+    if (marker === 0xd8 || (marker >= 0xd0 && marker <= 0xd7)) {
+      position += 2;
+      continue;
+    }
+    const length = (jpeg[position + 2] << 8) | jpeg[position + 3];
+    if (length < 2 || position + 2 + length > jpeg.length) {
+      break;
+    }
+    if (marker === APP1 && length > 2 + XMP_PREFIX.length) {
+      const payloadStart = position + 4;
+      const payloadEnd = position + 2 + length;
+      const prefix = String.fromCharCode(...jpeg.subarray(payloadStart, payloadStart + XMP_PREFIX.length));
+      if (prefix === XMP_PREFIX) {
+        const xml = new TextDecoder().decode(jpeg.subarray(payloadStart + XMP_PREFIX.length, payloadEnd));
+        const match = xml.match(/<apdi:AuxiliaryImageType>\s*([^<\s]+)\s*<\/apdi:AuxiliaryImageType>|apdi:AuxiliaryImageType="([^"]+)"/i);
+        const auxType = match?.[1] || match?.[2];
+        if (auxType) {
+          const kind = auxType.match(/^(?:urn:com:apple:photo:\d+:aux:)?(disparity|depth)$/i);
+          if (kind) {
+            return kind[1].toLowerCase();
+          }
+        }
+      }
+    }
+    position += 2 + length;
+  }
+}
+
+/**
+ * Extract the primary image and disparity/depth map of an MPF depth photo.
+ * Stereoscopic MPO files (with 2 or more disparity views) are excluded.
+ * @param {Uint8Array} bytes - content of the file
+ * @returns {{ primary: Uint8Array, disparity: Uint8Array, depthType?: 'disparity'|'depth' }|undefined}
+ */
+function readMpoDisparity(bytes) {
+  const images = readMpoIndex(bytes);
+  if (images.length < 2) {
+    return;
+  }
+  // A stereoscopic pair has 2 or more disparity views (e.g. Fuji, Panasonic).
+  // A depth/disparity photo has a primary image and a secondary disparity/depth map.
+  const disparityViews = images.filter(img => img.type === DISPARITY_IMAGE);
+  if (disparityViews.length >= 2) {
+    return;
+  }
+  let disparityEntry = images.slice(1).find(img => img.type === DISPARITY_IMAGE && img.offset > 0);
+  let depthType = disparityEntry ? 'disparity' : undefined;
+  if (!disparityEntry) {
+    // Real iPhone Portrait Mode JPEGs tag auxiliary MPF images with type 0x000000
+    // and identify disparity/depth via XMP apdi:AuxiliaryImageType inside the secondary JPEG.
+    for (const img of images.slice(1)) {
+      if (img.offset <= 0) continue;
+      const slice = bytes.subarray(img.offset, img.offset + img.size);
+      const kind = appleAuxiliaryDepthType(slice);
+      if (kind) {
+        disparityEntry = img;
+        depthType = kind;
+        break;
+      }
+    }
+  }
+  if (!disparityEntry) {
+    return;
+  }
+  const primary = bytes.subarray(images[0].offset, images[0].offset + images[0].size);
+  const disparity = bytes.subarray(disparityEntry.offset, disparityEntry.offset + disparityEntry.size);
+  return { primary, disparity, depthType };
+}
+
+export { parseMPO, readMpoIndex, readStereoPair, readMpoDisparity };

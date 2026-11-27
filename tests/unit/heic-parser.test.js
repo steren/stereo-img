@@ -23,6 +23,62 @@ function makeHeif({ brand = 'heic', compatible = ['mif1', 'heic'], primary = 1, 
   return concat(ftyp, box('meta', u32(0), ...metaChildren));
 }
 
+function makeHeicWithAuxDepth({ primary = 1, auxId = 2, auxType = 'urn:com:apple:photo:2018:aux:disparity', extraProps = [] } = {}) {
+  const ftyp = box('ftyp', text('heic'), u32(0), text('mif1'), text('heic'));
+  const pitm = box('pitm', u32(0).subarray(0, 4), new Uint8Array([0, primary]));
+  const auxl = box('auxl', new Uint8Array([0, auxId, 0, 1, 0, primary]));
+  const iref = box('iref', u32(0), auxl);
+
+  const auxCText = concat(text(auxType), new Uint8Array([0]));
+  const auxC = box('auxC', u32(0), auxCText);
+  const ipcoChildren = [auxC];
+  for (const ep of extraProps) {
+    ipcoChildren.push(box('auxC', u32(0), concat(text(ep), new Uint8Array([0]))));
+  }
+  const ipco = box('ipco', ...ipcoChildren);
+
+  const ipmaEntries = [
+    0, 0, 0, 0, // version & flags
+    0, 0, 0, 1, // 1 entry
+    0, auxId,   // item ID
+    1,          // assoc count
+    1           // prop 1
+  ];
+  const ipma = box('ipma', new Uint8Array(ipmaEntries));
+  const iprp = box('iprp', ipco, ipma);
+
+  return concat(ftyp, box('meta', u32(0), pitm, iref, iprp));
+}
+
+test('reads the auxiliary disparity item of an Apple Portrait HEIC file', () => {
+  const bytes = makeHeicWithAuxDepth({ primary: 1, auxId: 42, auxType: 'urn:com:apple:photo:2018:aux:disparity' });
+  const result = readHeic(bytes);
+  assert.equal(result.primary, 1);
+  assert.equal(result.depth, 42);
+  assert.equal(result.stereoPair, undefined);
+});
+
+test('handles multiple auxiliary items and selects disparity while ignoring matte masks and gain maps', () => {
+  const bytes = makeHeicWithAuxDepth({
+    primary: 1,
+    auxId: 10,
+    auxType: 'urn:com:apple:photo:2018:aux:disparity',
+    extraProps: ['urn:com:apple:photo:2020:aux:portraitmatte', 'urn:com:apple:photo:2020:aux:hdrgainmap'],
+  });
+  const result = readHeic(bytes);
+  assert.equal(result.primary, 1);
+  assert.equal(result.depth, 10);
+  assert.equal(result.stereoPair, undefined);
+});
+
+test('a HEIC file with non-depth auxiliary items has no depth map', () => {
+  const bytes = makeHeicWithAuxDepth({ primary: 1, auxId: 5, auxType: 'urn:com:apple:photo:2020:aux:portraitmatte' });
+  const result = readHeic(bytes);
+  assert.equal(result.primary, 1);
+  assert.equal(result.depth, undefined);
+  assert.equal(result.stereoPair, undefined);
+});
+
 test('reads the stereo pair of the Apple Vision Pro sample', () => {
   const bytes = new Uint8Array(readFileSync(new URL('../../examples/vision-pro.HEIC', import.meta.url)));
   assert.deepStrictEqual(readHeic(bytes), { primary: 26, stereoPair: [26, 52] });

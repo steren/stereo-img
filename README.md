@@ -1,7 +1,7 @@
 # `<stereo-img>`
 
 `<stereo-img>` is a web component to display stereographic pictures on web pages, with VR support.
-It supports various stereo picture formats: VR Photos (VR180, Google Camera panorama, Photosphere), left-right, and anaglyph.
+It supports various stereo and spatial picture formats: VR Photos (VR180, Google Camera panorama, Photosphere), side-by-side / top-bottom / interlaced, JPS, PNG Stereoscopic (PNS / `sTER`), MPO, HEIC, AVIF, Leia Image Format (LIF), RGB-D, depth/portrait photos, Looking Glass quilts, animated wigglegrams, and anaglyph.
 
 See the [demo](https://stereo-img.steren.fr/) for an example of the component in action.
 
@@ -49,6 +49,8 @@ This component has been manually tested to load pictures taken with the followin
 | ✔️     | Leia Lume Pad 2                     | left-right          | (none)                                |  X           | X 
 | ✔️     | Apple Vision Pro                    | HEIC                | (none)                                |  ✓           | X 
 | ✔️     | iPhone 17 Pro spatial photo         | HEIC                | (none)                                |  ✓           | X 
+| ✔️     | iPhone Portrait Mode                | depth (HEIC `auxC`) | (none)                                |  ✓           | X 
+| ✔️     | iPhone Portrait Mode                | depth (JPEG MPF)    | (none)                                |  X           | X 
 | ✔️     | Spatialify (half side by side)      | half-left-right     | (none) if the file name has `HSBS`, otherwise `type="half-left-right"` |  X           | X 
 
 ### Supported viewers and headsets
@@ -88,10 +90,16 @@ This component has been manually tested on the following hardware, OS and browse
   - `half-left-right`, `half-right-left`, `half-top-bottom`, `half-bottom-top`: like `left-right`, `right-left`, `top-bottom` and `bottom-top`, for pictures whose two views were squeezed to half of their width (or height) to fit in the size of one, like the "Half SBS" pictures of Spatialify. Nothing in such a picture tells it apart from a regular one: without the `type` attribute, it is only detected when its file name has `HSBS` or `half-SBS` (side by side), or `HOU`, `HTAB` or `half-OU` (top and bottom).
   - `pair`: separate files for left and right image. Left eye image read from `src` attribute, right eye image read from attribute `src-right`. Adding the `src-right` attribute will enable the `pair` type without the need to use the `type` attribute.
   - `mpo`: [Multi-Picture Format](https://en.wikipedia.org/wiki/JPEG#JPEG_Multi-Picture_Format) file of a stereo camera, holding the left and right pictures. Files ending with `.mpo` are detected without the `type` attribute.
-  - `heic`: HEIC picture, like the spatial photos of the Apple Vision Pro and of iPhones, holding the left and right pictures. They are detected without the `type` attribute, and displayed in browsers that cannot display HEIC pictures: the decoder ([libheif](https://github.com/strukturag/libheif), about 1.4 MB) is only downloaded for them. A HEIC picture that is not stereoscopic is displayed as `mono`.
+  - `jps`: [JPEG Stereoscopic](https://en.wikipedia.org/wiki/JPS_(file_format)) file holding a stereo pair and an optional `APP3` `_JPSJPS_` descriptor (supporting side-by-side, over-under, interleaved, anaglyph, mono, half-width/half-height, and eye-order flags). Files ending with `.jps` or containing an `_JPSJPS_` marker are detected without the `type` attribute.
+  - `pns`: PNG Stereoscopic file (`.pns` or a PNG containing the registered `sTER` ancillary chunk). Mode `0` (cross-fuse) is displayed as `right-left` and mode `1` (diverging-fuse) as `left-right`, with Adam7 padding columns stripped when present. Detected automatically without the `type` attribute.
+  - `heic`: HEIC picture, like the spatial photos of the Apple Vision Pro and of iPhones (holding the left and right pictures), or Apple Portrait Mode HEIC photos containing `auxC` disparity or metric depth maps. They are detected without the `type` attribute, and displayed in browsers that cannot display HEIC pictures: the decoder ([libheif](https://github.com/strukturag/libheif), about 1.4 MB) is only downloaded for them. A HEIC picture that is not stereoscopic or depth-mapped is displayed as `mono`.
+  - `avif` (or `avif-spatial`): AVIF picture with an ISO/IEC 23000-22 `ster` stereo pair entity group or auxiliary `auxC` depth/disparity map. Decoded natively by the browser without downloading a WASM decoder. Detected automatically without the `type` attribute.
   - `lif`: Leia Image Format, the pictures of the Lume Pad tablets. They are detected without the `type` attribute.
   - `anaglyph`: [Anaglyph 3D](https://en.wikipedia.org/wiki/Anaglyph_3D). The colours of the picture are detected. To name them instead, use `anaglyph-red-cyan`, `anaglyph-red-green`, `anaglyph-red-blue`, `anaglyph-green-magenta` or `anaglyph-amber-blue`: the first colour is the one of the left eye.
-  - `depth`: Picture with depth map (e.g. portrait or lens blur mode on Google Camera). Detected from the metadata of the picture.
+  - `depth`: Picture with depth or disparity map (e.g., portrait or lens blur mode on Google Camera `GDepth` / Dynamic Depth, or Apple Portrait Mode JPEG MPF disparity maps). Detected automatically from the metadata of the picture.
+  - `rgbd` (or `rgbd-sbs`, `rgbd-left-right`, `rgbd-right-left`, `rgbd-top-bottom`, `rgbd-ou`, `rgbd-tb`, `rgbd-bottom-top`): Composite color + depth-map image. `rgbd` chooses side-by-side when `width >= height` and top-bottom otherwise; the layout variants explicitly set which half holds the color image and which holds the depth map (e.g., `rgbd-left-right` / `rgbd-sbs` has color on the left and depth on the right). Without the `type` attribute, files whose name includes an explicit marker (`rgbd`, `rgb-d`, `color-depth`, `rgb-depth`) are detected automatically.
+  - `quilt`: Looking Glass Quilt multi-view light-field grid (tiles ordered bottom-left to top-right). Extracts the leftmost and rightmost views as a stereo pair. Detected automatically when the file name includes a `_qs<Cols>x<Rows>a<Aspect>` descriptor (e.g., `render_qs8x6a0.75.png`); otherwise set `type="quilt"` (defaults to `8` columns, `6` rows, `0.75` aspect).
+  - `wigglegram` (or `wiggle`, `wiggle-left-right`, `wiggle-right-left`): Animated multi-frame wigglegram (GIF, animated WebP, or APNG with 2 or more frames). Extracts extreme parallax frames as left and right eye views (`wiggle-right-left` reverses the eye order). Multi-frame GIF/WebP/APNG files are detected automatically without the `type` attribute; static single-frame files are unaffected. (Note: `type="wiggle"` specifies the input format, whereas `flat="wiggle"` sets the 2D display mode.)
   - `mono`: A regular, non-stereo picture. The same image is displayed on both eyes.
 * `angle`: (Optional) hint at angle of view for `left-right`, `top-bottom`, `interlaced`, `pair` or `anaglyph` types
   - If unset, Exif angle of view is used if present.

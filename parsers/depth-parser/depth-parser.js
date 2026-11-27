@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import exifr from './../../vendor/exifr/full.esm.js';
+import { readMpoDisparity } from '../mpo-parser/mpo-parser.js';
 
 function parseConcatenatedJFIF(imageData) {
   const jpeg = new Uint8Array(imageData);
@@ -102,10 +103,10 @@ function findGDepth(exif) {
 async function parseDepth(url, options) {
   const signal = options?.signal;
   signal?.throwIfAborted();
-  const image = await createImageFromURL(url);
+  const image = await createImageFromURL(url, signal);
   signal?.throwIfAborted();
 
-  const imageData = await urlToUint8Array(url, signal);
+  const imageData = options?.bytes || await urlToUint8Array(url, signal);
 
   let exif = options?.exif;
   if (!exif) {
@@ -130,21 +131,28 @@ async function parseDepth(url, options) {
   let picture = image;
   const gdepth = findGDepth(exif);
   if (gdepth) {
-    depth = await createImageFromURL(gdepth.depth);
+    depth = await createImageFromURL(gdepth.depth, signal);
     if (gdepth.image) {
-      picture = await createImageFromURL(gdepth.image);
+      picture = await createImageFromURL(gdepth.image, signal);
     }
   } else {
-    // Without metadata, assume the layout of Pixel portrait pictures, where the depth map is the fifth image.
-    const depthImageArray = findDepthMapFromMetadata(imageData, exif) || parseConcatenatedJFIF(imageData)[4];
+    // Check Container metadata, MPF secondary disparity map, or fall back to fifth image
+    const containerDepth = findDepthMapFromMetadata(imageData, exif);
+    const mpf = containerDepth ? undefined : readMpoDisparity(imageData);
+    const depthImageArray = containerDepth ||
+                            mpf?.disparity ||
+                            parseConcatenatedJFIF(imageData)[4];
     if (!depthImageArray) {
       throw new Error('No depth map found in image');
     }
     const depthUrl = URL.createObjectURL(new Blob([depthImageArray], {type: 'image/jpeg'}));
     try {
-      depth = await createImageFromURL(depthUrl);
+      depth = await createImageFromURL(depthUrl, signal);
     } finally {
       URL.revokeObjectURL(depthUrl);
+    }
+    if (!containerDepth && mpf?.disparity && mpf.depthType !== 'depth') {
+      depth = invertDisparityImage(depth);
     }
   }
   signal?.throwIfAborted();
@@ -162,14 +170,65 @@ async function parseDepth(url, options) {
   return {depth, leftEye, rightEye, phiLength, thetaStart, thetaLength};
 }
 
-async function createImageFromURL(url) {
-  const image = new Image();
-  image.src = url;
+/**
+ * Invert RGB grayscale values of an MPF disparity image (255 = near, 0 = far)
+ * to metric depth polarity (0 = near, 255 = far) expected by stereo-img.js.
+ * Returns the input unchanged when running without a 2D canvas DOM (e.g. Node unit tests).
+ * @param {HTMLImageElement} image
+ * @returns {HTMLCanvasElement|HTMLImageElement}
+ */
+function invertDisparityImage(image) {
+  if (typeof document === 'undefined' || !image) {
+    return image;
+  }
+  const width = image.naturalWidth || image.width;
+  const height = image.naturalHeight || image.height;
+  if (!width || !height) {
+    return image;
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx || !ctx.drawImage || !ctx.getImageData || !ctx.putImageData) {
+    return image;
+  }
+  ctx.drawImage(image, 0, 0, width, height);
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData?.data;
+  if (!data) {
+    return image;
+  }
+  const limit = data.length - (data.length % 4);
+  for (let i = 0; i < limit; i += 4) {
+    data[i] = 255 - data[i];
+    data[i + 1] = 255 - data[i + 1];
+    data[i + 2] = 255 - data[i + 2];
+  }
+  ctx.putImageData(imageData, 0, 0);
+  return canvas;
+}
+
+async function createImageFromURL(url, signal) {
+  signal?.throwIfAborted();
   return new Promise((resolve, reject) => {
+    const image = new Image();
+    const onAbort = () => {
+      image.onload = null;
+      image.onerror = null;
+      image.src = '';
+      reject(signal.reason);
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
     image.onload = () => {
+      signal?.removeEventListener('abort', onAbort);
       resolve(image);
     };
-    image.onerror = reject;
+    image.onerror = (err) => {
+      signal?.removeEventListener('abort', onAbort);
+      reject(err);
+    };
+    image.src = url;
   });
 }
 
@@ -180,4 +239,4 @@ async function urlToUint8Array(url, signal)
   return new Uint8Array(arrayBuffer);
 }
 
-export { parseDepth }
+export { parseDepth, invertDisparityImage }

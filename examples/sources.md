@@ -1,3 +1,11 @@
+JPS (JPEG Stereoscopic):
+
+* [`mario.jps`](mario.jps): Real stereoscopic `.jps` photograph (`ti1-1080-fhd.jps`, cross-eyed right-left 1080p) downloaded from [`Bill-Costa/3D-Test-Images`](https://github.com/Bill-Costa/3D-Test-Images/blob/master/JPS/ti1-1080-fhd.jps) (`https://raw.githubusercontent.com/Bill-Costa/3D-Test-Images/master/JPS/ti1-1080-fhd.jps`, MIT License).
+
+PNG Stereoscopic (sTER / PNS):
+
+* [`stereograph.sTER.png`](stereograph.sTER.png): Transcoded from the 1901 Underwood & Underwood stereograph ([`stereograph.left-right.jpg`](https://en.wikipedia.org/wiki/File:Stereograph_as_an_educator.jpg)), embedded with PNG registered ancillary `sTER` chunk before `IDAT` (Mode 1, diverging-fuse, CRC `0xB5E4B59C`). Public Domain.
+
 Google Camera panorama: 
 
 * `pixel3xl.PANO.jpg`: personal panorama picture taken with Google Camera on Pixel 3 XL 
@@ -11,6 +19,10 @@ VR180:
 Stereograph: 
 
 * [`stereograph.left-right.jpg`](https://en.wikipedia.org/wiki/File:Stereograph_as_an_educator.jpg)
+
+CGI:
+
+* [`capoda.left-right.jpg`](capoda.left-right.jpg): Repository CGI stereo sample ("CAPODA", left-right), Apache-2.0.
 
 GoPro:
 
@@ -62,6 +74,32 @@ Depth
 
 * [`Pixel7Pro.PORTRAIT.jpg`](Pixel7Pro.PORTRAIT.jpg): personal picture taken with Google Camera on Pixel 7 Pro, in portrait mode.
 
+Apple Portrait Mode Depth (HEIC `auxC` & JPEG MPF):
+
+* [`apple-portrait-pug.heic`](apple-portrait-pug.heic): Real iPhone Portrait Mode HEIC (`4032×3024` primary + `768×576` HEVC auxiliary disparity map using `urn:mpeg:hevc:2015:auxid:2` with `depth_representation_info` SEI uniform disparity `d-min`/`d-max`), downloaded from [`bigcat88/pillow_heif`](https://github.com/bigcat88/pillow_heif/blob/master/tests/images/heif_other/pug.heic) (`https://raw.githubusercontent.com/bigcat88/pillow_heif/master/tests/images/heif_other/pug.heic`, BSD-3-Clause).
+* [`apple-portrait-mug.jpg`](apple-portrait-mug.jpg): Real iPhone Portrait Mode JPEG with Multi-Picture Format (MPF) auxiliary images (primary photo + HDR gain map + XMP `apdi:AuxiliaryImageType="disparity"` disparity map), downloaded from [`lyangas/depthmap_from_jpeg`](https://github.com/lyangas/depthmap_from_jpeg/blob/master/test.jpeg) (`https://raw.githubusercontent.com/lyangas/depthmap_from_jpeg/master/test.jpeg`).
+
+Interlaced:
+
+* [`cork.interlaced.jpg`](cork.interlaced.jpg): Row-interlaced stereoscopic photograph ("Immagine Stereoscopica Interlacciata"), downloaded from [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Immagine_Stereoscopica_Interlacciata.jpg) (Public Domain).
+
+RGB-D (Color + Depth Composite):
+
+* [`sample-rgbd.png`](sample-rgbd.png): `1920×540` side-by-side composite (`960×540` color left + `960×540` 8-bit disparity right, 255 = near, 0 = far), built from the indoor color + 16-bit depth pair `example_data/color_12.png` + `example_data/depth_12.png` (`1920×1080`, `884–5253` mm) from [`Aedelon/rgbd-depth`](https://github.com/Aedelon/rgbd-depth) (`https://raw.githubusercontent.com/Aedelon/rgbd-depth/master/example_data/color_12.png` and `depth_12.png`, Apache-2.0).
+
+AVIF Spatial / Stereo Photos (`ster` entity group):
+
+* [`spatial-stereo.avif`](spatial-stereo.avif): `640×553` per-eye AV1 stereo AVIF container with an ISO/IEC 23000-22 MIAF `grpl` / `ster` entity group (`[1, 2]`), transcoded via `heif-enc -A` from the Public Domain 1901 Underwood & Underwood stereograph [`stereograph.left-right.jpg`](stereograph.left-right.jpg) ([Wikimedia](https://en.wikipedia.org/wiki/File:Stereograph_as_an_educator.jpg)).
+
+Looking Glass Quilt (`_qs<Cols>x<Rows>a<Aspect>`):
+
+* [`looking-glass_qs8x6a0.75.png`](looking-glass_qs8x6a0.75.png): `3360×3360` Looking Glass 8×6 Quilt (48 views of `420×560`, `0.75` aspect), downloaded from [`peterwilli/Liquilt`](https://github.com/peterwilli/Liquilt/blob/master/test_quilt.png) (`https://raw.githubusercontent.com/peterwilli/Liquilt/master/test_quilt.png`, MIT License).
+
+Animated Wigglegrams (`.gif`, `.webp`, `.apng`):
+
+* [`london-underground.wiggle.gif`](london-underground.wiggle.gif): `660×500` 2-frame animated GIF wigglegram ("London Underground Train 3D Wigglegram" by Albin Olsson), downloaded from [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:London_Underground_Wigglegram.gif) (`https://upload.wikimedia.org/wikipedia/commons/5/54/London_Underground_Wigglegram.gif`, CC BY-SA 3.0).
+
 Insta360 Evo
 
 * [`insta360evo.jpg`](insta360evo.jpg): personal picture taken using Insta360 Evo donated by @azw413 [here](https://github.com/steren/stereo-img/issues/48)
+

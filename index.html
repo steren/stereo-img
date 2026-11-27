@@ -18,7 +18,7 @@ limitations under the License.
 <head>
   <title>Stereo image web component</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="&lt;stereo-img&gt; is a web component to display stereo 3D pictures on web pages, with VR support. It supports VR180, panorama, left-right, and anaglyph formats.">
+  <meta name="description" content="&lt;stereo-img&gt; is a web component to display stereo 3D pictures on web pages, with VR support. It supports VR180, panorama, left-right, JPS, PNS, HEIC, AVIF, depth, RGB-D, Looking Glass quilts, wigglegrams, and anaglyph formats.">
 
   <link rel="icon" type="image/svg+xml" href="icon.svg">
 
@@ -97,7 +97,7 @@ limitations under the License.
     <h1>&lt;stereo-img></h1>
     <p>
       A web component for stereo 3D pictures with VR support (<a href="https://github.com/steren/stereo-img">GitHub</a>).<br>
-      It supports VR Photos (VR180, Google Camera panorama, Cardboard camera), left-right, anaglyph...<br>
+      It supports VR Photos (VR180, Google Camera panorama, Cardboard camera), left-right, JPS, PNS, HEIC, AVIF, depth, RGB-D, Looking Glass quilts, wigglegrams, anaglyph...<br>
       See <a href="https://stereo-viewer.com">stereo-viewer.com</a> for a stereo image viewer web app using this component.
     </p>
   </header>
@@ -121,13 +121,23 @@ limitations under the License.
         <option value='{"src": "examples/calf-left-right.jpg"}'>                                  CALF (left-right)</option>
         <option value='{"src": "examples/insta360evo.jpg"}'>                                      Insta360 Evo</option>
         <option value='{"src": "examples/stereograph.left-right.jpg", "type": "left-right"}'>     Stereograph from 1901</option>
-        <option value='{"src": "examples/wikipedia.anaglyph.jpg", "type": "anaglyph"}'>           Anaglyph</option>  
+        <option value='{"src": "examples/stereograph.sTER.png"}'>                                  PNG Stereoscopic (sTER chunk)</option>
+        <option value='{"src": "examples/wikipedia.anaglyph.jpg", "type": "anaglyph"}'>           Anaglyph</option>
+        <option value='{"src": "examples/cork.interlaced.jpg", "type": "interlaced"}'>            Interlaced (row-interlaced)</option>
         <option value='{"src": "examples/Panasonic-DMC-GX8-left.jpg", "src-right": "examples/Panasonic-DMC-GX8-right.jpg", "type": "pair"}'>Left / Right images</option>          
         <option value='{"src": "examples/Panasonic-DMC-GX8.mpo"}'>                                Panasonic DMC-GX8 (MPO)</option>
+        <option value='{"src": "examples/mario.jps"}'>                                            JPS Stereoscopic (.jps)</option>
         <option value='{"src": "examples/leia_lume_pad2.jpg"}'>                                    Leia Lume Pad 2 (Leia Image Format)</option>
         <option value='{"src": "examples/vision-pro.HEIC"}'>                                      Apple Vision Pro (HEIC)</option>
         <option value='{"src": "examples/iphone-spatial.HEIC"}'>                                  iPhone spatial photo (HEIC)</option>
         <option value='{"src": "examples/spatialify-iphone_HSBS.jpg"}'>                           iPhone with Spatialify (half side by side)</option>
+        <option value='{"src": "examples/Pixel7Pro.PORTRAIT.jpg"}'>                                Google Pixel 7 Pro Portrait (Depth map)</option>
+        <option value='{"src": "examples/apple-portrait-pug.heic"}'>                               Apple Portrait Depth (HEIC auxC)</option>
+        <option value='{"src": "examples/apple-portrait-mug.jpg"}'>                                Apple Portrait Depth (JPEG MPF)</option>
+        <option value='{"src": "examples/sample-rgbd.png", "type": "rgbd-left-right"}'>            RGB-D Color + Depth (side-by-side)</option>
+        <option value='{"src": "examples/spatial-stereo.avif"}'>                                   AVIF Spatial Photo (ster)</option>
+        <option value='{"src": "examples/looking-glass_qs8x6a0.75.png"}'>                          Looking Glass Quilt (8x6)</option>
+        <option value='{"src": "examples/london-underground.wiggle.gif"}'>                         Animated Wigglegram (GIF)</option>
       </select>
     </p>
 
@@ -162,6 +172,7 @@ limitations under the License.
       const type = parsed["type"];
       const angle = parsed["angle"];
       const srcRight = parsed["src-right"];
+      const projection = parsed["projection"];
 
       const stereoImg = document.querySelector('stereo-img');
       stereoImg.src = src;
@@ -180,6 +191,7 @@ limitations under the License.
       } else {
         stereoImg.angle = angle;
       }
+      stereoImg.projection = projection === undefined ? null : projection;
 
       const img = document.getElementById('img-ref');
       img.src = src;

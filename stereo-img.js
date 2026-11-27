@@ -80,17 +80,25 @@ function rayHitsPicture(mesh, origin, direction) {
 }
 
 /**
- * Tell if the metadata of a picture describes a depth map embedded in it.
+ * Tell if the metadata or byte contents of a picture describes a depth map embedded in it.
  * @param {Object} exif - The metadata of the picture, as read by readMetadata.
- * @returns {boolean} - True for the two formats of Google Camera: "GDepth" and "Dynamic Depth".
+ * @param {Uint8Array} [bytes] - The content of the file, to check for MPF disparity.
+ * @returns {Promise<boolean>} - True for Google Camera ("GDepth" / "Dynamic Depth") or Apple MPF Disparity.
  */
-function describesDepthMap(exif) {
+async function describesDepthMap(exif, bytes) {
   if (exif?.GDepth?.Data) {
     return true;
   }
   // Dynamic Depth lists the images appended to the file.
   const items = [].concat(exif?.Container?.Directory || []).map(entry => entry?.Item || entry);
-  return items.some(item => item?.Semantic === 'Depth' || /depthmap/i.test(item?.DataURI));
+  if (items.some(item => item?.Semantic === 'Depth' || /depthmap/i.test(item?.DataURI))) {
+    return true;
+  }
+  if (bytes && mayHaveMultiPictureIndex(bytes)) {
+    const { readMpoDisparity } = await import('./parsers/mpo-parser/mpo-parser.js');
+    return Boolean(readMpoDisparity(bytes));
+  }
+  return false;
 }
 
 /**
@@ -110,12 +118,293 @@ function mayHaveMultiPictureIndex(bytes) {
 }
 
 /**
+ * Quickly tell if a file is in the AVIF format, by checking its "ftyp" major and compatible brands for "avif" or "avis".
+ * @param {Uint8Array} bytes - The content of the file.
+ * @returns {boolean}
+ */
+function isAvif(bytes) {
+  if (!(bytes instanceof Uint8Array) || bytes.length < 16) {
+    return false;
+  }
+  if (String.fromCharCode(bytes[4], bytes[5], bytes[6], bytes[7]) !== 'ftyp') {
+    return false;
+  }
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let size = view.getUint32(0);
+  let header = 8;
+  if (size === 1) {
+    if (bytes.length < 24) {
+      return false;
+    }
+    const bigSize = view.getBigUint64(8);
+    if (bigSize > BigInt(Number.MAX_SAFE_INTEGER)) {
+      return false;
+    }
+    size = Number(bigSize);
+    header = 16;
+  } else if (size === 0) {
+    size = bytes.length;
+  }
+  if (size < header + 8 || size > bytes.length || (size - header - 8) % 4 !== 0) {
+    return false;
+  }
+  const major = String.fromCharCode(bytes[header], bytes[header + 1], bytes[header + 2], bytes[header + 3]);
+  if (major === 'avif' || major === 'avis') {
+    return true;
+  }
+  for (let pos = header + 8; pos + 4 <= size; pos += 4) {
+    const brand = String.fromCharCode(bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]);
+    if (brand === 'avif' || brand === 'avis') {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Quickly tell if a file is in the HEIF format (as HEIC pictures), from the type of its first box.
  * @param {Uint8Array} bytes - The content of the file.
  * @returns {boolean}
  */
 function isHeif(bytes) {
   return bytes.length >= 12 && String.fromCharCode(bytes[4], bytes[5], bytes[6], bytes[7]) === 'ftyp';
+}
+
+/**
+ * Quickly tell if a JPEG file may have a JPS marker (APP3 "_JPSJPS_").
+ * Scans JPEG marker segments before SOS (0xFFDA) within the first 64 KB.
+ * @param {Uint8Array} bytes - The content of the file.
+ * @returns {boolean}
+ */
+function mayHaveJpsMarker(bytes) {
+  if (bytes.length < 16 || bytes[0] !== 0xff || bytes[1] !== 0xd8) {
+    return false;
+  }
+  let position = 2;
+  const maxScan = Math.min(bytes.length, 1 << 16);
+  while (position + 4 <= maxScan && bytes[position] === 0xff) {
+    const marker = bytes[position + 1];
+    if (marker === 0xda) break; // SOS
+    if (marker === 0xd8 || (marker >= 0xd0 && marker <= 0xd7)) {
+      position += 2;
+      continue;
+    }
+    const length = (bytes[position + 2] << 8) | bytes[position + 3];
+    if (length < 2) break;
+    if (marker === 0xe3 && position + 12 <= bytes.length) { // APP3
+      if (
+        bytes[position + 4] === 0x5f && // '_'
+        bytes[position + 5] === 0x4a && // 'J'
+        bytes[position + 6] === 0x50 && // 'P'
+        bytes[position + 7] === 0x53 && // 'S'
+        bytes[position + 8] === 0x4a && // 'J'
+        bytes[position + 9] === 0x50 && // 'P'
+        bytes[position + 10] === 0x53 && // 'S'
+        bytes[position + 11] === 0x5f    // '_'
+      ) {
+        return true;
+      }
+    }
+    position += 2 + length;
+  }
+  return false;
+}
+
+/**
+ * Quickly tell if a PNG file has an sTER chunk before IDAT.
+ * @param {Uint8Array} bytes - The content of the file.
+ * @returns {boolean}
+ */
+function hasSterChunk(bytes) {
+  if (
+    !bytes ||
+    bytes.length < 33 ||
+    bytes[0] !== 0x89 ||
+    bytes[1] !== 0x50 ||
+    bytes[2] !== 0x4e ||
+    bytes[3] !== 0x47 ||
+    bytes[4] !== 0x0d ||
+    bytes[5] !== 0x0a ||
+    bytes[6] !== 0x1a ||
+    bytes[7] !== 0x0a
+  ) {
+    return false;
+  }
+  let offset = 8;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  while (offset + 8 <= bytes.length) {
+    const length = view.getUint32(offset, false);
+    if (offset + 8 + length + 4 > bytes.length) {
+      break;
+    }
+    // 'sTER' = 0x73, 0x54, 0x45, 0x52
+    if (
+      bytes[offset + 4] === 0x73 &&
+      bytes[offset + 5] === 0x54 &&
+      bytes[offset + 6] === 0x45 &&
+      bytes[offset + 7] === 0x52
+    ) {
+      return true;
+    }
+    // 'IDAT' = 0x49, 0x44, 0x41, 0x54
+    if (
+      bytes[offset + 4] === 0x49 &&
+      bytes[offset + 5] === 0x44 &&
+      bytes[offset + 6] === 0x41 &&
+      bytes[offset + 7] === 0x54
+    ) {
+      break;
+    }
+    offset += 8 + length + 4;
+  }
+  return false;
+}
+
+/**
+ * Quickly tell if raw bytes represent an animated wigglegram container
+ * (multi-frame GIF with >= 2 image descriptors, WebP with >= 2 ANMF chunks,
+ * or APNG with acTL.numFrames >= 2). Static 1-frame GIFs, WebPs, and PNGs return false.
+ * @param {Uint8Array} bytes - The content of the file.
+ * @returns {boolean}
+ */
+function mayBeAnimatedWigglegram(bytes) {
+  if (!(bytes instanceof Uint8Array) || bytes.length < 12) {
+    return false;
+  }
+
+  // GIF87a / GIF89a: walk blocks cleanly to count 0x2C image descriptors
+  if (
+    bytes[0] === 0x47 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x38 &&
+    (bytes[4] === 0x37 || bytes[4] === 0x39) &&
+    bytes[5] === 0x61
+  ) {
+    if (bytes.length < 13) return false;
+    const screenWidth = bytes[6] | (bytes[7] << 8);
+    const screenHeight = bytes[8] | (bytes[9] << 8);
+    if (screenWidth === 0 || screenHeight === 0) return false;
+    let pos = 13;
+    if (bytes[10] & 0x80) {
+      const gctBytes = 3 * (1 << ((bytes[10] & 0x07) + 1));
+      if (pos + gctBytes > bytes.length) return false;
+      pos += gctBytes;
+    }
+    let imageCount = 0;
+    while (pos < bytes.length) {
+      const introducer = bytes[pos++];
+      if (introducer === 0x3b) break;
+      if (introducer === 0x21) {
+        if (pos >= bytes.length) break;
+        const label = bytes[pos++];
+        if (label !== 0xfe) {
+          if (pos >= bytes.length) break;
+          const blockSize = bytes[pos++];
+          if (pos + blockSize > bytes.length) break;
+          pos += blockSize;
+        }
+        while (pos < bytes.length) {
+          const subLen = bytes[pos++];
+          if (subLen === 0) break;
+          if (pos + subLen > bytes.length) {
+            pos = bytes.length;
+            break;
+          }
+          pos += subLen;
+        }
+      } else if (introducer === 0x2c) {
+        if (pos + 9 > bytes.length) break;
+        imageCount++;
+        if (imageCount >= 2) return true;
+        const packed = bytes[pos + 8];
+        pos += 9;
+        if (packed & 0x80) {
+          const lctBytes = 3 * (1 << ((packed & 0x07) + 1));
+          if (pos + lctBytes > bytes.length) break;
+          pos += lctBytes;
+        }
+        if (pos >= bytes.length) break;
+        pos++;
+        while (pos < bytes.length) {
+          const subLen = bytes[pos++];
+          if (subLen === 0) break;
+          if (pos + subLen > bytes.length) {
+            pos = bytes.length;
+            break;
+          }
+          pos += subLen;
+        }
+      } else {
+        break;
+      }
+    }
+    return false;
+  }
+
+  // RIFF....WEBP: check for >= 2 ANMF chunks (aligned with isAnimatedWigglegram)
+  if (
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  ) {
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let offset = 12;
+    let anmfCount = 0;
+    while (offset + 8 <= bytes.length) {
+      const id = String.fromCharCode(bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3]);
+      const size = view.getUint32(offset + 4, true);
+      const dataStart = offset + 8;
+      if (dataStart + size > bytes.length) break;
+      if (id === 'ANMF' && size >= 16) {
+        anmfCount++;
+        if (anmfCount >= 2) return true;
+      }
+      offset = dataStart + size + (size & 1);
+    }
+    return false;
+  }
+
+  // PNG: check acTL chunk before IDAT with num_frames >= 2
+  if (
+    bytes.length >= 33 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47 &&
+    bytes[4] === 0x0d &&
+    bytes[5] === 0x0a &&
+    bytes[6] === 0x1a &&
+    bytes[7] === 0x0a
+  ) {
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let offset = 8;
+    while (offset + 12 <= bytes.length) {
+      const length = view.getUint32(offset, false);
+      if (offset + 12 + length > bytes.length) break;
+      const c0 = bytes[offset + 4];
+      const c1 = bytes[offset + 5];
+      const c2 = bytes[offset + 6];
+      const c3 = bytes[offset + 7];
+      // 'acTL'
+      if (c0 === 0x61 && c1 === 0x63 && c2 === 0x54 && c3 === 0x4c) {
+        return length >= 8 && view.getUint32(offset + 8, false) >= 2;
+      }
+      // 'IDAT' or 'IEND'
+      if ((c0 === 0x49 && c1 === 0x44 && c2 === 0x41 && c3 === 0x54) ||
+          (c0 === 0x49 && c1 === 0x45 && c2 === 0x4e && c3 === 0x44)) {
+        break;
+      }
+      offset += 12 + length;
+    }
+  }
+
+  return false;
 }
 
 /**
@@ -144,6 +433,85 @@ function halfTypeOfName(src) {
 // Types of the pictures read by the stereo parser.
 const STEREO_TYPES = ['left-right', 'right-left', 'bottom-top', 'top-bottom', 'interlaced', 'interlaced-reverse', 'column-interlaced', 'column-interlaced-reverse',
   'half-left-right', 'half-right-left', 'half-top-bottom', 'half-bottom-top'];
+
+// Types of the pictures read by the RGB-D parser (composite color + depth map).
+const RGBD_TYPES = ['rgbd', 'rgbd-sbs', 'rgbd-left-right', 'rgbd-right-left', 'rgbd-top-bottom', 'rgbd-ou', 'rgbd-tb', 'rgbd-bottom-top'];
+
+// Types of the pictures read by the animated wigglegram parser.
+const WIGGLE_TYPES = ['wiggle', 'wigglegram', 'wiggle-left-right', 'wiggle-right-left'];
+
+/**
+ * Tell from the name of a file if it is an RGB-D composite picture (color + depth map).
+ * Requires an explicit RGB-D token ("rgbd", "rgb-d", "color-depth", "rgb-depth") so generic
+ * stereo names like "foo_tb_bar.jpg" or "walrus-360.top-bottom.jpg" are not misclassified.
+ * @param {string} src - The URL of the picture.
+ * @returns {string|undefined} - One of RGBD_TYPES, or undefined.
+ */
+function rgbdTypeOfName(src) {
+  if (typeof src !== 'string' || /^\s*(?:data|blob):/i.test(src)) {
+    return;
+  }
+  let name = src.split(/[?#]/)[0].split('/').pop() || '';
+  try {
+    name = decodeURIComponent(name);
+  } catch (e) {
+    // keep it encoded
+  }
+  const lower = name.toLowerCase();
+  const words = lower.split(/[^a-z0-9]+/).filter(Boolean);
+  const hasRgbdMarker =
+    words.includes('rgbd') ||
+    /(?:^|[^a-z0-9])rgb(?:\s+|[-_])?d(?:[^a-z0-9]|$)/.test(lower) ||
+    /(?:^|[^a-z0-9])(?:color|rgb)(?:\s+|[-_])?depth(?:[^a-z0-9]|$)/.test(lower);
+  if (!hasRgbdMarker) {
+    return;
+  }
+  if (/(?:^|[^a-z0-9])bottom(?:\s+|[-_])?top(?:[^a-z0-9]|$)/.test(lower) || words.includes('bt')) {
+    return 'rgbd-bottom-top';
+  }
+  if (/(?:^|[^a-z0-9])top(?:\s+|[-_])?bottom(?:[^a-z0-9]|$)/.test(lower) || words.includes('tb') || words.includes('ou')) {
+    return 'rgbd-top-bottom';
+  }
+  if (/(?:^|[^a-z0-9])right(?:\s+|[-_])?left(?:[^a-z0-9]|$)/.test(lower) || words.includes('rl')) {
+    return 'rgbd-right-left';
+  }
+  if (/(?:^|[^a-z0-9])left(?:\s+|[-_])?right(?:[^a-z0-9]|$)/.test(lower) || words.includes('sbs') || words.includes('lr')) {
+    return 'rgbd-left-right';
+  }
+  return 'rgbd';
+}
+
+const QUILT_DESCRIPTOR_REGEX = /_qs(\d+)x(\d+)a(\d+(?:\.\d+)?|\.\d+)(?=(?:\.[a-z][a-z0-9]*)+$|[^a-z0-9.]|$)/i;
+
+/**
+ * Tell from the name of a file if it is a Looking Glass Quilt ("_qs<Cols>x<Rows>a<Aspect>").
+ * @param {string} src - The URL of the picture.
+ * @returns {{ cols: number, rows: number, aspect: number, totalViews: number }|undefined}
+ */
+function quiltDescriptorOfName(src) {
+  if (typeof src !== 'string' || /^\s*(?:data|blob):/i.test(src)) {
+    return;
+  }
+  let name = src.split(/[?#]/)[0].split(/[/\\]/).pop() || '';
+  try {
+    name = decodeURIComponent(name);
+  } catch (e) {
+    // keep it encoded
+  }
+  name = name.split(/[/\\]/).pop() || '';
+  const match = name.match(QUILT_DESCRIPTOR_REGEX);
+  if (!match) {
+    return;
+  }
+  const cols = Number.parseInt(match[1], 10);
+  const rows = Number.parseInt(match[2], 10);
+  const aspect = Number.parseFloat(match[3]);
+  const totalViews = cols * rows;
+  if (!Number.isInteger(cols) || cols < 1 || !Number.isInteger(rows) || rows < 1 || !Number.isSafeInteger(totalViews) || !Number.isFinite(aspect) || aspect <= 0) {
+    return;
+  }
+  return { cols, rows, aspect, totalViews };
+}
 
 // Distance between the viewer and the picture, in the 3D scene.
 const PICTURE_DISTANCE = 10;
@@ -310,7 +678,9 @@ function noteUse(element) {
   }
 }
 
-class StereoImg extends HTMLElement {
+const BaseElement = typeof HTMLElement !== 'undefined' ? HTMLElement : class {};
+
+class StereoImg extends BaseElement {
 
   get type() {
     return this.getAttribute('type');
@@ -562,7 +932,7 @@ class StereoImg extends HTMLElement {
       };
       img.onerror = (err) => {
         signal?.removeEventListener('abort', onAbort);
-        reject(err);
+        reject(err instanceof Error ? err : new Error(`Failed to load image: ${url}`));
       };
       img.src = url;
     });
@@ -680,6 +1050,11 @@ class StereoImg extends HTMLElement {
       return parseStereo(url, { ...stereoOptions, type });
     }
 
+    if (RGBD_TYPES.includes(type)) {
+      const { parseRGBD } = await import('./parsers/rgbd-parser/rgbd-parser.js');
+      return parseRGBD(url, { ...stereoOptions, type, bytes: await picture.bytes() });
+    }
+
     if (type === 'anaglyph' || type?.startsWith('anaglyph-')) {
       const { parseAnaglyph } = await import('./parsers/anaglyph-parser/anaglyph-parser.js');
       // "anaglyph-red-cyan" names the colours of the picture, "anaglyph" lets the parser find them
@@ -688,7 +1063,7 @@ class StereoImg extends HTMLElement {
 
     if (type === 'depth') {
       const { parseDepth } = await import('./parsers/depth-parser/depth-parser.js');
-      return parseDepth(url, { signal });
+      return parseDepth(url, { signal, bytes: await picture.bytes() });
     }
 
     if (type === 'mono') {
@@ -706,9 +1081,33 @@ class StereoImg extends HTMLElement {
       return parseHEIC(url, { angle, projection, signal });
     }
 
+    if (type === 'avif' || type === 'avif-spatial') {
+      const { parseAVIFStereo } = await import('./parsers/avif-parser/avif-parser.js');
+      return parseAVIFStereo(url, { ...stereoOptions, bytes: await picture.bytes() });
+    }
+
     if (type === 'mpo') {
       const { parseMPO } = await import('./parsers/mpo-parser/mpo-parser.js');
       return parseMPO(url, { angle, projection, signal });
+    }
+
+    if (type === 'jps') {
+      const { parseJPS } = await import('./parsers/jps-parser/jps-parser.js');
+      return parseJPS(url, stereoOptions);
+    }
+
+    if (type === 'pns') {
+      const { parsePNS } = await import('./parsers/png-parser/png-parser.js');
+      return parsePNS(url, stereoOptions);
+    }
+
+    if (type === 'quilt') {
+      const { parseQuilt } = await import('./parsers/quilt-parser/quilt-parser.js');
+      return parseQuilt(url, {
+        ...stereoOptions,
+        bytes: await picture.bytes(),
+        fallbackDefault: true,
+      });
     }
 
     if (type === 'pair' || (!type && pictureRight)) {
@@ -719,6 +1118,11 @@ class StereoImg extends HTMLElement {
       console.error('<stereo-img> type "pair" is missing the "src-right" attribute for the right eye image.');
       const { parseStereo } = await import('./parsers/stereo-parser/stereo-parser.js');
       return parseStereo(url, stereoOptions);
+    }
+
+    if (WIGGLE_TYPES.includes(type)) {
+      const { parseWigglegram } = await import('./parsers/wiggle-parser/wiggle-parser.js');
+      return parseWigglegram(url, { ...stereoOptions, type, bytes: await picture.bytes() });
     }
 
     // No type specified
@@ -743,22 +1147,64 @@ class StereoImg extends HTMLElement {
       }
     }
 
-    // HEIC: Apple Vision Pro and iPhone spatial photos. Most browsers cannot display them by themselves.
-    if (isHeif(bytes)) {
-      const { parseHEIC, readHeic } = await import('./parsers/heic-parser/heic-parser.js');
-      if (readHeic(bytes)) {
-        return parseHEIC(url, { angle, projection, signal });
+    // AVIF: Spatial photos ("ster" entity group) and AVIF auxiliary depth maps.
+    // Checked strictly before HEIC so "mif1"+"avif" and brand-neutral "mif1"+"miaf"+AV1 files are never misrouted to libheif.
+    if (isAvif(bytes)) {
+      const { parseAVIFStereo, readAvif } = await import('./parsers/avif-parser/avif-parser.js');
+      const avif = readAvif(bytes);
+      if (avif && (avif.stereoPair || avif.depth !== undefined || avif.truncated || avif.invalidSter)) {
+        return parseAVIFStereo(url, { ...stereoOptions, bytes, structure: avif });
+      }
+    } else if (isHeif(bytes)) {
+      const { parseAVIFStereo, readAvif } = await import('./parsers/avif-parser/avif-parser.js');
+      const avif = readAvif(bytes);
+      if (avif) {
+        if (avif.stereoPair || avif.depth !== undefined || avif.truncated || avif.invalidSter) {
+          return parseAVIFStereo(url, { ...stereoOptions, bytes, structure: avif });
+        }
+      } else {
+        // HEIC: Apple Vision Pro and iPhone spatial photos. Most browsers cannot display them by themselves.
+        const { parseHEIC, readHeic } = await import('./parsers/heic-parser/heic-parser.js');
+        if (readHeic(bytes)) {
+          return parseHEIC(url, { angle, projection, signal });
+        }
       }
     }
 
+    // JPS: JPEG Stereoscopic files, either with .jps extension or with an APP3 _JPSJPS_ marker.
+    const isNamedJps = /\.jps$/i.test(src.split(/[?#]/)[0]);
+    if (isNamedJps || mayHaveJpsMarker(bytes)) {
+      const { parseJPS } = await import('./parsers/jps-parser/jps-parser.js');
+      return parseJPS(url, { ...stereoOptions, bytes });
+    }
+
+    // PNG Stereoscopic files (.pns or PNG files with an sTER chunk).
+    const isNamedPns = /\.pns$/i.test(src.split(/[?#]/)[0]);
+    if (isNamedPns || hasSterChunk(bytes)) {
+      const { parsePNS } = await import('./parsers/png-parser/png-parser.js');
+      return parsePNS(url, { ...stereoOptions, bytes });
+    }
+
+    // Animated Wigglegrams (multi-frame GIF, animated WebP, APNG).
+    // Checked after sTER PNG so static PNGs/GIFs/WebPs fall through to standard mono/stereo parsing.
+    if (mayBeAnimatedWigglegram(bytes)) {
+      const { parseWigglegram } = await import('./parsers/wiggle-parser/wiggle-parser.js');
+      return parseWigglegram(url, { ...stereoOptions, bytes });
+    }
+
     // try to read XMP metadata to see if VR Photo, otherwise assume stereo-style (e.g. "left right")
-    const exif = await readMetadata(bytes);
+    let exif;
+    try {
+      exif = await readMetadata(bytes);
+    } catch (e) {
+      // ignore unsupported metadata containers
+    }
     signal?.throwIfAborted();
 
-    if (describesDepthMap(exif)) {
+    if (await describesDepthMap(exif, bytes)) {
       // Checked before VR Photos: a picture with a depth map can also hold a second image, the original picture.
       const { parseDepth } = await import('./parsers/depth-parser/depth-parser.js');
-      return parseDepth(url, { signal, exif });
+      return parseDepth(url, { signal, exif, bytes });
     }
 
     if (exif?.GImage?.Data) {
@@ -773,6 +1219,22 @@ class StereoImg extends HTMLElement {
       console.info(`<stereo-img> does not have a "type" attribute. From its file name, the picture seems to be "${squeezed}".`);
       const { parseStereo } = await import('./parsers/stereo-parser/stereo-parser.js');
       return parseStereo(url, { ...stereoOptions, type: squeezed });
+    }
+
+    // RGB-D composite images (color + depth map): detect by filename before _isStereo since color vs depth halves differ significantly.
+    const rgbdType = rgbdTypeOfName(src);
+    if (rgbdType) {
+      console.info(`<stereo-img> does not have a "type" attribute. From its file name, the picture seems to be "${rgbdType}".`);
+      const { parseRGBD } = await import('./parsers/rgbd-parser/rgbd-parser.js');
+      return parseRGBD(url, { ...stereoOptions, type: rgbdType, exif, bytes });
+    }
+
+    // Looking Glass Quilt images (_qs<Cols>x<Rows>a<Aspect>): detect before _isStereo so multi-view grids are not misclassified as SBS.
+    const quiltDescriptor = quiltDescriptorOfName(src);
+    if (quiltDescriptor) {
+      console.info(`<stereo-img> does not have a "type" attribute. From its file name, the picture seems to be a ${quiltDescriptor.cols}x${quiltDescriptor.rows} Looking Glass quilt.`);
+      const { parseQuilt } = await import('./parsers/quilt-parser/quilt-parser.js');
+      return parseQuilt(url, { ...stereoOptions, exif: exif ?? {}, bytes });
     }
 
     // no left eye found, check if it is a stereo or mono image
@@ -852,7 +1314,7 @@ class StereoImg extends HTMLElement {
         const img = new Image();
         img.crossOrigin = "Anonymous";
         img.onload = () => resolve(img);
-        img.onerror = (err) => reject(err);
+        img.onerror = (err) => reject(err instanceof Error ? err : new Error(`Failed to load image: ${src}`));
         img.src = src;
       });
     }
@@ -871,7 +1333,7 @@ class StereoImg extends HTMLElement {
     if (this.stereoData.phiLength < Math.PI / 2) {
       const imageWidth = imageData.width;
       const imageHeight = imageData.height;
-      const aspectRatio = imageWidth / imageHeight;
+      const aspectRatio = (this.stereoData && this.stereoData.aspect > 0) ? this.stereoData.aspect : (imageWidth / imageHeight);
 
       const planeWidth = radius * 2;
       const planeHeight = planeWidth / aspectRatio;
@@ -2080,5 +2542,9 @@ class StereoImg extends HTMLElement {
 
 }
 
-window.customElements.define('stereo-img', StereoImg);
+if (typeof window !== 'undefined' && window.customElements) {
+  window.customElements.define('stereo-img', StereoImg);
+}
+
+export { describesDepthMap, isAvif, mayBeAnimatedWigglegram, quiltDescriptorOfName, rgbdTypeOfName, StereoImg };
 
