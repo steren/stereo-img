@@ -1858,12 +1858,16 @@ class StereoImg extends BaseElement {
    * The "disparity-adjustment" attribute is the distance to add between the two pictures,
    * in percent of the width of one of them. A negative value moves them closer together:
    * the left picture to the right and the right picture to the left. Each moves by half of the value.
+   * When the attribute is not set, falls back to any adjustment embedded in the picture metadata
+   * (such as Apple's HorizontalDisparityAdjustment in spatial HEIC photos).
    */
   updateDisparityAdjustment() {
     if (!this.stereoImageGroup || !this.stereoData) {
       return;
     }
-    const adjustment = (parseFloat(this.getAttribute('disparity-adjustment')) || 0) / 100;
+    const attr = this.getAttribute('disparity-adjustment');
+    const percent = attr !== null ? (parseFloat(attr) || 0) : (this.stereoData.disparityAdjustment || 0);
+    const adjustment = percent / 100;
     // same rule as in createEye
     const isPlane = this.stereoData.phiLength < Math.PI / 2;
 

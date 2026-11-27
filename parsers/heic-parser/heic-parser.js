@@ -28,6 +28,23 @@ import { anglesOfView } from './../stereo-parser/stereo-parser.js';
 // Brands of the "ftyp" box of HEIF files whose images are HEVC encoded: the ones libheif decodes here.
 const HEIC_BRANDS = ['heic', 'heix', 'heim', 'heis', 'hevc', 'hevx', 'mif1', 'msf1', 'mif2'];
 
+// Apple Spatial Photo HorizontalDisparityAdjustment uuid item property:
+// de225085-36cb-4365-8743-2f8705e7c78a, followed by a signed big-endian int32 in [-10000, +10000]
+// mapping linearly to [-100%, +100%] of one eye's image width.
+const APPLE_DISPARITY_ADJUSTMENT_UUID = new Uint8Array([
+  0xde, 0x22, 0x50, 0x85, 0x36, 0xcb, 0x43, 0x65,
+  0x87, 0x43, 0x2f, 0x87, 0x05, 0xe7, 0xc7, 0x8a,
+]);
+
+function matchesUuid(bytes, offset, uuid) {
+  for (let i = 0; i < 16; i++) {
+    if (bytes[offset + i] !== uuid[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // Auxiliary type strings for Apple Portrait depth / disparity maps
 const DISPARITY_AUX_URNS = [
   'urn:com:apple:photo:2018:aux:disparity',
@@ -132,9 +149,9 @@ function readBoxes(view, start, end) {
 }
 
 /**
- * Read the structure of a HEIC file: its primary image, stereo pair, and depth item if any.
+ * Read the structure of a HEIC file: its primary image, stereo pair, disparity adjustment, and depth item if any.
  * @param {Uint8Array} bytes - content of the file
- * @returns {{primary: number|undefined, stereoPair: Array<number>|undefined, depth?: number, depthType?: 'disparity'|'depth'}|undefined} IDs of the images. Undefined if the file is not a HEIC file.
+ * @returns {{primary: number|undefined, stereoPair: Array<number>|undefined, disparityAdjustment?: number, depth?: number, depthType?: 'disparity'|'depth'}|undefined} IDs of the images. Undefined if the file is not a HEIC file.
  */
 function readHeic(bytes) {
   if (!(bytes instanceof Uint8Array)) {
@@ -165,6 +182,7 @@ function readHeic(bytes) {
     }
     const auxRefs = [];
     const depthPropTypes = new Map();
+    const disparityPropValues = new Map();
     const itemProperties = new Map();
     let hasNonDepthAuxC = false;
 
@@ -225,6 +243,11 @@ function readHeic(bytes) {
                 } else {
                   hasNonDepthAuxC = true;
                 }
+              } else if (prop.type === 'uuid' && prop.start + 20 <= prop.end && matchesUuid(bytes, prop.start, APPLE_DISPARITY_ADJUSTMENT_UUID)) {
+                const raw = view.getInt32(prop.start + 16);
+                if (raw >= -10000 && raw <= 10000) {
+                  disparityPropValues.set(propIndex, raw / 100);
+                }
               }
             }
           } else if (child.type === 'ipma' && child.start + 8 <= child.end) {
@@ -264,6 +287,27 @@ function readHeic(bytes) {
             }
           }
         }
+      }
+    }
+
+    if (result.stereoPair && disparityPropValues.size > 0) {
+      let disparityAdjustment;
+      for (const itemId of result.stereoPair) {
+        const props = itemProperties.get(itemId);
+        if (!props) continue;
+        for (const propIdx of props) {
+          if (disparityPropValues.has(propIdx)) {
+            disparityAdjustment = disparityPropValues.get(propIdx);
+            break;
+          }
+        }
+        if (disparityAdjustment !== undefined) break;
+      }
+      if (disparityAdjustment === undefined && itemProperties.size === 0) {
+        disparityAdjustment = disparityPropValues.values().next().value;
+      }
+      if (disparityAdjustment !== undefined) {
+        result.disparityAdjustment = disparityAdjustment;
       }
     }
 
@@ -450,7 +494,14 @@ async function parseHEIC(url, options) {
 
   const projection = !structure.depth && options?.projection === 'fisheye' ? 'fisheye' : undefined;
   const angles = anglesOfView(leftEye.width, leftEye.height, { angle: options?.angle, projection, exif });
-  return { leftEye, rightEye, ...(depth ? { depth } : {}), ...angles, projection };
+  return {
+    leftEye,
+    rightEye,
+    ...(depth ? { depth } : {}),
+    ...(structure.disparityAdjustment !== undefined ? { disparityAdjustment: structure.disparityAdjustment } : {}),
+    ...angles,
+    projection,
+  };
 }
 
 export { parseHEIC, readHeic, invertDepthData };

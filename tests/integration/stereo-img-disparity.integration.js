@@ -166,4 +166,23 @@ describe('stereo-img disparity-adjustment', function () {
     const positions = element.stereoImageGroup.children.map(object => object.position.x);
     expect(positions).to.deep.equal([2, 2, -2, -2]);
   });
+
+  it('should apply disparityAdjustment from picture metadata and allow the attribute to override it', async () => {
+    await display();
+    element.stereoData.disparityAdjustment = 10;
+    element.updateDisparityAdjustment();
+
+    expect(barPosition(LEFT_EYE)).to.be.closeTo(-onPlane(0.05), 2);
+    expect(barPosition(RIGHT_EYE)).to.be.closeTo(onPlane(0.05), 2);
+
+    // Explicit attribute overrides embedded metadata (including 0)
+    element.disparityAdjustment = 0;
+    expect(barPosition(LEFT_EYE)).to.be.closeTo(0, 1);
+    expect(barPosition(RIGHT_EYE)).to.be.closeTo(0, 1);
+
+    // Removing the attribute falls back to embedded metadata
+    element.removeAttribute('disparity-adjustment');
+    expect(barPosition(LEFT_EYE)).to.be.closeTo(-onPlane(0.05), 2);
+    expect(barPosition(RIGHT_EYE)).to.be.closeTo(onPlane(0.05), 2);
+  });
 });

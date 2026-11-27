@@ -79,9 +79,44 @@ test('a HEIC file with non-depth auxiliary items has no depth map', () => {
   assert.equal(result.stereoPair, undefined);
 });
 
-test('reads the stereo pair of the Apple Vision Pro sample', () => {
+test('reads the stereo pair and HorizontalDisparityAdjustment of the Apple Vision Pro sample', () => {
   const bytes = new Uint8Array(readFileSync(new URL('../../examples/vision-pro.HEIC', import.meta.url)));
-  assert.deepStrictEqual(readHeic(bytes), { primary: 26, stereoPair: [26, 52] });
+  assert.deepStrictEqual(readHeic(bytes), { primary: 26, stereoPair: [26, 52], disparityAdjustment: 2.93 });
+});
+
+test('reads the stereo pair and HorizontalDisparityAdjustment of the iPhone spatial sample', () => {
+  const bytes = new Uint8Array(readFileSync(new URL('../../examples/iphone-spatial.HEIC', import.meta.url)));
+  assert.deepStrictEqual(readHeic(bytes), { primary: 46, stereoPair: [122, 95], disparityAdjustment: 2.4 });
+});
+
+test('reads positive and negative Apple HorizontalDisparityAdjustment uuid properties and ignores out-of-range values', () => {
+  const DISPARITY_UUID = new Uint8Array([
+    0xde, 0x22, 0x50, 0x85, 0x36, 0xcb, 0x43, 0x65,
+    0x87, 0x43, 0x2f, 0x87, 0x05, 0xe7, 0xc7, 0x8a,
+  ]);
+  const i32 = value => {
+    const buf = new ArrayBuffer(4);
+    new DataView(buf).setInt32(0, value);
+    return new Uint8Array(buf);
+  };
+  const makeStereoWithDisparity = (rawValue, associatedItems = [1, 2]) => {
+    const ftyp = box('ftyp', text('heic'), u32(0), text('mif1'), text('heic'));
+    const pitm = box('pitm', u32(0), new Uint8Array([0, 1]));
+    const grpl = box('grpl', box('ster', u32(0, 99, 2, 1, 2)));
+    const ipco = box('ipco', box('uuid', DISPARITY_UUID, i32(rawValue)));
+    const ipmaBody = [0, 0, 0, 0, 0, 0, 0, associatedItems.length];
+    for (const id of associatedItems) {
+      ipmaBody.push(0, id, 1, 1);
+    }
+    const iprp = box('iprp', ipco, box('ipma', new Uint8Array(ipmaBody)));
+    return concat(ftyp, box('meta', u32(0), pitm, grpl, iprp));
+  };
+
+  assert.equal(readHeic(makeStereoWithDisparity(250)).disparityAdjustment, 2.5);
+  assert.equal(readHeic(makeStereoWithDisparity(-175)).disparityAdjustment, -1.75);
+  assert.equal(readHeic(makeStereoWithDisparity(0)).disparityAdjustment, 0);
+  assert.equal(readHeic(makeStereoWithDisparity(20000)).disparityAdjustment, undefined);
+  assert.equal(readHeic(makeStereoWithDisparity(250, [99])).disparityAdjustment, undefined);
 });
 
 test('reads the left then the right image of a stereo pair', () => {
